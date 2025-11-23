@@ -20,12 +20,45 @@ builder.Services.AddSwaggerGen(c =>
 // For public endpoints, we can use without authentication
 // For authenticated endpoints, configure with API credentials from appsettings.json
 var kalshiConfig = builder.Configuration.GetSection("KalshiApi");
-if (kalshiConfig["ApiKey"] != null && kalshiConfig["PrivateKey"] != null)
+var apiKey = kalshiConfig["ApiKey"];
+var privateKeyPath = kalshiConfig["PrivateKeyPath"];
+
+string? privateKey = null;
+if (!string.IsNullOrWhiteSpace(privateKeyPath))
+{
+    var fullPath = Path.Combine(builder.Environment.ContentRootPath, privateKeyPath);
+    if (File.Exists(fullPath))
+    {
+        privateKey = File.ReadAllText(fullPath);
+    }
+}
+
+// If not found via config path, try common locations
+if (string.IsNullOrWhiteSpace(privateKey))
+{
+    // Try relative to project root (../../Market.txt from KSignal.API)
+    var projectRootPath = Path.Combine(builder.Environment.ContentRootPath, "..", "..", "Market.txt");
+    if (File.Exists(projectRootPath))
+    {
+        privateKey = File.ReadAllText(projectRootPath);
+    }
+    else
+    {
+        // Try in backend folder
+        var backendPath = Path.Combine(builder.Environment.ContentRootPath, "..", "Market.txt");
+        if (File.Exists(backendPath))
+        {
+            privateKey = File.ReadAllText(backendPath);
+        }
+    }
+}
+
+if (!string.IsNullOrWhiteSpace(apiKey) && !string.IsNullOrWhiteSpace(privateKey))
 {
     var apiConfig = new KalshiApiConfiguration
     {
-        ApiKey = kalshiConfig["ApiKey"],
-        PrivateKey = kalshiConfig["PrivateKey"],
+        ApiKey = apiKey,
+        PrivateKey = privateKey,
         BaseUrl = kalshiConfig["BaseUrl"] ?? "https://api.elections.kalshi.com/trade-api/v2"
     };
     builder.Services.AddSingleton(new KalshiClient(apiConfig));
