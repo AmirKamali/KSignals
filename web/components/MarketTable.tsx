@@ -1,9 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
+import { useSearchParams, usePathname, useRouter } from "next/navigation";
 import { ArrowRight, Loader2 } from "lucide-react";
-import { Market, getSeriesByTags, getMarketsBySeries } from "@/lib/kalshi";
+import { Market, getSeriesByTags, getMarketsBySeries, getSeriesByCategory } from "@/lib/kalshi";
 import styles from "./MarketTable.module.css";
 
 interface MarketTableProps {
@@ -12,36 +13,54 @@ interface MarketTableProps {
 }
 
 export default function MarketTable({ markets: initialMarkets, tagsByCategories }: MarketTableProps) {
-    const [activeCategory, setActiveCategory] = useState("All");
-    const [activeSubTag, setActiveSubTag] = useState<string | null>(null);
-    const [displayedMarkets, setDisplayedMarkets] = useState<Market[]>(initialMarkets);
-    const [isLoading, setIsLoading] = useState(false);
+    const searchParams = useSearchParams();
+    const pathname = usePathname();
+    const { replace } = useRouter();
+
+    const initialCategory = searchParams.get("category") || "All";
+    const initialTag = searchParams.get("tag");
+
+    const [activeCategory, setActiveCategory] = useState(initialCategory);
+    const [activeSubTag, setActiveSubTag] = useState<string | null>(initialTag);
+    
+    // Initialize displayed markets based on synchronous category filtering
+    // Only use initialMarkets fallback if we are on "All" or if we want to show *something* while fetching
+    // But since we are moving to async fetching for categories too, we might want to start with empty or initial if matches.
+    const [displayedMarkets, setDisplayedMarkets] = useState<Market[]>(() => {
+        if (initialCategory === "All") {
+            return initialMarkets;
+        }
+        // If category is set but no tag, we initially show fallback filtering 
+        // until the async fetch completes (handled in useEffect).
+        // This provides better UX than empty table.
+        return initialMarkets.filter(m => m.category === initialCategory || (!m.category && initialCategory === "Other"));
+    });
+    
+    // We are loading if there is a tag OR a category (that is not All) because now we fetch for categories too
+    const [isLoading, setIsLoading] = useState(!!initialTag || (initialCategory !== "All"));
 
     const categories = ["All", ...Object.keys(tagsByCategories).sort()];
 
-    const handleCategoryClick = (cat: string) => {
-        setActiveCategory(cat);
-        setActiveSubTag(null);
-
-        if (cat === "All") {
-            setDisplayedMarkets(initialMarkets);
-        } else {
-            // Filter initial markets by category as a fallback/initial view
-            const filtered = initialMarkets.filter(m => m.category === cat || (!m.category && cat === "Other"));
-            setDisplayedMarkets(filtered);
-        }
-    };
-
-    const handleSubTagClick = async (tag: string) => {
-        setActiveSubTag(tag);
+    const fetchMarkets = useCallback(async (category: string, tag: string | null) => {
         setIsLoading(true);
         try {
-            // 1. Get series for the tag
-            const seriesList = await getSeriesByTags(tag);
+            let seriesList;
+            
+            if (tag) {
+                // 1. Get series for the tag
+                seriesList = await getSeriesByTags(tag);
+            } else if (category !== "All") {
+                // 1. Get series for the category
+                seriesList = await getSeriesByCategory(category);
+            } else {
+                // "All" category - we use initialMarkets, no need to fetch series
+                setDisplayedMarkets(initialMarkets);
+                setIsLoading(false);
+                return;
+            }
 
             // 2. Get markets for each series
             // Limit to first 10 series to avoid too many requests if series list is huge
-            // Prioritize series with more recent activity if possible, but we don't have that info yet.
             const targetSeries = seriesList.slice(0, 10);
 
             const marketsPromises = targetSeries.map(series => getMarketsBySeries(series.ticker));
@@ -57,10 +76,56 @@ export default function MarketTable({ markets: initialMarkets, tagsByCategories 
 
             setDisplayedMarkets(uniqueMarkets);
         } catch (error) {
-            console.error("Error loading markets by tag:", error);
+            console.error("Error loading markets:", error);
+            // Fallback to local filtering if fetch fails
+             if (!tag && category !== "All") {
+                const filtered = initialMarkets.filter(m => m.category === category || (!m.category && category === "Other"));
+                setDisplayedMarkets(filtered);
+            }
         } finally {
             setIsLoading(false);
         }
+    }, [initialMarkets]);
+
+    useEffect(() => {
+        const cat = searchParams.get("category") || "All";
+        const tag = searchParams.get("tag");
+
+        setActiveCategory(cat);
+        setActiveSubTag(tag);
+
+        if (tag || cat !== "All") {
+            fetchMarkets(cat, tag);
+        } else {
+            setDisplayedMarkets(initialMarkets);
+        }
+    }, [searchParams, initialMarkets, fetchMarkets]);
+
+    const updateUrl = (newCategory: string, newTag: string | null) => {
+        const params = new URLSearchParams(searchParams);
+        
+        if (newCategory && newCategory !== "All") {
+            params.set("category", newCategory);
+        } else {
+            params.delete("category");
+        }
+
+        if (newTag) {
+            params.set("tag", newTag);
+        } else {
+            params.delete("tag");
+        }
+
+        replace(`${pathname}?${params.toString()}`, { scroll: false });
+    };
+
+    const handleCategoryClick = (cat: string) => {
+        // When category changes, clear the tag
+        updateUrl(cat, null);
+    };
+
+    const handleSubTagClick = (tag: string) => {
+        updateUrl(activeCategory, tag);
     };
 
     const subTags = activeCategory !== "All" && tagsByCategories[activeCategory]
@@ -76,7 +141,7 @@ export default function MarketTable({ markets: initialMarkets, tagsByCategories 
                         <button
                             key={cat}
                             className={`${styles.segmentBtn} ${activeCategory === cat ? styles.active : ""}`}
-                                onClick={() => handleCategoryClick(cat)}
+                            onClick={() => handleCategoryClick(cat)}
                         >
                             {cat}
                         </button>
