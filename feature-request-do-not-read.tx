@@ -1,0 +1,6 @@
+I want to build a modern website, clean and professional "Kalshi Signals" that allows users to view markets available through Kalshi and get insights about what are the odds and percentage for each trade through running LLM and providing more information. The home page should have a hero and slider attracting users to sign up. The remaining of the screen should contain a 2x3 items of highest trade volume received through api (highlighting trades) and the remaining of the screen should have a segmented buttons allowing users to switch differeny markets following by a table of "Title, volume, odds, and button to see more details" . When user opens the details of the trade it should see the details of the trade followed by 2 sections: Kalshi Signal Predictions about odds and chances of winning each item in the trade. The tech stack needs to ASP.NET core api , Next JS modern frameworks and MySQL db. 
+
+To access Kalshi APIs to read latest trades, use openapi.yaml, auth key: Market.txt , further documentation: https://docs.kalshi.com/getting_started/making_your_first_request 
+
+
+followed "Influencers say:" and name of users who participated in that trade discussion. Users should be able to join Kalshi Signals and enable public or private follower list that they can share what they think with their audience, 

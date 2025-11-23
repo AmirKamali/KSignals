@@ -1,0 +1,15 @@
+Get all tags and categories, Display categories, when user taps on catgeoies, display tags:
+https://api.elections.kalshi.com/trade-api/v2/search/tags_by_categories
+
+If categories selected use Get series with categories query string, if tags selected, use Get series with tags in the query:
+
+Get series:
+/series?category=xxx
+/series?tags=xxx
+https://docs.kalshi.com/api-reference/market/get-series-list 
+
+Get markets:
+https://api.elections.kalshi.com/trade-api/v2/markets/{ticker}
+
+Get trades:
+https://api.elections.kalshi.com/trade-api/v2/markets/trades  
