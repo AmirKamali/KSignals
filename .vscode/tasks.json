@@ -39,6 +39,76 @@
         "kind": "build",
         "isDefault": false
       }
+    },
+    {
+      "label": "build-dotnet-solution",
+      "type": "shell",
+      "command": "dotnet build backend/KalshiSignals.sln",
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "problemMatcher": "$msCompile",
+      "group": {
+        "kind": "build",
+        "isDefault": false
+      }
+    },
+    {
+      "label": "Clean C# API",
+      "type": "shell",
+      "command": "dotnet clean",
+      "options": {
+        "cwd": "${workspaceFolder}/backend/Kalshi.Api"
+      },
+      "problemMatcher": "$msCompile"
+    },
+    {
+      "label": "Restore .NET Packages",
+      "type": "shell",
+      "command": "dotnet restore backend/KalshiSignals.sln",
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "problemMatcher": "$msCompile"
+    },
+    {
+      "label": "Run .NET Tests",
+      "type": "shell",
+      "command": "dotnet test backend/KalshiSignals.sln",
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "problemMatcher": "$msCompile",
+      "group": {
+        "kind": "test",
+        "isDefault": false
+      }
+    },
+    {
+      "label": "build-ksignal-api",
+      "type": "shell",
+      "command": "dotnet build",
+      "options": {
+        "cwd": "${workspaceFolder}/backend/KSignal.API"
+      },
+      "problemMatcher": "$msCompile",
+      "group": {
+        "kind": "build",
+        "isDefault": false
+      }
+    },
+    {
+      "label": "Build KSignal.API",
+      "type": "shell",
+      "command": "dotnet build",
+      "options": {
+        "cwd": "${workspaceFolder}/backend/KSignal.API"
+      },
+      "problemMatcher": "$msCompile",
+      "group": {
+        "kind": "build",
+        "isDefault": false
+      }
     }
   ]
 }
