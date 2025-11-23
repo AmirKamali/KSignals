@@ -1,4 +1,5 @@
 using Kalshi.Api;
+using Kalshi.Api.Client;
 using Kalshi.Api.Model;
 using Microsoft.AspNetCore.Mvc;
 
@@ -51,6 +52,22 @@ public class SearchController : ControllerBase
             _logger.LogInformation("Successfully retrieved tags by categories");
             return Ok(response);
         }
+        catch (ApiException apiEx)
+        {
+            _logger.LogError(apiEx, "API error fetching tags by categories from Kalshi API. Status: {StatusCode}", apiEx.ErrorCode);
+
+            var statusCode = apiEx.ErrorCode >= 400 && apiEx.ErrorCode < 600
+                ? apiEx.ErrorCode
+                : StatusCodes.Status502BadGateway;
+
+            return StatusCode(statusCode, new
+            {
+                error = "Kalshi API error",
+                message = apiEx.Message,
+                statusCode = apiEx.ErrorCode,
+                details = apiEx.ErrorContent
+            });
+        }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error fetching tags by categories from Kalshi API");
@@ -58,4 +75,3 @@ public class SearchController : ControllerBase
         }
     }
 }
-

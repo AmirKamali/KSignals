@@ -1,5 +1,8 @@
 using Kalshi.Api;
 using Kalshi.Api.Configuration;
+using KSignal.API.Data;
+using Microsoft.EntityFrameworkCore;
+using KSignal.API.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -15,6 +18,10 @@ builder.Services.AddSwaggerGen(c =>
         Description = "API for Kalshi Signals - Wrapper around Kalshi Trade API"
     });
 });
+
+var connectionString = builder.Configuration.GetConnectionString("KalshiMySql");
+builder.Services.AddDbContext<KalshiDbContext>(options =>
+    options.UseMySql(connectionString, ServerVersion.AutoDetect(connectionString)));
 
 // Register Kalshi API Client
 // For public endpoints, we can use without authentication
@@ -68,6 +75,8 @@ else
     // Use unauthenticated client for public endpoints
     builder.Services.AddSingleton(new KalshiClient());
 }
+
+builder.Services.AddScoped<KalshiService>();
 
 var app = builder.Build();
 

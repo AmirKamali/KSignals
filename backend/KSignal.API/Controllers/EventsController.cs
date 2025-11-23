@@ -1,4 +1,5 @@
 using Kalshi.Api;
+using Kalshi.Api.Client;
 using Kalshi.Api.Model;
 using Microsoft.AspNetCore.Mvc;
 
@@ -32,8 +33,9 @@ public class EventsController : ControllerBase
     /// <remarks>
     /// Retrieves a list of events from the Kalshi API with optional filtering.
     /// Supports filtering by status, series ticker, minimum close timestamp, and pagination.
+    /// Maximum limit is 200.
     /// </remarks>
-    /// <param name="limit">Maximum number of events to return (default: API default)</param>
+    /// <param name="limit">Maximum number of events to return (default: 100, maximum: 200)</param>
     /// <param name="cursor">Cursor for pagination</param>
     /// <param name="withNestedMarkets">Whether to include nested markets in the response</param>
     /// <param name="withMilestones">Whether to include milestones in the response</param>
@@ -42,12 +44,14 @@ public class EventsController : ControllerBase
     /// <param name="minCloseTs">Filter by minimum close timestamp (Unix timestamp)</param>
     /// <returns>A list of events</returns>
     /// <response code="200">Events retrieved successfully</response>
+    /// <response code="400">Bad request - invalid parameters</response>
     /// <response code="500">Internal server error</response>
     [HttpGet]
     [ProducesResponseType(typeof(GetEventsResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status500InternalServerError)]
     public async Task<ActionResult<GetEventsResponse>> GetEvents(
-        [FromQuery] int limit = 100,
+        [FromQuery] int limit = 200,
         [FromQuery] string? cursor = null,
         [FromQuery] bool? withNestedMarkets = null,
         [FromQuery] bool? withMilestones = null,
@@ -57,6 +61,17 @@ public class EventsController : ControllerBase
     {
         try
         {
+            // Validate limit parameter
+            if (limit < 1)
+            {
+                return BadRequest(new { error = "Limit must be greater than 0", limit });
+            }
+            
+            if (limit > 200)
+            {
+                return BadRequest(new { error = "Limit cannot exceed 200. Maximum value is 200.", limit });
+            }
+            
             _logger.LogInformation("Fetching events from Kalshi API with filters: limit={Limit}, status={Status}, seriesTicker={SeriesTicker}", 
                 limit, status, seriesTicker);
             
@@ -71,6 +86,11 @@ public class EventsController : ControllerBase
             
             _logger.LogInformation("Successfully retrieved {Count} events", response?.Events?.Count ?? 0);
             return Ok(response);
+        }
+        catch (ApiException apiEx)
+        {
+            _logger.LogError(apiEx, "API error fetching events from Kalshi API. Status: {StatusCode}", apiEx.ErrorCode);
+            return BuildApiErrorResponse(apiEx, "Kalshi API error");
         }
         catch (Exception ex)
         {
@@ -110,15 +130,20 @@ public class EventsController : ControllerBase
             _logger.LogInformation("Successfully retrieved event {EventTicker}", eventTicker);
             return Ok(response);
         }
+        catch (ApiException apiEx)
+        {
+            _logger.LogError(apiEx, "API error fetching event {EventTicker} from Kalshi API. Status: {StatusCode}", eventTicker, apiEx.ErrorCode);
+
+            if (apiEx.ErrorCode == StatusCodes.Status404NotFound)
+            {
+                return NotFound(new { error = "Event not found", eventTicker, message = apiEx.Message });
+            }
+
+            return BuildApiErrorResponse(apiEx, "Kalshi API error");
+        }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error fetching event {EventTicker} from Kalshi API", eventTicker);
-            
-            // Check if it's a 404 error
-            if (ex.Message.Contains("404") || ex.Message.Contains("not found", StringComparison.OrdinalIgnoreCase))
-            {
-                return NotFound(new { error = "Event not found", eventTicker });
-            }
             
             return StatusCode(StatusCodes.Status500InternalServerError, new { error = "Failed to retrieve event", message = ex.Message });
         }
@@ -150,15 +175,20 @@ public class EventsController : ControllerBase
             _logger.LogInformation("Successfully retrieved metadata for event {EventTicker}", eventTicker);
             return Ok(response);
         }
+        catch (ApiException apiEx)
+        {
+            _logger.LogError(apiEx, "API error fetching metadata for event {EventTicker} from Kalshi API. Status: {StatusCode}", eventTicker, apiEx.ErrorCode);
+
+            if (apiEx.ErrorCode == StatusCodes.Status404NotFound)
+            {
+                return NotFound(new { error = "Event not found", eventTicker, message = apiEx.Message });
+            }
+
+            return BuildApiErrorResponse(apiEx, "Kalshi API error");
+        }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error fetching metadata for event {EventTicker} from Kalshi API", eventTicker);
-            
-            // Check if it's a 404 error
-            if (ex.Message.Contains("404") || ex.Message.Contains("not found", StringComparison.OrdinalIgnoreCase))
-            {
-                return NotFound(new { error = "Event not found", eventTicker });
-            }
             
             return StatusCode(StatusCodes.Status500InternalServerError, new { error = "Failed to retrieve event metadata", message = ex.Message });
         }
@@ -203,11 +233,36 @@ public class EventsController : ControllerBase
             _logger.LogInformation("Successfully retrieved multivariate events");
             return Ok(response);
         }
+        catch (ApiException apiEx)
+        {
+            _logger.LogError(apiEx, "API error fetching multivariate events from Kalshi API. Status: {StatusCode}", apiEx.ErrorCode);
+            return BuildApiErrorResponse(apiEx, "Kalshi API error");
+        }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error fetching multivariate events from Kalshi API");
             return StatusCode(StatusCodes.Status500InternalServerError, new { error = "Failed to retrieve multivariate events", message = ex.Message });
         }
     }
-}
 
+    /// <summary>
+    /// Creates a consistent API error response for Kalshi API exceptions.
+    /// </summary>
+    /// <param name="apiEx">The Kalshi API exception</param>
+    /// <param name="error">Friendly error label for clients</param>
+    /// <returns>Formatted error response with appropriate status code</returns>
+    private ObjectResult BuildApiErrorResponse(ApiException apiEx, string error)
+    {
+        var statusCode = apiEx.ErrorCode >= 400 && apiEx.ErrorCode < 600
+            ? apiEx.ErrorCode
+            : StatusCodes.Status502BadGateway;
+
+        return StatusCode(statusCode, new
+        {
+            error,
+            message = apiEx.Message,
+            statusCode = apiEx.ErrorCode,
+            details = apiEx.ErrorContent
+        });
+    }
+}

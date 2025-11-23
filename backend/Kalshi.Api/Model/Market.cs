@@ -92,7 +92,19 @@ namespace Kalshi.Api.Model
             /// Enum Determined for value: determined
             /// </summary>
             [EnumMember(Value = "determined")]
-            Determined = 5
+            Determined = 5,
+
+            /// <summary>
+            /// Enum Inactive for value: inactive
+            /// </summary>
+            [EnumMember(Value = "inactive")]
+            Inactive = 6,
+
+            /// <summary>
+            /// Enum Finalized for value: finalized
+            /// </summary>
+            [EnumMember(Value = "finalized")]
+            Finalized = 7
         }
 
 
