@@ -77,14 +77,37 @@ function assignCategory(market: Market): string {
     return "Other";
 }
 
-export async function getMarketsBySeries(seriesTicker: string): Promise<Market[]> {
+export async function getMarketsBySeries(seriesTicker: string, maxCloseTs: number | null = null): Promise<Market[]> {
     try {
-        const response = await fetch(`${BASE_URL}/markets?series_ticker=${seriesTicker}&status=open`);
-        if (!response.ok) return [];
+        let url = `${BASE_URL}/markets?series_ticker=${seriesTicker}&status=open`;
+
+        if (maxCloseTs) {
+            url += `&max_close_ts=${maxCloseTs}`;
+        }
+
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
+
+        const response = await fetch(url, {
+            signal: controller.signal,
+            next: { revalidate: 60 }
+        });
+
+        clearTimeout(timeoutId);
+
+        if (!response.ok) {
+            console.warn(`API returned ${response.status} for series ${seriesTicker}`);
+            return [];
+        }
+
         const data = await response.json();
         return data.markets || [];
     } catch (error) {
-        console.error(`Error fetching series ${seriesTicker}:`, error);
+        if (error instanceof Error && error.name === 'AbortError') {
+            console.error(`Request timeout for series ${seriesTicker}`);
+        } else {
+            console.error(`Error fetching series ${seriesTicker}:`, error);
+        }
         return [];
     }
 }

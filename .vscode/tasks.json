@@ -2,19 +2,44 @@
   "version": "2.0.0",
   "tasks": [
     {
-      "label": "build",
-      "type": "process",
-      "command": "dotnet",
-      "args": [
-        "build",
-        "${workspaceFolder}/backend/KalshiSignals.Web/KalshiSignals.Web.csproj",
-        "/property:GenerateFullPaths=true"
-      ],
-      "problemMatcher": ["$msCompile"],
+      "label": "npm: dev",
+      "type": "shell",
+      "command": "npm run dev",
+      "options": {
+        "cwd": "${workspaceFolder}/web"
+      },
+      "problemMatcher": [],
+      "isBackground": true,
+      "runOptions": {
+        "runOn": "default"
+      }
+    },
+    {
+      "label": "Generate C# API",
+      "type": "shell",
+      "command": "./generate_dotnet.sh",
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "problemMatcher": [],
       "group": {
         "kind": "build",
-        "isDefault": true
+        "isDefault": false
+      }
+    },
+    {
+      "label": "Build C# API",
+      "type": "shell",
+      "command": "dotnet build",
+      "options": {
+        "cwd": "${workspaceFolder}/backend/Kalshi.Api"
+      },
+      "problemMatcher": "$msCompile",
+      "group": {
+        "kind": "build",
+        "isDefault": false
       }
     }
   ]
 }
+

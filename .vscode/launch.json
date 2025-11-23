@@ -2,25 +2,50 @@
   "version": "0.2.0",
   "configurations": [
     {
-      "name": ".NET Launch (web)",
-      "type": "coreclr",
+      "name": "Next.js: debug server-side",
+      "type": "node-terminal",
       "request": "launch",
-      "preLaunchTask": "build",
-      "program": "${workspaceFolder}/backend/KalshiSignals.Web/bin/Debug/net10.0/KalshiSignals.Web.dll",
-      "args": [],
-      "cwd": "${workspaceFolder}/backend/KalshiSignals.Web",
-      "stopAtEntry": false,
-      "console": "integratedTerminal",
-      "env": {
-        "ASPNETCORE_ENVIRONMENT": "Development"
-      },
+      "command": "npm run dev",
+      "cwd": "${workspaceFolder}/web",
       "serverReadyAction": {
-        "action": "openExternally",
-        "pattern": "\\bNow listening on:\\s+(https?://\\S+)"
-      },
-      "sourceFileMap": {
-        "/Views": "${workspaceFolder}/backend/KalshiSignals.Web/Views"
+        "pattern": "- Local:.+(https?://.+)",
+        "uriFormat": "%s",
+        "action": "debugWithChrome"
       }
+    },
+    {
+      "name": "Next.js: debug client-side",
+      "type": "chrome",
+      "request": "launch",
+      "url": "http://localhost:3000",
+      "webRoot": "${workspaceFolder}/web",
+      "sourceMaps": true,
+      "sourceMapPathOverrides": {
+        "webpack://_N_E/*": "${webRoot}/*"
+      }
+    },
+    {
+      "name": "Next.js: debug full stack",
+      "type": "node-terminal",
+      "request": "launch",
+      "command": "npm run dev",
+      "cwd": "${workspaceFolder}/web",
+      "serverReadyAction": {
+        "pattern": "- Local:.+(https?://.+)",
+        "uriFormat": "%s",
+        "action": "openExternally"
+      }
+    }
+  ],
+  "compounds": [
+    {
+      "name": "Next.js: debug full stack (compound)",
+      "configurations": [
+        "Next.js: debug server-side",
+        "Next.js: debug client-side"
+      ],
+      "stopAll": true
     }
   ]
 }
+

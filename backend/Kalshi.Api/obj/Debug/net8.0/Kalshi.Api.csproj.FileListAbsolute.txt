@@ -1,0 +1,11 @@
+/Users/amir/Documents/dev/kalshi-signals/backend/Kalshi.Api/obj/Debug/net8.0/Kalshi.Api.csproj.AssemblyReference.cache
+/Users/amir/Documents/dev/kalshi-signals/backend/Kalshi.Api/obj/Debug/net8.0/Kalshi.Api.GeneratedMSBuildEditorConfig.editorconfig
+/Users/amir/Documents/dev/kalshi-signals/backend/Kalshi.Api/obj/Debug/net8.0/Kalshi.Api.csproj.CoreCompileInputs.cache
+/Users/amir/Documents/dev/kalshi-signals/backend/Kalshi.Api/bin/Debug/net8.0/Kalshi.Api.xml
+/Users/amir/Documents/dev/kalshi-signals/backend/Kalshi.Api/bin/Debug/net8.0/Kalshi.Api.deps.json
+/Users/amir/Documents/dev/kalshi-signals/backend/Kalshi.Api/bin/Debug/net8.0/Kalshi.Api.dll
+/Users/amir/Documents/dev/kalshi-signals/backend/Kalshi.Api/bin/Debug/net8.0/Kalshi.Api.pdb
+/Users/amir/Documents/dev/kalshi-signals/backend/Kalshi.Api/obj/Debug/net8.0/Kalshi.Api.dll
+/Users/amir/Documents/dev/kalshi-signals/backend/Kalshi.Api/obj/Debug/net8.0/refint/Kalshi.Api.dll
+/Users/amir/Documents/dev/kalshi-signals/backend/Kalshi.Api/obj/Debug/net8.0/Kalshi.Api.pdb
+/Users/amir/Documents/dev/kalshi-signals/backend/Kalshi.Api/obj/Debug/net8.0/ref/Kalshi.Api.dll

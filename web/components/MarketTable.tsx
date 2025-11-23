@@ -3,13 +3,55 @@
 import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { useSearchParams, usePathname, useRouter } from "next/navigation";
-import { ArrowRight, Loader2 } from "lucide-react";
+import { ArrowRight, Loader2, Calendar } from "lucide-react";
 import { Market, getSeriesByTags, getMarketsBySeries, getSeriesByCategory } from "@/lib/kalshi";
 import styles from "./MarketTable.module.css";
 
 interface MarketTableProps {
     markets: Market[];
     tagsByCategories: Record<string, string[]>;
+}
+
+type DateFilterOption = "All time" | "Today" | "Tomorrow" | "This week" | "This month" | "Next 3 months" | "This year";
+
+// Calculate max_close_ts Unix timestamp for Kalshi API based on date filter
+// This filters markets that close/expire before the target date
+function getMaxCloseTimestamp(dateFilter: DateFilterOption): number | null {
+    if (dateFilter === "All time") return null;
+
+    const now = new Date();
+    let targetDate = new Date();
+
+    switch (dateFilter) {
+        case "Today":
+            targetDate.setHours(23, 59, 59, 999);
+            break;
+        case "Tomorrow":
+            targetDate.setDate(now.getDate() + 1);
+            targetDate.setHours(23, 59, 59, 999);
+            break;
+        case "This week":
+            // Find next Sunday (end of week)
+            const daysUntilSunday = 7 - now.getDay();
+            targetDate.setDate(now.getDate() + daysUntilSunday);
+            targetDate.setHours(23, 59, 59, 999);
+            break;
+        case "This month":
+            targetDate.setMonth(now.getMonth() + 1, 0); // Last day of current month
+            targetDate.setHours(23, 59, 59, 999);
+            break;
+        case "Next 3 months":
+            targetDate.setMonth(now.getMonth() + 3);
+            targetDate.setHours(23, 59, 59, 999);
+            break;
+        case "This year":
+            targetDate.setMonth(11, 31); // December 31st of current year
+            targetDate.setHours(23, 59, 59, 999);
+            break;
+    }
+
+    // Return Unix timestamp (seconds since epoch)
+    return Math.floor(targetDate.getTime() / 1000);
 }
 
 export default function MarketTable({ markets: initialMarkets, tagsByCategories }: MarketTableProps) {
@@ -19,9 +61,11 @@ export default function MarketTable({ markets: initialMarkets, tagsByCategories 
 
     const initialCategory = searchParams.get("category") || "All";
     const initialTag = searchParams.get("tag");
+    const initialDate = (searchParams.get("date") as DateFilterOption) || "All time";
 
     const [activeCategory, setActiveCategory] = useState(initialCategory);
     const [activeSubTag, setActiveSubTag] = useState<string | null>(initialTag);
+    const [activeDate, setActiveDate] = useState<DateFilterOption>(initialDate);
     
     // Initialize displayed markets based on synchronous category filtering
     // Only use initialMarkets fallback if we are on "All" or if we want to show *something* while fetching
@@ -41,11 +85,11 @@ export default function MarketTable({ markets: initialMarkets, tagsByCategories 
 
     const categories = ["All", ...Object.keys(tagsByCategories).sort()];
 
-    const fetchMarkets = useCallback(async (category: string, tag: string | null) => {
+    const fetchMarkets = useCallback(async (category: string, tag: string | null, maxCloseTs: number | null) => {
         setIsLoading(true);
         try {
             let seriesList;
-            
+
             if (tag) {
                 // 1. Get series for the tag
                 seriesList = await getSeriesByTags(tag);
@@ -59,21 +103,30 @@ export default function MarketTable({ markets: initialMarkets, tagsByCategories 
                 return;
             }
 
+            console.log(`Fetching markets for ${seriesList.length} series with maxCloseTs: ${maxCloseTs}`);
+
             // 2. Get markets for each series
-            // Limit to first 10 series to avoid too many requests if series list is huge
-            const targetSeries = seriesList.slice(0, 10);
+            // Reduce to first 5 series to avoid timeout issues
+            const targetSeries = seriesList.slice(0, 5);
 
-            const marketsPromises = targetSeries.map(series => getMarketsBySeries(series.ticker));
-            const marketsArrays = await Promise.all(marketsPromises);
+            // Fetch markets in batches of 3 to reduce concurrent requests
+            const batchSize = 3;
+            const allMarkets: any[] = [];
 
-            const newMarkets = marketsArrays.flat();
+            for (let i = 0; i < targetSeries.length; i += batchSize) {
+                const batch = targetSeries.slice(i, i + batchSize);
+                const batchPromises = batch.map(series => getMarketsBySeries(series.ticker, maxCloseTs));
+                const batchResults = await Promise.all(batchPromises);
+                allMarkets.push(...batchResults.flat());
+            }
 
             // Remove duplicates
-            const uniqueMarkets = Array.from(new Map(newMarkets.map(m => [m.ticker, m])).values());
+            const uniqueMarkets = Array.from(new Map(allMarkets.map(m => [m.ticker, m])).values());
 
             // Sort by volume descending
             uniqueMarkets.sort((a, b) => b.volume - a.volume);
 
+            console.log(`Fetched ${uniqueMarkets.length} unique markets`);
             setDisplayedMarkets(uniqueMarkets);
         } catch (error) {
             console.error("Error loading markets:", error);
@@ -90,20 +143,24 @@ export default function MarketTable({ markets: initialMarkets, tagsByCategories 
     useEffect(() => {
         const cat = searchParams.get("category") || "All";
         const tag = searchParams.get("tag");
+        const date = (searchParams.get("date") as DateFilterOption) || "All time";
 
         setActiveCategory(cat);
         setActiveSubTag(tag);
+        setActiveDate(date);
+
+        const maxCloseTs = getMaxCloseTimestamp(date);
 
         if (tag || cat !== "All") {
-            fetchMarkets(cat, tag);
+            fetchMarkets(cat, tag, maxCloseTs);
         } else {
             setDisplayedMarkets(initialMarkets);
         }
     }, [searchParams, initialMarkets, fetchMarkets]);
 
-    const updateUrl = (newCategory: string, newTag: string | null) => {
+    const updateUrl = (newCategory: string, newTag: string | null, newDate?: DateFilterOption) => {
         const params = new URLSearchParams(searchParams);
-        
+
         if (newCategory && newCategory !== "All") {
             params.set("category", newCategory);
         } else {
@@ -114,6 +171,13 @@ export default function MarketTable({ markets: initialMarkets, tagsByCategories 
             params.set("tag", newTag);
         } else {
             params.delete("tag");
+        }
+
+        const dateToUse = newDate !== undefined ? newDate : activeDate;
+        if (dateToUse && dateToUse !== "All time") {
+            params.set("date", dateToUse);
+        } else {
+            params.delete("date");
         }
 
         replace(`${pathname}?${params.toString()}`, { scroll: false });
@@ -128,9 +192,15 @@ export default function MarketTable({ markets: initialMarkets, tagsByCategories 
         updateUrl(activeCategory, tag);
     };
 
+    const handleDateChange = (date: DateFilterOption) => {
+        updateUrl(activeCategory, activeSubTag, date);
+    };
+
     const subTags = activeCategory !== "All" && tagsByCategories[activeCategory]
         ? tagsByCategories[activeCategory]
         : [];
+
+    const dateOptions: DateFilterOption[] = ["All time", "Today", "Tomorrow", "This week", "This month", "Next 3 months", "This year"];
 
     return (
         <section className={styles.section}>
@@ -161,6 +231,21 @@ export default function MarketTable({ markets: initialMarkets, tagsByCategories 
                             ))}
                         </div>
                     )}
+
+                    <div className={styles.dateFilterContainer}>
+                        <Calendar size={16} className={styles.calendarIcon} />
+                        <select
+                            value={activeDate}
+                            onChange={(e) => handleDateChange(e.target.value as DateFilterOption)}
+                            className={styles.dateSelect}
+                        >
+                            {dateOptions.map((option) => (
+                                <option key={option} value={option}>
+                                    {option}
+                                </option>
+                            ))}
+                        </select>
+                    </div>
                 </div>
 
                 <div className={styles.tableContainer}>

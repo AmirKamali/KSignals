@@ -1,0 +1,32 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
+    <TargetFramework>net8.0</TargetFramework>
+    <AssemblyName>Kalshi.Api</AssemblyName>
+    <PackageId>Kalshi.Api</PackageId>
+    <OutputType>Library</OutputType>
+    <Authors>Kalshi Signals</Authors>
+    <Company>Kalshi Signals</Company>
+    <AssemblyTitle>Kalshi Trade API Client Library</AssemblyTitle>
+    <Description>C# API client library for Kalshi Trade API</Description>
+    <Copyright>Copyright © Kalshi Signals</Copyright>
+    <RootNamespace>Kalshi.Api</RootNamespace>
+    <Version>1.0.0</Version>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <DocumentationFile>bin\$(Configuration)\$(TargetFramework)\Kalshi.Api.xml</DocumentationFile>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <ManagePackageVersionsCentrally>false</ManagePackageVersionsCentrally>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="JsonSubTypes" Version="2.0.1" />
+    <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
+    <PackageReference Include="RestSharp" Version="112.1.0" />
+    <PackageReference Include="Polly" Version="8.1.0" />
+    <PackageReference Include="System.Text.Json" Version="8.0.5" />
+    <PackageReference Include="System.Security.Cryptography.Algorithms" Version="4.3.1" />
+  </ItemGroup>
+
+</Project>
