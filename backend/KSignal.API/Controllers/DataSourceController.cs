@@ -21,11 +21,11 @@ public class DataSourceController : ControllerBase
     [HttpPost("refresh-market")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status500InternalServerError)]
-    public async Task<IActionResult> RefreshMarket(CancellationToken cancellationToken)
+    public async Task<IActionResult> RefreshMarket([FromQuery] string? category = null, [FromQuery] string? tag = null, CancellationToken cancellationToken = default)
     {
         try
         {
-            var updated = await _kalshiService.RefreshMarketCategoriesAsync(cancellationToken);
+            var updated = await _kalshiService.RefreshMarketCategoriesAsync(category, tag, cancellationToken);
             return Ok(new { updated, refreshedAt = DateTime.UtcNow });
         }
         catch (ApiException apiEx)
@@ -46,4 +46,3 @@ public class DataSourceController : ControllerBase
         }
     }
 }
-

@@ -29,46 +29,84 @@ public class KalshiService
         }
     }
 
-    public async Task<int> RefreshMarketCategoriesAsync(CancellationToken cancellationToken = default)
+    public async Task<int> RefreshMarketCategoriesAsync(string? category = null, string? tag = null, CancellationToken cancellationToken = default)
     {
         await _db.Database.EnsureCreatedAsync(cancellationToken);
 
-        var existingIds = (await _db.MarketCategories
-                .AsNoTracking()
-                .Select(x => x.SeriesId)
-                .ToListAsync(cancellationToken))
-            .ToHashSet(StringComparer.OrdinalIgnoreCase);
-
-        var tagsResponse = await _kalshiClient.Search.GetTagsForSeriesCategoriesAsync(cancellationToken: cancellationToken);
-        if (tagsResponse?.TagsByCategories == null)
-        {
-            _logger.LogWarning("Tags by categories response was null or empty.");
-            return 0;
-        }
-
-        _logger.LogInformation("Fetched {CategoryCount} categories from tags endpoint", tagsResponse.TagsByCategories.Count);
         var now = DateTime.UtcNow;
         var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var requestedCategory = string.IsNullOrWhiteSpace(category) ? null : category;
+        var requestedTag = string.IsNullOrWhiteSpace(tag) ? null : tag;
 
-        // Pull series per category
-        foreach (var category in tagsResponse.TagsByCategories.Keys)
+        // Full refresh when no filters are provided
+        if (requestedCategory == null && requestedTag == null)
         {
-            _logger.LogInformation("Fetching series for category {Category}", category);
-            await FetchSeriesIntoLookupAsync(existingIds, seen, now, category, null, cancellationToken);
-        }
+            var existingIds = (await _db.MarketCategories
+                    .AsNoTracking()
+                    .Select(x => x.SeriesId)
+                    .ToListAsync(cancellationToken))
+                .ToHashSet(StringComparer.OrdinalIgnoreCase);
 
-        // Pull series per tag
-        foreach (var kvp in tagsResponse.TagsByCategories)
-        {
-            if (kvp.Value == null) continue;
-            foreach (var tag in kvp.Value)
+            var tagsResponse = await _kalshiClient.Search.GetTagsForSeriesCategoriesAsync(cancellationToken: cancellationToken);
+            if (tagsResponse?.TagsByCategories == null)
             {
-                _logger.LogInformation("Fetching series for tag {Tag}", tag);
-                await FetchSeriesIntoLookupAsync(existingIds, seen, now, null, tag, cancellationToken);
+                _logger.LogWarning("Tags by categories response was null or empty.");
+                return 0;
             }
+
+            _logger.LogInformation("Fetched {CategoryCount} categories from tags endpoint", tagsResponse.TagsByCategories.Count);
+
+            // Pull series per category
+            foreach (var cat in tagsResponse.TagsByCategories.Keys)
+            {
+                _logger.LogInformation("Fetching series for category {Category}", cat);
+                await FetchSeriesIntoLookupAsync(existingIds, seen, now, cat, null, cancellationToken);
+            }
+
+            // Pull series per tag
+            foreach (var kvp in tagsResponse.TagsByCategories)
+            {
+                if (kvp.Value == null) continue;
+                foreach (var t in kvp.Value)
+                {
+                    _logger.LogInformation("Fetching series for tag {Tag}", t);
+                    await FetchSeriesIntoLookupAsync(existingIds, seen, now, null, t, cancellationToken);
+                }
+            }
+
+            await CleanupMissingAsync(existingIds, cancellationToken);
+            return seen.Count;
         }
 
-        await CleanupMissingAsync(existingIds, cancellationToken);
+        // Filtered refresh
+        var existingFiltered = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        if (requestedCategory != null)
+        {
+            var ids = await _db.MarketCategories
+                .AsNoTracking()
+                .Where(x => x.Category == requestedCategory)
+                .Select(x => x.SeriesId)
+                .ToListAsync(cancellationToken);
+            foreach (var id in ids) existingFiltered.Add(id);
+
+            _logger.LogInformation("Fetching series for category {Category}", requestedCategory);
+            await FetchSeriesIntoLookupAsync(existingFiltered, seen, now, requestedCategory, null, cancellationToken);
+        }
+
+        if (requestedTag != null)
+        {
+            var ids = await _db.MarketCategories
+                .AsNoTracking()
+                .Where(x => x.Tags != null && x.Tags.Contains(requestedTag))
+                .Select(x => x.SeriesId)
+                .ToListAsync(cancellationToken);
+            foreach (var id in ids) existingFiltered.Add(id);
+
+            _logger.LogInformation("Fetching series for tag {Tag}", requestedTag);
+            await FetchSeriesIntoLookupAsync(existingFiltered, seen, now, null, requestedTag, cancellationToken);
+        }
+
+        await CleanupMissingAsync(existingFiltered, cancellationToken);
         return seen.Count;
     }
 
