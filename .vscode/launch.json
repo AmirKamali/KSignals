@@ -54,7 +54,8 @@
       "stopAtEntry": false,
       "serverReadyAction": {
         "action": "openExternally",
-        "uriFormat": "https://localhost:%port%/swagger"
+        "pattern": "\\bNow listening on:\\s+(https?://\\S+)",
+        "uriFormat": "%s/swagger"
       },
       "env": {
         "ASPNETCORE_ENVIRONMENT": "Development"

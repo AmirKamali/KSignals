@@ -94,7 +94,10 @@ namespace Kalshi.Api.Authentication
             try
             {
                 var rsa = RSA.Create();
-                
+
+                // Detect the key format based on the PEM header
+                bool isPkcs1 = privateKeyPem.Contains("-----BEGIN RSA PRIVATE KEY-----");
+
                 // Remove PEM headers/footers and whitespace
                 var keyData = privateKeyPem
                     .Replace("-----BEGIN PRIVATE KEY-----", "")
@@ -106,7 +109,19 @@ namespace Kalshi.Api.Authentication
                     .Replace(" ", "");
 
                 var keyBytes = Convert.FromBase64String(keyData);
-                rsa.ImportPkcs8PrivateKey(keyBytes, out _);
+
+                // Use the appropriate import method based on the format
+                if (isPkcs1)
+                {
+                    // PKCS#1 format (RSA PRIVATE KEY)
+                    rsa.ImportRSAPrivateKey(keyBytes, out _);
+                }
+                else
+                {
+                    // PKCS#8 format (PRIVATE KEY)
+                    rsa.ImportPkcs8PrivateKey(keyBytes, out _);
+                }
+
                 return rsa;
             }
             catch (Exception ex)

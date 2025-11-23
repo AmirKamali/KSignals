@@ -37,7 +37,7 @@ public class SearchController : ControllerBase
     /// <returns>A mapping of series categories to their associated tags</returns>
     /// <response code="200">Tags retrieved successfully</response>
     /// <response code="500">Internal server error</response>
-    [HttpGet("tags-by-categories")]
+    [HttpGet("categories")]
     [ProducesResponseType(typeof(GetTagsForSeriesCategoriesResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status500InternalServerError)]
     public async Task<ActionResult<GetTagsForSeriesCategoriesResponse>> GetTagsByCategories()
