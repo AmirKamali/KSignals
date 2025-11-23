@@ -50,7 +50,7 @@ namespace Kalshi.Api.Model
         /// <param name="strikePeriod">The time period this event covers (e.g., &#39;week&#39;, &#39;month&#39;). Only filled when the event uses a period strike (mutually exclusive with strike_date)..</param>
         /// <param name="markets">Array of markets associated with this event. Only populated when &#39;with_nested_markets&#x3D;true&#39; is specified in the request..</param>
         /// <param name="availableOnBrokers">Whether this event is available to trade on brokers. (required).</param>
-        /// <param name="productMetadata">Additional metadata for the event. (required).</param>
+        /// <param name="productMetadata">Additional metadata for the event.</param>
         public EventData(string eventTicker = default, string seriesTicker = default, string subTitle = default, string title = default, string collateralReturnType = default, bool mutuallyExclusive = default, string category = default, DateTime? strikeDate = default, string strikePeriod = default, List<Market> markets = default, bool availableOnBrokers = default, Object productMetadata = default)
         {
             // to ensure "eventTicker" is required (not null)
@@ -91,11 +91,6 @@ namespace Kalshi.Api.Model
             }
             this.Category = category;
             this.AvailableOnBrokers = availableOnBrokers;
-            // to ensure "productMetadata" is required (not null)
-            if (productMetadata == null)
-            {
-                throw new ArgumentNullException("productMetadata is a required property for EventData and cannot be null");
-            }
             this.ProductMetadata = productMetadata;
             this.StrikeDate = strikeDate;
             this.StrikePeriod = strikePeriod;
@@ -183,7 +178,7 @@ namespace Kalshi.Api.Model
         /// Additional metadata for the event.
         /// </summary>
         /// <value>Additional metadata for the event.</value>
-        [DataMember(Name = "product_metadata", IsRequired = true, EmitDefaultValue = true)]
+        [DataMember(Name = "product_metadata", IsRequired = false, EmitDefaultValue = false)]
         public Object ProductMetadata { get; set; }
 
         /// <summary>
