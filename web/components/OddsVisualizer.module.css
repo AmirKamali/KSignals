@@ -1,0 +1,48 @@
+.container {
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    border-radius: var(--radius-lg);
+    padding: 1.5rem;
+}
+
+.heading {
+    font-size: 1.25rem;
+    font-weight: 600;
+    margin-bottom: 1.5rem;
+}
+
+.barContainer {
+    margin-bottom: 1.5rem;
+}
+
+.barContainer:last-child {
+    margin-bottom: 0;
+}
+
+.barLabel {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 0.5rem;
+    font-weight: 600;
+}
+
+.track {
+    height: 12px;
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 6px;
+    overflow: hidden;
+}
+
+.fillYes {
+    height: 100%;
+    background: var(--success);
+    border-radius: 6px;
+    transition: width 1s ease-out;
+}
+
+.fillNo {
+    height: 100%;
+    background: var(--danger);
+    border-radius: 6px;
+    transition: width 1s ease-out;
+}
