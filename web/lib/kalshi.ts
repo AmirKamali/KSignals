@@ -169,7 +169,11 @@ export async function getOrderBook(ticker: string): Promise<OrderBook | null> {
     }
 }
 
-export async function getBackendMarkets(params?: { category?: string | null; tag?: string | null }): Promise<Market[]> {
+export async function getBackendMarkets(params?: {
+    category?: string | null;
+    tag?: string | null;
+    close_date_type?: string | null;
+}): Promise<Market[]> {
     // Use Next.js API route for client-side calls, direct backend for server-side
     const isServer = typeof window === 'undefined';
     const baseUrl = isServer ? BACKEND_BASE_URL : '';
@@ -178,11 +182,11 @@ export async function getBackendMarkets(params?: { category?: string | null; tag
     const url = new URL(endpoint, isServer ? baseUrl : window.location.origin);
     if (params?.category) url.searchParams.set("category", params.category);
     if (params?.tag) url.searchParams.set("tag", params.tag);
+    if (params?.close_date_type) url.searchParams.set("close_date_type", params.close_date_type);
 
     try {
-        console.log("Fetching from:", url.toString());
         const response = await fetch(url.toString(), {
-            cache: 'no-store' // Disable cache for debugging
+            cache: 'no-store'
         });
         if (!response.ok) {
             console.warn(`Backend markets response ${response.status}`);
@@ -190,15 +194,7 @@ export async function getBackendMarkets(params?: { category?: string | null; tag
         }
 
         const data = await response.json();
-        console.log("Backend response:", { count: data.count, marketsLength: data.markets?.length });
-        if (data.markets && data.markets.length > 0) {
-            console.log("First raw market from backend:", data.markets[0]);
-        }
         const markets: Market[] = (data.markets || []).map(normalizeBackendMarket);
-        console.log("Normalized markets:", markets.length);
-        if (markets.length > 0) {
-            console.log("First normalized market:", markets[0]);
-        }
         return markets;
     } catch (error) {
         console.error("Error fetching backend markets:", error);

@@ -87,13 +87,14 @@ public class EventsController : ControllerBase
     public async Task<IActionResult> GetMarkets(
         [FromQuery] string? category = null,
         [FromQuery] string? tag = null,
+        [FromQuery] string? close_date_type = null,
         [FromQuery] int page = 1,
         [FromQuery] int pageSize = 50,
         CancellationToken cancellationToken = default)
     {
         try
         {
-            var markets = await _kalshiService.GetMarketsAsync(category, tag, cancellationToken);
+            var markets = await _kalshiService.GetMarketsAsync(category, tag, close_date_type, cancellationToken);
             var safePageSize = Math.Max(1, pageSize);
             var safePage = Math.Max(1, page);
             var totalCount = markets.Count;

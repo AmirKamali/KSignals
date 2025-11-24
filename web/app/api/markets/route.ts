@@ -6,10 +6,12 @@ export async function GET(request: Request) {
     const { searchParams } = new URL(request.url);
     const category = searchParams.get('category');
     const tag = searchParams.get('tag');
+    const closeDateType = searchParams.get('close_date_type');
 
     const backendUrl = new URL(`${BACKEND_BASE_URL}/api/markets`);
     if (category) backendUrl.searchParams.set('category', category);
     if (tag) backendUrl.searchParams.set('tag', tag);
+    if (closeDateType) backendUrl.searchParams.set('close_date_type', closeDateType);
 
     try {
         const response = await fetch(backendUrl.toString(), {
@@ -17,6 +19,7 @@ export async function GET(request: Request) {
         });
 
         if (!response.ok) {
+            console.error(`Backend returned ${response.status} for ${backendUrl.toString()}`);
             return NextResponse.json(
                 { error: `Backend returned ${response.status}` },
                 { status: response.status }

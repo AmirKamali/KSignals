@@ -12,7 +12,7 @@ interface MarketTableProps {
     tagsByCategories: Record<string, string[]>;
 }
 
-type DateFilterOption = "All time" | "Today" | "Tomorrow" | "This week" | "This month" | "Next 3 months" | "This year";
+type DateFilterOption = "All time" | "Today" | "Tomorrow" | "This week" | "This month" | "Next 3 months" | "This year" | "Next year";
 
 // Calculate max_close_ts Unix timestamp for Kalshi API based on date filter
 // This filters markets that close/expire before the target date
@@ -46,6 +46,11 @@ function getMaxCloseTimestamp(dateFilter: DateFilterOption): number | null {
             break;
         case "This year":
             targetDate.setMonth(11, 31); // December 31st of current year
+            targetDate.setHours(23, 59, 59, 999);
+            break;
+        case "Next year":
+            targetDate.setFullYear(now.getFullYear() + 1);
+            targetDate.setMonth(11, 31); // December 31st of next year
             targetDate.setHours(23, 59, 59, 999);
             break;
     }
@@ -85,24 +90,19 @@ export default function MarketTable({ markets: initialMarkets, tagsByCategories 
 
     const categories = ["All", ...Object.keys(tagsByCategories).sort()];
 
-    const fetchMarkets = useCallback(async (category: string, tag: string | null, maxCloseTs: number | null) => {
+    const fetchMarkets = useCallback(async (category: string, tag: string | null, dateFilter: DateFilterOption) => {
         setIsLoading(true);
-        console.log("fetchMarkets called with:", { category, tag, maxCloseTs });
         try {
             const markets = await getBackendMarkets({
                 category: category !== "All" ? category : null,
                 tag,
+                close_date_type: dateFilter !== "All time" ? dateFilter : null,
             });
 
-            console.log("Received markets from backend:", markets.length);
-            const filtered = applyDateFilter(markets, maxCloseTs);
-            console.log("After date filter:", filtered.length);
-
             // Sort by volume descending for consistency
-            filtered.sort((a, b) => b.volume - a.volume);
+            markets.sort((a, b) => b.volume - a.volume);
 
-            console.log("Setting displayed markets:", filtered.length);
-            setDisplayedMarkets(filtered);
+            setDisplayedMarkets(markets);
         } catch (error) {
             console.error("Error loading markets:", error);
             // Fallback to local filtering if fetch fails
@@ -124,13 +124,12 @@ export default function MarketTable({ markets: initialMarkets, tagsByCategories 
         setActiveSubTag(tag);
         setActiveDate(date);
 
-        const maxCloseTs = getMaxCloseTimestamp(date);
-
-        if (tag || cat !== "All") {
-            fetchMarkets(cat, tag, maxCloseTs);
+        // Always fetch from backend with filters (including for "All" category)
+        if (tag || cat !== "All" || date !== "All time") {
+            fetchMarkets(cat, tag, date);
         } else {
-            const filtered = applyDateFilter(initialMarkets, maxCloseTs);
-            setDisplayedMarkets(filtered);
+            // Only use initial markets if no filters are applied at all
+            setDisplayedMarkets(initialMarkets);
         }
     }, [searchParams, initialMarkets, fetchMarkets]);
 
@@ -176,7 +175,7 @@ export default function MarketTable({ markets: initialMarkets, tagsByCategories 
         ? tagsByCategories[activeCategory]
         : [];
 
-    const dateOptions: DateFilterOption[] = ["All time", "Today", "Tomorrow", "This week", "This month", "Next 3 months", "This year"];
+    const dateOptions: DateFilterOption[] = ["All time", "Today", "Tomorrow", "This week", "This month", "Next 3 months", "This year", "Next year"];
 
     return (
         <section className={styles.section}>
@@ -274,20 +273,14 @@ export default function MarketTable({ markets: initialMarkets, tagsByCategories 
 }
 
 function applyDateFilter(markets: Market[], maxCloseTs: number | null): Market[] {
-    if (!maxCloseTs) {
-        console.log("No date filter applied");
-        return markets;
-    }
+    if (!maxCloseTs) return markets;
 
-    console.log("Applying date filter with maxCloseTs:", maxCloseTs, new Date(maxCloseTs * 1000));
     const cutoffMs = maxCloseTs * 1000;
-    const filtered = markets.filter(m => {
+    return markets.filter(m => {
         const close = m.close_time || m.closeTime;
         if (!close) return true;
         const closeMs = new Date(close).getTime();
         if (Number.isNaN(closeMs)) return true;
         return closeMs <= cutoffMs;
     });
-    console.log(`Date filter: ${markets.length} -> ${filtered.length}`);
-    return filtered;
 }

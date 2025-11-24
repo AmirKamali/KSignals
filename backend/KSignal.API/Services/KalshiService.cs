@@ -110,7 +110,7 @@ public class KalshiService
         return seen.Count;
     }
 
-    public async Task<List<MarketCache>> GetMarketsAsync(string? category = null, string? tag = null, CancellationToken cancellationToken = default)
+    public async Task<List<MarketCache>> GetMarketsAsync(string? category = null, string? tag = null, string? closeDateType = null, CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrWhiteSpace(category) && string.IsNullOrWhiteSpace(tag))
         {
@@ -136,53 +136,115 @@ public class KalshiService
         if (seriesTickers.Count == 0) return new List<MarketCache>();
 
         var nowUtc = DateTime.UtcNow;
-        var cached = await
-                _db.Markets
-                    .AsNoTracking()
-                    .Where(m => seriesTickers.Contains(m.SeriesTicker) && m.CloseTime > nowUtc)
-                    .Select(m => new MarketCache
-                    {
-                        TickerId = m.TickerId,
-                        SeriesTicker = m.SeriesTicker,
-                        Title = m.Title,
-                        Subtitle = m.Subtitle,
-                        Volume = m.Volume,
-                        Volume24h = m.Volume24h,
-                        CreatedTime = m.CreatedTime,
-                        ExpirationTime = m.ExpirationTime,
-                        CloseTime = m.CloseTime,
-                        LatestExpirationTime = m.LatestExpirationTime,
-                        OpenTime = m.OpenTime,
-                        Status = m.Status,
-                        YesBid = m.YesBid,
-                        YesBidDollars = m.YesBidDollars,
-                        YesAsk = m.YesAsk,
-                        YesAskDollars = m.YesAskDollars,
-                        NoBid = m.NoBid,
-                        NoBidDollars = m.NoBidDollars,
-                        NoAsk = m.NoAsk,
-                        NoAskDollars = m.NoAskDollars,
-                        LastPrice = m.LastPrice,
-                        LastPriceDollars = m.LastPriceDollars,
-                        PreviousYesBid = m.PreviousYesBid,
-                        PreviousYesBidDollars = m.PreviousYesBidDollars,
-                        PreviousYesAsk = m.PreviousYesAsk,
-                        PreviousYesAskDollars = m.PreviousYesAskDollars,
-                        PreviousPrice = m.PreviousPrice,
-                        PreviousPriceDollars = m.PreviousPriceDollars,
-                        Liquidity = m.Liquidity,
-                        LiquidityDollars = m.LiquidityDollars,
-                        SettlementValue = m.SettlementValue,
-                        SettlementValueDollars = m.SettlementValueDollars,
-                        NotionalValue = m.NotionalValue,
-                        NotionalValueDollars = m.NotionalValueDollars,
-                        LastUpdate = m.LastUpdate
-                    }).ToListAsync(cancellationToken);
+        var maxCloseTime = GetMaxCloseTimeFromDateType(closeDateType, nowUtc);
+
+        var query = _db.Markets
+            .AsNoTracking()
+            .Where(m => seriesTickers.Contains(m.SeriesTicker) && m.CloseTime > nowUtc);
+
+        // Apply date filter if specified
+        if (maxCloseTime.HasValue)
+        {
+            query = query.Where(m => m.CloseTime <= maxCloseTime.Value);
+        }
+
+        var cached = await query
+            .Select(m => new MarketCache
+            {
+                TickerId = m.TickerId,
+                SeriesTicker = m.SeriesTicker,
+                Title = m.Title,
+                Subtitle = m.Subtitle,
+                Volume = m.Volume,
+                Volume24h = m.Volume24h,
+                CreatedTime = m.CreatedTime,
+                ExpirationTime = m.ExpirationTime,
+                CloseTime = m.CloseTime,
+                LatestExpirationTime = m.LatestExpirationTime,
+                OpenTime = m.OpenTime,
+                Status = m.Status,
+                YesBid = m.YesBid,
+                YesBidDollars = m.YesBidDollars,
+                YesAsk = m.YesAsk,
+                YesAskDollars = m.YesAskDollars,
+                NoBid = m.NoBid,
+                NoBidDollars = m.NoBidDollars,
+                NoAsk = m.NoAsk,
+                NoAskDollars = m.NoAskDollars,
+                LastPrice = m.LastPrice,
+                LastPriceDollars = m.LastPriceDollars,
+                PreviousYesBid = m.PreviousYesBid,
+                PreviousYesBidDollars = m.PreviousYesBidDollars,
+                PreviousYesAsk = m.PreviousYesAsk,
+                PreviousYesAskDollars = m.PreviousYesAskDollars,
+                PreviousPrice = m.PreviousPrice,
+                PreviousPriceDollars = m.PreviousPriceDollars,
+                Liquidity = m.Liquidity,
+                LiquidityDollars = m.LiquidityDollars,
+                SettlementValue = m.SettlementValue,
+                SettlementValueDollars = m.SettlementValueDollars,
+                NotionalValue = m.NotionalValue,
+                NotionalValueDollars = m.NotionalValueDollars,
+                LastUpdate = m.LastUpdate
+            }).ToListAsync(cancellationToken);
 
         return cached
             .GroupBy(m => m.SeriesTicker, StringComparer.OrdinalIgnoreCase)
             .Select(g => g.OrderByDescending(x => x.Volume24h).First())
             .ToList();
+    }
+
+    private static DateTime? GetMaxCloseTimeFromDateType(string? closeDateType, DateTime nowUtc)
+    {
+        if (string.IsNullOrWhiteSpace(closeDateType) || closeDateType.Equals("All time", StringComparison.OrdinalIgnoreCase))
+        {
+            return null;
+        }
+
+        var targetDate = nowUtc;
+
+        switch (closeDateType)
+        {
+            case "Today":
+                targetDate = new DateTime(nowUtc.Year, nowUtc.Month, nowUtc.Day, 23, 59, 59, DateTimeKind.Utc);
+                break;
+
+            case "Tomorrow":
+                targetDate = nowUtc.AddDays(1);
+                targetDate = new DateTime(targetDate.Year, targetDate.Month, targetDate.Day, 23, 59, 59, DateTimeKind.Utc);
+                break;
+
+            case "This week":
+                // Find next Sunday (end of week)
+                var daysUntilSunday = 7 - (int)nowUtc.DayOfWeek;
+                targetDate = nowUtc.AddDays(daysUntilSunday);
+                targetDate = new DateTime(targetDate.Year, targetDate.Month, targetDate.Day, 23, 59, 59, DateTimeKind.Utc);
+                break;
+
+            case "This month":
+                // Last day of current month
+                var lastDayOfMonth = DateTime.DaysInMonth(nowUtc.Year, nowUtc.Month);
+                targetDate = new DateTime(nowUtc.Year, nowUtc.Month, lastDayOfMonth, 23, 59, 59, DateTimeKind.Utc);
+                break;
+
+            case "Next 3 months":
+                targetDate = nowUtc.AddMonths(3);
+                targetDate = new DateTime(targetDate.Year, targetDate.Month, targetDate.Day, 23, 59, 59, DateTimeKind.Utc);
+                break;
+
+            case "This year":
+                targetDate = new DateTime(nowUtc.Year, 12, 31, 23, 59, 59, DateTimeKind.Utc);
+                break;
+
+            case "Next year":
+                targetDate = new DateTime(nowUtc.Year + 1, 12, 31, 23, 59, 59, DateTimeKind.Utc);
+                break;
+
+            default:
+                return null;
+        }
+
+        return targetDate;
     }
 
     public async Task<List<MarketCache>> GetTodayMarketsAsync(CancellationToken cancellationToken = default)

@@ -2,7 +2,8 @@
   "permissions": {
     "allow": [
       "WebFetch(domain:docs.kalshi.com)",
-      "Bash(curl:*)"
+      "Bash(curl:*)",
+      "Bash(dotnet build:*)"
     ],
     "deny": [],
     "ask": []
