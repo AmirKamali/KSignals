@@ -47,9 +47,9 @@ public class EventsController : ControllerBase
         try
         {
             _logger.LogInformation("Fetching tags by categories from Kalshi API");
-            
+
             var response = await _kalshiClient.Search.GetTagsForSeriesCategoriesAsync();
-            
+
             _logger.LogInformation("Successfully retrieved tags by categories");
             return Ok(response);
         }
@@ -73,6 +73,34 @@ public class EventsController : ControllerBase
         {
             _logger.LogError(ex, "Error fetching tags by categories from Kalshi API");
             return StatusCode(StatusCodes.Status500InternalServerError, new { error = "Failed to retrieve tags by categories", message = ex.Message });
+        }
+    }
+
+    [HttpGet("/api/markets")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status500InternalServerError)]
+    public async Task<IActionResult> GetMarkets([FromQuery] string? category = null, [FromQuery] string? tag = null, CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            var markets = await _kalshiService.GetMarketsAsync(category, tag, cancellationToken);
+            return Ok(new { count = markets.Count, markets });
+        }
+        catch (ApiException apiEx)
+        {
+            _logger.LogError(apiEx, "Kalshi API error during markets fetch");
+            return StatusCode(StatusCodes.Status502BadGateway, new
+            {
+                error = "Kalshi API error",
+                message = apiEx.Message,
+                statusCode = apiEx.ErrorCode,
+                details = apiEx.ErrorContent
+            });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to fetch markets");
+            return StatusCode(StatusCodes.Status500InternalServerError, new { error = "Failed to fetch markets", message = ex.Message });
         }
     }
 

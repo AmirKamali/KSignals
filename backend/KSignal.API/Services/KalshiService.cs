@@ -110,6 +110,178 @@ public class KalshiService
         return seen.Count;
     }
 
+    public async Task<List<MarketCache>> GetMarketsAsync(string? category = null, string? tag = null, CancellationToken cancellationToken = default)
+    {
+        await _db.Database.EnsureCreatedAsync(cancellationToken);
+        await EnsureMarketsTableAsync(cancellationToken);
+        var loweredCategory = category?.ToLowerInvariant();
+        var loweredTag = tag?.ToLowerInvariant();
+
+        var seriesQuery = _db.MarketCategories.AsNoTracking().AsQueryable();
+        if (!string.IsNullOrWhiteSpace(loweredCategory))
+        {
+            seriesQuery = seriesQuery.Where(s => s.Category != null && s.Category.ToLower() == loweredCategory);
+        }
+        if (!string.IsNullOrWhiteSpace(loweredTag))
+        {
+            seriesQuery = seriesQuery.Where(s => s.Tags != null && s.Tags.ToLower().Contains(loweredTag));
+        }
+
+        var seriesTickers = await seriesQuery.Select(s => s.SeriesId).Distinct().ToListAsync(cancellationToken);
+        if (seriesTickers.Count == 0) return new List<MarketCache>();
+
+        var now = DateTime.UtcNow;
+        var cutoff = now.AddHours(-1);
+        var results = new List<MarketCache>();
+        var staleSeries = new List<string>();
+
+        foreach (var series in seriesTickers)
+        {
+            var cached = await _db.Markets
+                .AsNoTracking()
+                .Where(m => m.SeriesTicker == series && m.LastUpdate >= cutoff)
+                .ToListAsync(cancellationToken);
+
+            if (cached.Count > 0)
+            {
+                results.AddRange(cached);
+            }
+            else
+            {
+                staleSeries.Add(series);
+            }
+        }
+
+        foreach (var series in staleSeries)
+        {
+            try
+            {
+                var response = await _kalshiClient.Markets.GetMarketsAsync(
+                    limit: 1000,
+                    seriesTicker: series,
+                    status: "open",
+                    cancellationToken: cancellationToken);
+
+                if (response?.Markets == null) continue;
+
+                var entities = response.Markets
+                    .Where(m => m != null)
+                    .Select(m => MapMarket(series, m!, now))
+                    .ToList();
+
+                // Replace existing cache for series
+                var existing = await _db.Markets.Where(x => x.SeriesTicker == series).ToListAsync(cancellationToken);
+                if (existing.Count > 0)
+                {
+                    _db.Markets.RemoveRange(existing);
+                }
+                if (entities.Count > 0)
+                {
+                    await _db.Markets.AddRangeAsync(entities, cancellationToken);
+                    results.AddRange(entities);
+                }
+                await _db.SaveChangesAsync(cancellationToken);
+            }
+            catch (ApiException apiEx)
+            {
+                _logger.LogError(apiEx, "Kalshi API error when fetching markets for series {Series}", series);
+                throw;
+            }
+        }
+
+        return results;
+    }
+
+    private async Task EnsureMarketsTableAsync(CancellationToken cancellationToken)
+    {
+        const string createSql = @"
+CREATE TABLE IF NOT EXISTS Markets (
+    TickerId VARCHAR(255) NOT NULL,
+    SeriesTicker VARCHAR(255) NOT NULL,
+    Title TEXT,
+    Subtitle TEXT,
+    Volume INT,
+    Volume24h INT,
+    CreatedTime DATETIME,
+    ExpirationTime DATETIME,
+    CloseTime DATETIME,
+    LatestExpirationTime DATETIME,
+    OpenTime DATETIME,
+    Status VARCHAR(64),
+    YesBid DECIMAL(18,4),
+    YesBidDollars VARCHAR(255),
+    YesAsk DECIMAL(18,4),
+    YesAskDollars VARCHAR(255),
+    NoBid DECIMAL(18,4),
+    NoBidDollars VARCHAR(255),
+    NoAsk DECIMAL(18,4),
+    NoAskDollars VARCHAR(255),
+    LastPrice DECIMAL(18,4),
+    LastPriceDollars VARCHAR(255),
+    PreviousYesBid INT,
+    PreviousYesBidDollars VARCHAR(255),
+    PreviousYesAsk INT,
+    PreviousYesAskDollars VARCHAR(255),
+    PreviousPrice INT,
+    PreviousPriceDollars VARCHAR(255),
+    Liquidity INT,
+    LiquidityDollars VARCHAR(255),
+    SettlementValue INT,
+    SettlementValueDollars VARCHAR(255),
+    NotionalValue INT,
+    NotionalValueDollars VARCHAR(255),
+    JsonResponse LONGTEXT,
+    LastUpdate DATETIME,
+    PRIMARY KEY (TickerId),
+    KEY idx_series_ticker (SeriesTicker)
+) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;";
+
+        await _db.Database.ExecuteSqlRawAsync(createSql, cancellationToken);
+    }
+
+    private static MarketCache MapMarket(string seriesTicker, Market market, DateTime lastUpdate)
+    {
+        return new MarketCache
+        {
+            TickerId = market.Ticker,
+            SeriesTicker = seriesTicker,
+            Title = market.Title,
+            Subtitle = market.Subtitle,
+            Volume = market.Volume,
+            Volume24h = market.Volume24h,
+            CreatedTime = market.CreatedTime,
+            ExpirationTime = market.ExpirationTime,
+            CloseTime = market.CloseTime,
+            LatestExpirationTime = market.LatestExpirationTime,
+            OpenTime = market.OpenTime,
+            Status = market.Status.ToString(),
+            YesBid = market.YesBid,
+            YesBidDollars = market.YesBidDollars,
+            YesAsk = market.YesAsk,
+            YesAskDollars = market.YesAskDollars,
+            NoBid = market.NoBid,
+            NoBidDollars = market.NoBidDollars,
+            NoAsk = market.NoAsk,
+            NoAskDollars = market.NoAskDollars,
+            LastPrice = market.LastPrice,
+            LastPriceDollars = market.LastPriceDollars,
+            PreviousYesBid = market.PreviousYesBid,
+            PreviousYesBidDollars = market.PreviousYesBidDollars,
+            PreviousYesAsk = market.PreviousYesAsk,
+            PreviousYesAskDollars = market.PreviousYesAskDollars,
+            PreviousPrice = market.PreviousPrice,
+            PreviousPriceDollars = market.PreviousPriceDollars,
+            Liquidity = market.Liquidity,
+            LiquidityDollars = market.LiquidityDollars,
+            SettlementValue = market.SettlementValue,
+            SettlementValueDollars = market.SettlementValueDollars,
+            NotionalValue = market.NotionalValue,
+            NotionalValueDollars = market.NotionalValueDollars,
+            JsonResponse = JsonConvert.SerializeObject(market),
+            LastUpdate = lastUpdate
+        };
+    }
+
     private async Task FetchSeriesIntoLookupAsync(
         HashSet<string> existingIds,
         HashSet<string> seen,
