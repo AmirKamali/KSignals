@@ -16,7 +16,7 @@ services:
       timeout: 3s
       retries: 3
     networks:
-      - kalshi-network
+      - web
     restart: unless-stopped
 
   backend:
@@ -30,6 +30,7 @@ services:
     environment:
       - ASPNETCORE_ENVIRONMENT=Development
       - ASPNETCORE_URLS=http://+:3006
+      - ASPNETCORE_HTTP_PORTS=3006
       - KALSHI_REDIS_CONNECTION=${KALSHI_REDIS_CONNECTION:-redis:6379}
       - KALSHI_DB_CONNECTION=${KALSHI_DB_CONNECTION:?Set KALSHI_DB_CONNECTION}
       - KALSHI_DB_VERSION=${KALSHI_DB_VERSION:-8.0.32}
@@ -40,7 +41,7 @@ services:
       redis:
         condition: service_healthy
     networks:
-      - kalshi-network
+      - web
     restart: unless-stopped
 
   web:
@@ -58,12 +59,12 @@ services:
     depends_on:
       - backend
     networks:
-      - kalshi-network
+      - web
     restart: unless-stopped
 
 networks:
-  kalshi-network:
-    name: kalshi-network
+  web:
+    name: web
 
 volumes:
   redis-data:

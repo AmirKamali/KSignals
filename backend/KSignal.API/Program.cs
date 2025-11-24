@@ -125,5 +125,4 @@ if (app.Environment.IsDevelopment())
 app.UseAuthorization();
 app.MapControllers();
 
-app.Urls.Add("http://localhost:3006");
 app.Run();
