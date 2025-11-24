@@ -170,22 +170,38 @@ export async function getOrderBook(ticker: string): Promise<OrderBook | null> {
 }
 
 export async function getBackendMarkets(params?: { category?: string | null; tag?: string | null }): Promise<Market[]> {
-    const url = new URL(`${BACKEND_BASE_URL}/api/DataSource/markets`);
+    // Use Next.js API route for client-side calls, direct backend for server-side
+    const isServer = typeof window === 'undefined';
+    const baseUrl = isServer ? BACKEND_BASE_URL : '';
+    const endpoint = isServer ? '/api/markets' : '/api/markets';
+
+    const url = new URL(endpoint, isServer ? baseUrl : window.location.origin);
     if (params?.category) url.searchParams.set("category", params.category);
     if (params?.tag) url.searchParams.set("tag", params.tag);
 
     try {
-        const response = await fetch(url.toString(), { next: { revalidate: 60 } });
+        console.log("Fetching from:", url.toString());
+        const response = await fetch(url.toString(), {
+            cache: 'no-store' // Disable cache for debugging
+        });
         if (!response.ok) {
             console.warn(`Backend markets response ${response.status}`);
             return [];
         }
 
         const data = await response.json();
+        console.log("Backend response:", { count: data.count, marketsLength: data.markets?.length });
+        if (data.markets && data.markets.length > 0) {
+            console.log("First raw market from backend:", data.markets[0]);
+        }
         const markets: Market[] = (data.markets || []).map(normalizeBackendMarket);
+        console.log("Normalized markets:", markets.length);
+        if (markets.length > 0) {
+            console.log("First normalized market:", markets[0]);
+        }
         return markets;
     } catch (error) {
-        console.warn("Error fetching backend markets, falling back:", error);
+        console.error("Error fetching backend markets:", error);
         return [];
     }
 }
@@ -195,7 +211,10 @@ type BackendMarket = Record<string, unknown>;
 function normalizeBackendMarket(raw: BackendMarket): Market {
     const ticker = (raw.tickerId ?? raw.ticker) as string | undefined;
     const seriesTicker = (raw.seriesTicker ?? raw.eventTicker ?? ticker) as string | undefined;
-    const yesBid = (raw.yesBid ?? raw.lastPrice) as number | undefined;
+    // Prefer lastPrice over yesBid as yesBid is often 0
+    const lastPrice = raw.lastPrice as number | undefined;
+    const yesBid = raw.yesBid as number | undefined;
+    const yesPrice = lastPrice ?? yesBid ?? 0;
     const liquidity = raw.liquidity as number | undefined;
     const volume = raw.volume as number | undefined;
     const closeTime = (raw.closeTime ?? raw.close_time) as string | undefined;
@@ -205,7 +224,7 @@ function normalizeBackendMarket(raw: BackendMarket): Market {
         event_ticker: seriesTicker ?? "",
         title: (raw.title as string) ?? "",
         subtitle: (raw.subtitle as string) ?? "",
-        yes_price: yesBid ?? 0,
+        yes_price: yesPrice,
         volume: volume ?? 0,
         open_interest: liquidity ?? 0,
         liquidity: liquidity ?? 0,

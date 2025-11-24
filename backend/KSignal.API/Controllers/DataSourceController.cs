@@ -4,8 +4,11 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace KSignal.API.Controllers;
 
+/// <summary>
+/// Private API for data source refresh
+/// </summary>
 [ApiController]
-[Route("api/[controller]")]
+[Route("api/private/data-source/[controller]")]
 [Produces("application/json")]
 public class DataSourceController : ControllerBase
 {

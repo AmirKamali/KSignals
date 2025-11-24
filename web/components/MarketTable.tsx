@@ -87,18 +87,21 @@ export default function MarketTable({ markets: initialMarkets, tagsByCategories 
 
     const fetchMarkets = useCallback(async (category: string, tag: string | null, maxCloseTs: number | null) => {
         setIsLoading(true);
+        console.log("fetchMarkets called with:", { category, tag, maxCloseTs });
         try {
             const markets = await getBackendMarkets({
                 category: category !== "All" ? category : null,
                 tag,
-                detailed: false,
             });
 
+            console.log("Received markets from backend:", markets.length);
             const filtered = applyDateFilter(markets, maxCloseTs);
+            console.log("After date filter:", filtered.length);
 
             // Sort by volume descending for consistency
             filtered.sort((a, b) => b.volume - a.volume);
 
+            console.log("Setting displayed markets:", filtered.length);
             setDisplayedMarkets(filtered);
         } catch (error) {
             console.error("Error loading markets:", error);
@@ -271,14 +274,20 @@ export default function MarketTable({ markets: initialMarkets, tagsByCategories 
 }
 
 function applyDateFilter(markets: Market[], maxCloseTs: number | null): Market[] {
-    if (!maxCloseTs) return markets;
+    if (!maxCloseTs) {
+        console.log("No date filter applied");
+        return markets;
+    }
 
+    console.log("Applying date filter with maxCloseTs:", maxCloseTs, new Date(maxCloseTs * 1000));
     const cutoffMs = maxCloseTs * 1000;
-    return markets.filter(m => {
+    const filtered = markets.filter(m => {
         const close = m.close_time || m.closeTime;
         if (!close) return true;
         const closeMs = new Date(close).getTime();
         if (Number.isNaN(closeMs)) return true;
         return closeMs <= cutoffMs;
     });
+    console.log(`Date filter: ${markets.length} -> ${filtered.length}`);
+    return filtered;
 }
