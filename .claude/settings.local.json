@@ -4,7 +4,9 @@
       "Bash(curl:*)",
       "Bash(python3:*)",
       "Bash(dotnet build:*)",
-      "Bash(lsof:*)"
+      "Bash(lsof:*)",
+      "Bash(npm run build:*)",
+      "Bash(npx tsc:*)"
     ],
     "deny": [],
     "ask": []

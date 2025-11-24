@@ -12,43 +12,37 @@ interface MarketTableProps {
     tagsByCategories: Record<string, string[]>;
 }
 
-type DateFilterOption = "All time" | "Today" | "Tomorrow" | "This week" | "This month" | "Next 3 months" | "This year" | "Next year";
+type DateFilterOption = "all_time" | "next_24_hr" | "next_48_hr" | "next_7_days" | "next_30_days" | "next_90_days" | "this_year" | "next_year";
 
 // Calculate max_close_ts Unix timestamp for Kalshi API based on date filter
 // This filters markets that close/expire before the target date
 function getMaxCloseTimestamp(dateFilter: DateFilterOption): number | null {
-    if (dateFilter === "All time") return null;
+    if (dateFilter === "all_time") return null;
 
     const now = new Date();
-    const targetDate = new Date();
+    const targetDate = new Date(now);
 
     switch (dateFilter) {
-        case "Today":
-            targetDate.setHours(23, 59, 59, 999);
+        case "next_24_hr":
+            targetDate.setHours(now.getHours() + 24);
             break;
-        case "Tomorrow":
-            targetDate.setDate(now.getDate() + 1);
-            targetDate.setHours(23, 59, 59, 999);
+        case "next_48_hr":
+            targetDate.setHours(now.getHours() + 48);
             break;
-        case "This week":
-            // Find next Sunday (end of week)
-            const daysUntilSunday = 7 - now.getDay();
-            targetDate.setDate(now.getDate() + daysUntilSunday);
-            targetDate.setHours(23, 59, 59, 999);
+        case "next_7_days":
+            targetDate.setDate(now.getDate() + 7);
             break;
-        case "This month":
-            targetDate.setMonth(now.getMonth() + 1, 0); // Last day of current month
-            targetDate.setHours(23, 59, 59, 999);
+        case "next_30_days":
+            targetDate.setDate(now.getDate() + 30);
             break;
-        case "Next 3 months":
-            targetDate.setMonth(now.getMonth() + 3);
-            targetDate.setHours(23, 59, 59, 999);
+        case "next_90_days":
+            targetDate.setDate(now.getDate() + 90);
             break;
-        case "This year":
+        case "this_year":
             targetDate.setMonth(11, 31); // December 31st of current year
             targetDate.setHours(23, 59, 59, 999);
             break;
-        case "Next year":
+        case "next_year":
             targetDate.setFullYear(now.getFullYear() + 1);
             targetDate.setMonth(11, 31); // December 31st of next year
             targetDate.setHours(23, 59, 59, 999);
@@ -66,7 +60,7 @@ export default function MarketTable({ markets: initialMarkets, tagsByCategories 
 
     const initialCategory = searchParams.get("category") || "All";
     const initialTag = searchParams.get("tag");
-    const initialDate = (searchParams.get("date") as DateFilterOption) || "All time";
+    const initialDate = (searchParams.get("date") as DateFilterOption) || "all_time";
 
     const [activeCategory, setActiveCategory] = useState(initialCategory);
     const [activeSubTag, setActiveSubTag] = useState<string | null>(initialTag);
@@ -96,7 +90,7 @@ export default function MarketTable({ markets: initialMarkets, tagsByCategories 
             const markets = await getBackendMarkets({
                 category: category !== "All" ? category : null,
                 tag,
-                close_date_type: dateFilter !== "All time" ? dateFilter : null,
+                close_date_type: dateFilter !== "all_time" ? dateFilter : null,
             });
 
             // Sort by volume descending for consistency
@@ -118,14 +112,14 @@ export default function MarketTable({ markets: initialMarkets, tagsByCategories 
     useEffect(() => {
         const cat = searchParams.get("category") || "All";
         const tag = searchParams.get("tag");
-        const date = (searchParams.get("date") as DateFilterOption) || "All time";
+        const date = (searchParams.get("date") as DateFilterOption) || "all_time";
 
         setActiveCategory(cat);
         setActiveSubTag(tag);
         setActiveDate(date);
 
         // Always fetch from backend with filters (including for "All" category)
-        if (tag || cat !== "All" || date !== "All time") {
+        if (tag || cat !== "All" || date !== "all_time") {
             fetchMarkets(cat, tag, date);
         } else {
             // Only use initial markets if no filters are applied at all
@@ -149,7 +143,7 @@ export default function MarketTable({ markets: initialMarkets, tagsByCategories 
         }
 
         const dateToUse = newDate !== undefined ? newDate : activeDate;
-        if (dateToUse && dateToUse !== "All time") {
+        if (dateToUse && dateToUse !== "all_time") {
             params.set("date", dateToUse);
         } else {
             params.delete("date");
@@ -175,7 +169,16 @@ export default function MarketTable({ markets: initialMarkets, tagsByCategories 
         ? tagsByCategories[activeCategory]
         : [];
 
-    const dateOptions: DateFilterOption[] = ["All time", "Today", "Tomorrow", "This week", "This month", "Next 3 months", "This year", "Next year"];
+    const dateOptions: { value: DateFilterOption; label: string }[] = [
+        { value: "all_time", label: "All time" },
+        { value: "next_24_hr", label: "Next 24 Hours" },
+        { value: "next_48_hr", label: "Next 48 Hours" },
+        { value: "next_7_days", label: "Next 7 Days" },
+        { value: "next_30_days", label: "Next 30 Days" },
+        { value: "next_90_days", label: "Next 90 Days" },
+        { value: "this_year", label: "This Year" },
+        { value: "next_year", label: "Next Year" },
+    ];
 
     return (
         <section className={styles.section}>
@@ -215,8 +218,8 @@ export default function MarketTable({ markets: initialMarkets, tagsByCategories 
                             className={styles.dateSelect}
                         >
                             {dateOptions.map((option) => (
-                                <option key={option} value={option}>
-                                    {option}
+                                <option key={option.value} value={option.value}>
+                                    {option.label}
                                 </option>
                             ))}
                         </select>

@@ -135,14 +135,17 @@ public class KalshiService
 
         var nowUtc = DateTime.UtcNow;
         var maxCloseTime = GetMaxCloseTimeFromDateType(closeDateType, nowUtc);
-        var maxCloseTs = maxCloseTime.HasValue
-            ? new DateTimeOffset(maxCloseTime.Value).ToUnixTimeSeconds()
-            : (long?)null;
 
-        var allMarkets = _db.Markets
+        var query = _db.Markets
             .AsNoTracking()
-            .Where(p => seriesIds.Contains(p.SeriesTicker))
-            .ToList();
+            .Where(p => seriesIds.Contains(p.SeriesTicker) && p.CloseTime > nowUtc);
+
+        if (maxCloseTime.HasValue)
+        {
+            query = query.Where(p => p.CloseTime <= maxCloseTime.Value);
+        }
+
+        var allMarkets = query.ToList();
         var fetchedAtUtc = nowUtc;
 
         
@@ -157,48 +160,41 @@ public class KalshiService
 
     private static DateTime? GetMaxCloseTimeFromDateType(string? closeDateType, DateTime nowUtc)
     {
-        if (string.IsNullOrWhiteSpace(closeDateType) || closeDateType.Equals("All time", StringComparison.OrdinalIgnoreCase))
+        if (string.IsNullOrWhiteSpace(closeDateType) || closeDateType.Equals("all_time", StringComparison.OrdinalIgnoreCase))
         {
             return null;
         }
 
         var targetDate = nowUtc;
 
-        switch (closeDateType)
+        switch (closeDateType.ToLowerInvariant())
         {
-            case "Today":
-                targetDate = new DateTime(nowUtc.Year, nowUtc.Month, nowUtc.Day, 23, 59, 59, DateTimeKind.Utc);
+            case "next_24_hr":
+                targetDate = nowUtc.AddHours(24);
                 break;
 
-            case "Tomorrow":
-                targetDate = nowUtc.AddDays(1);
-                targetDate = new DateTime(targetDate.Year, targetDate.Month, targetDate.Day, 23, 59, 59, DateTimeKind.Utc);
+            case "next_48_hr":
+                targetDate = nowUtc.AddHours(48);
                 break;
 
-            case "This week":
-                // Find next Sunday (end of week)
-                var daysUntilSunday = 7 - (int)nowUtc.DayOfWeek;
-                targetDate = nowUtc.AddDays(daysUntilSunday);
-                targetDate = new DateTime(targetDate.Year, targetDate.Month, targetDate.Day, 23, 59, 59, DateTimeKind.Utc);
+            case "next_7_days":
+                targetDate = nowUtc.AddDays(7);
                 break;
 
-            case "This month":
-                // Last day of current month
-                var lastDayOfMonth = DateTime.DaysInMonth(nowUtc.Year, nowUtc.Month);
-                targetDate = new DateTime(nowUtc.Year, nowUtc.Month, lastDayOfMonth, 23, 59, 59, DateTimeKind.Utc);
+            case "next_30_days":
+                targetDate = nowUtc.AddDays(30);
                 break;
 
-            case "Next 3 months":
-                targetDate = nowUtc.AddMonths(3);
-                targetDate = new DateTime(targetDate.Year, targetDate.Month, targetDate.Day, 23, 59, 59, DateTimeKind.Utc);
+            case "next_90_days":
+                targetDate = nowUtc.AddDays(90);
                 break;
 
-            case "This year":
-                targetDate = new DateTime(nowUtc.Year, 12, 31, 23, 59, 59, DateTimeKind.Utc);
+            case "this_year":
+                targetDate = new DateTime(nowUtc.Year + 1, DateTimeKind.Utc).AddSeconds(-1);
                 break;
 
-            case "Next year":
-                targetDate = new DateTime(nowUtc.Year + 1, 12, 31, 23, 59, 59, DateTimeKind.Utc);
+            case "next_year":
+                targetDate = new DateTime(nowUtc.Year + 2, DateTimeKind.Utc).AddSeconds(-1);
                 break;
 
             default:
