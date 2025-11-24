@@ -118,9 +118,6 @@ if (app.Environment.IsDevelopment())
 app.UseAuthorization();
 app.MapControllers();
 
-// Ensure the API is reachable from outside the container by binding to all interfaces
-app.Urls.Add("http://0.0.0.0:3006");
-app.Urls.Add("http://[::]:3006");
 app.Run();
 
 string BuildConnectionString(ConfigurationManager configuration)
