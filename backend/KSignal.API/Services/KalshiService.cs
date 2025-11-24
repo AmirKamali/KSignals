@@ -117,80 +117,41 @@ public class KalshiService
             return await GetTodayMarketsAsync(cancellationToken);
         }
 
-        await _db.Database.EnsureCreatedAsync(cancellationToken);
-        await EnsureMarketsTableAsync(cancellationToken);
-        var loweredCategory = category?.ToLowerInvariant();
-        var loweredTag = tag?.ToLowerInvariant();
+        // Read `marketcategories` to find series matching the filters and aggregate seriesIds
+        var seriesIds = new HashSet<string>(_db.MarketCategories
+            .AsNoTracking()
+            .Where(mc =>
+                (string.IsNullOrWhiteSpace(category) || mc.Category == category) &&
+                (string.IsNullOrWhiteSpace(tag) || (mc.Tags != null && mc.Tags.Contains(tag))))
+            .Select(mc => mc.SeriesId)
+            .Distinct()
+            .ToList());
 
-        var seriesQuery = _db.MarketCategories.AsNoTracking().AsQueryable();
-        if (!string.IsNullOrWhiteSpace(loweredCategory))
+        if (seriesIds == null || seriesIds.Count == 0)
         {
-            seriesQuery = seriesQuery.Where(s => s.Category != null && s.Category.ToLower() == loweredCategory);
+            _logger.LogWarning("No series found for category={Category}, tag={Tag}", category, tag);
+            return new List<MarketCache>();
         }
-        if (!string.IsNullOrWhiteSpace(loweredTag))
-        {
-            seriesQuery = seriesQuery.Where(s => s.Tags != null && s.Tags.ToLower().Contains(loweredTag));
-        }
-
-        var seriesTickers = await seriesQuery.Select(s => s.SeriesId).Distinct().ToListAsync(cancellationToken);
-        if (seriesTickers.Count == 0) return new List<MarketCache>();
 
         var nowUtc = DateTime.UtcNow;
         var maxCloseTime = GetMaxCloseTimeFromDateType(closeDateType, nowUtc);
+        var maxCloseTs = maxCloseTime.HasValue
+            ? new DateTimeOffset(maxCloseTime.Value).ToUnixTimeSeconds()
+            : (long?)null;
 
-        var query = _db.Markets
+        var allMarkets = _db.Markets
             .AsNoTracking()
-            .Where(m => seriesTickers.Contains(m.SeriesTicker) && m.CloseTime > nowUtc);
+            .Where(p => seriesIds.Contains(p.SeriesTicker))
+            .ToList();
+        var fetchedAtUtc = nowUtc;
 
-        // Apply date filter if specified
-        if (maxCloseTime.HasValue)
-        {
-            query = query.Where(m => m.CloseTime <= maxCloseTime.Value);
-        }
+        
 
-        var cached = await query
-            .Select(m => new MarketCache
-            {
-                TickerId = m.TickerId,
-                SeriesTicker = m.SeriesTicker,
-                Title = m.Title,
-                Subtitle = m.Subtitle,
-                Volume = m.Volume,
-                Volume24h = m.Volume24h,
-                CreatedTime = m.CreatedTime,
-                ExpirationTime = m.ExpirationTime,
-                CloseTime = m.CloseTime,
-                LatestExpirationTime = m.LatestExpirationTime,
-                OpenTime = m.OpenTime,
-                Status = m.Status,
-                YesBid = m.YesBid,
-                YesBidDollars = m.YesBidDollars,
-                YesAsk = m.YesAsk,
-                YesAskDollars = m.YesAskDollars,
-                NoBid = m.NoBid,
-                NoBidDollars = m.NoBidDollars,
-                NoAsk = m.NoAsk,
-                NoAskDollars = m.NoAskDollars,
-                LastPrice = m.LastPrice,
-                LastPriceDollars = m.LastPriceDollars,
-                PreviousYesBid = m.PreviousYesBid,
-                PreviousYesBidDollars = m.PreviousYesBidDollars,
-                PreviousYesAsk = m.PreviousYesAsk,
-                PreviousYesAskDollars = m.PreviousYesAskDollars,
-                PreviousPrice = m.PreviousPrice,
-                PreviousPriceDollars = m.PreviousPriceDollars,
-                Liquidity = m.Liquidity,
-                LiquidityDollars = m.LiquidityDollars,
-                SettlementValue = m.SettlementValue,
-                SettlementValueDollars = m.SettlementValueDollars,
-                NotionalValue = m.NotionalValue,
-                NotionalValueDollars = m.NotionalValueDollars,
-                LastUpdate = m.LastUpdate
-            }).ToListAsync(cancellationToken);
-
-        return cached
+        // Group by series and take the market with highest 24h volume per series
+        return allMarkets
             .GroupBy(m => m.SeriesTicker, StringComparer.OrdinalIgnoreCase)
-            .Select(g => g.OrderByDescending(x => x.Volume24h).First())
+            .Select(g => WithoutJsonResponse(g.OrderByDescending(x => x.Volume24h).First()))
+            .OrderByDescending(m => m.Volume24h)
             .ToList();
     }
 
