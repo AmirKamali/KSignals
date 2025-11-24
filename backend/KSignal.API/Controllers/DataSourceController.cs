@@ -49,13 +49,31 @@ public class DataSourceController : ControllerBase
     [HttpGet("markets")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status500InternalServerError)]
-    public async Task<IActionResult> GetMarkets([FromQuery] string? category = null, [FromQuery] string? tag = null, CancellationToken cancellationToken = default)
+    public async Task<IActionResult> GetMarkets(
+        [FromQuery] string? category = null,
+        [FromQuery] string? tag = null,
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = 50,
+        CancellationToken cancellationToken = default)
     {
         try
         {
             var markets = await _kalshiService.GetMarketsAsync(category, tag, cancellationToken);
-            var shaped = MarketResponseMapper.Shape(markets).ToList();
-            return Ok(new { count = shaped.Count, markets = shaped });
+            var safePageSize = Math.Max(1, pageSize);
+            var safePage = Math.Max(1, page);
+            var totalCount = markets.Count;
+            var totalPages = (int)Math.Ceiling(totalCount / (double)safePageSize);
+            var paged = markets.Skip((safePage - 1) * safePageSize).Take(safePageSize).ToList();
+            var shaped = MarketResponseMapper.Shape(paged).ToList();
+
+            return Ok(new
+            {
+                count = totalCount,
+                totalPages,
+                currentPage = safePage,
+                pageSize = safePageSize,
+                markets = shaped
+            });
         }
         catch (ApiException apiEx)
         {

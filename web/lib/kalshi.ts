@@ -37,7 +37,7 @@ export interface Series {
 }
 
 export async function getHighVolumeMarkets(limit = 100): Promise<Market[]> {
-    const fromBackend = await getBackendMarkets({ detailed: false });
+    const fromBackend = await getBackendMarkets();
     if (fromBackend.length > 0) {
         return fromBackend.sort((a, b) => b.volume - a.volume).slice(0, limit);
     }
@@ -169,11 +169,10 @@ export async function getOrderBook(ticker: string): Promise<OrderBook | null> {
     }
 }
 
-export async function getBackendMarkets(params?: { category?: string | null; tag?: string | null; detailed?: boolean }): Promise<Market[]> {
+export async function getBackendMarkets(params?: { category?: string | null; tag?: string | null }): Promise<Market[]> {
     const url = new URL(`${BACKEND_BASE_URL}/api/DataSource/markets`);
     if (params?.category) url.searchParams.set("category", params.category);
     if (params?.tag) url.searchParams.set("tag", params.tag);
-    if (params?.detailed) url.searchParams.set("detailed", "true");
 
     try {
         const response = await fetch(url.toString(), { next: { revalidate: 60 } });

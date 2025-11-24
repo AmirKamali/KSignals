@@ -110,7 +110,7 @@ public class KalshiService
         return seen.Count;
     }
 
-    public async Task<List<MarketCache>> GetMarketsAsync(string? category = null, string? tag = null, int page, CancellationToken cancellationToken = default)
+    public async Task<List<MarketCache>> GetMarketsAsync(string? category = null, string? tag = null, CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrWhiteSpace(category) && string.IsNullOrWhiteSpace(tag))
         {
@@ -185,7 +185,7 @@ public class KalshiService
             .ToList();
     }
 
-    public async Task<List<MarketCache>> GetTodayMarketsAsync( CancellationToken cancellationToken = default)
+    public async Task<List<MarketCache>> GetTodayMarketsAsync(CancellationToken cancellationToken = default)
     {
         var nowUtc = DateTime.UtcNow;
         var maxCloseTs = DateTimeOffset.UtcNow.AddHours(24).ToUnixTimeSeconds();
