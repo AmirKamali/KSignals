@@ -1,6 +1,7 @@
 using Kalshi.Api;
 using Kalshi.Api.Client;
 using Kalshi.Api.Model;
+using KSignal.API.Attributes;
 using KSignal.API.Models;
 using KSignal.API.Services;
 using Microsoft.AspNetCore.Mvc;
@@ -17,6 +18,7 @@ public class EventsController : ControllerBase
 {
     private readonly KalshiClient _kalshiClient;
     private readonly ILogger<EventsController> _logger;
+    private readonly KalshiService _kalshiService;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="EventsController"/> class.
@@ -31,8 +33,6 @@ public class EventsController : ControllerBase
         _kalshiService = kalshiService ?? throw new ArgumentNullException(nameof(kalshiService));
     }
 
-    private readonly KalshiService _kalshiService;
-
     /// <summary>
     /// Get tags organized by series categories
     /// </summary>
@@ -45,6 +45,7 @@ public class EventsController : ControllerBase
     /// <response code="200">Tags retrieved successfully</response>
     /// <response code="500">Internal server error</response>
     [HttpGet("categories")]
+    [RedisCache(durationMinutes: 5, cacheKeyPrefix: "tags_by_categories")]
     [ProducesResponseType(typeof(GetTagsForSeriesCategoriesResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status500InternalServerError)]
     public async Task<ActionResult<GetTagsForSeriesCategoriesResponse>> GetTagsByCategories()
@@ -82,6 +83,7 @@ public class EventsController : ControllerBase
     }
 
     [HttpGet("/api/markets")]
+    [RedisCache(durationMinutes: 5, cacheKeyPrefix: "markets")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status500InternalServerError)]
     public async Task<IActionResult> GetMarkets(

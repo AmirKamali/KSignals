@@ -1,0 +1,10 @@
+**/bin/
+**/obj/
+**/.vs/
+**/.vscode/
+**/.git/
+**/.gitignore
+**/*.md
+**/node_modules/
+**/.DS_Store
+**/appsettings.Development.json

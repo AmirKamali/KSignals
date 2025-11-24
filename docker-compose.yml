@@ -1,0 +1,65 @@
+version: '3.8'
+
+services:
+  # Redis Cache
+  redis:
+    image: redis:7-alpine
+    container_name: kalshi-signals-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    command: redis-server --appendonly yes
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+    networks:
+      - kalshi-network
+
+  # Backend API
+  backend:
+    build:
+      context: ./backend
+      dockerfile: KSignal.API/Dockerfile
+    container_name: kalshi-signals-backend
+    ports:
+      - "3006:3006"
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - ASPNETCORE_URLS=http://+:3006
+      - Redis__ConnectionString=redis:6379
+      - ConnectionStrings__KalshiMySql=Server=sydneyappdev.com;Database=sydneyap_ksignals;User ID=ksignalsUser;Password=DQ%h1Vnn9fas0@co;SslMode=Disabled
+    depends_on:
+      redis:
+        condition: service_healthy
+    networks:
+      - kalshi-network
+    restart: unless-stopped
+
+  # Web Client
+  web:
+    build:
+      context: ./web
+      dockerfile: Dockerfile
+    container_name: kalshi-signals-web
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+      - BACKEND_API_BASE_URL=http://backend:3006
+      - NEXT_TELEMETRY_DISABLED=1
+    depends_on:
+      - backend
+    networks:
+      - kalshi-network
+    restart: unless-stopped
+
+networks:
+  kalshi-network:
+    driver: bridge
+
+volumes:
+  redis-data:
+    driver: local

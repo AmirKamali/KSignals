@@ -6,7 +6,16 @@
       "Bash(dotnet build:*)",
       "Bash(lsof:*)",
       "Bash(npm run build:*)",
-      "Bash(npx tsc:*)"
+      "Bash(npx tsc:*)",
+      "Bash(dotnet add package:*)",
+      "Bash(docker run:*)",
+      "Bash(docker exec:*)",
+      "Bash(dotnet run:*)",
+      "Bash(kill:*)",
+      "Bash(time curl -s http://localhost:3006/api/events/categories)",
+      "Bash(time curl -s \"http://localhost:3006/api/markets?category=World&date=this_year\")",
+      "Bash(pkill:*)",
+      "Bash(killall:*)"
     ],
     "deny": [],
     "ask": []

@@ -78,6 +78,9 @@ else
 
 builder.Services.AddScoped<KalshiService>();
 
+// Register Redis cache service as singleton (connection pooling)
+builder.Services.AddSingleton<IRedisCacheService, RedisCacheService>();
+
 var app = builder.Build();
 
 // Configure the HTTP request pipeline.
