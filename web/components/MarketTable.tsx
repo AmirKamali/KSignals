@@ -245,8 +245,10 @@ export default function MarketTable({ markets: initialMarkets, tagsByCategories 
                                 {displayedMarkets.slice(0, 20).map((market) => (
                                 <tr key={market.ticker}>
                                     <td className={styles.titleCell}>
-                                        <div className={styles.marketTitle}>{market.title}</div>
-                                        <div className={styles.marketSubtitle}>{market.event_ticker}</div>
+                                        <Link href={`/trade/${market.ticker}`} className={styles.titleLink}>
+                                            <div className={styles.marketTitle}>{market.title}</div>
+                                            <div className={styles.marketSubtitle}>{market.event_ticker}</div>
+                                        </Link>
                                     </td>
                                     <td>{market.volume.toLocaleString()}</td>
                                     <td>
