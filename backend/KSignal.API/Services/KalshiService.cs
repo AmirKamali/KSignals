@@ -112,6 +112,11 @@ public class KalshiService
 
     public async Task<List<MarketCache>> GetMarketsAsync(string? category = null, string? tag = null, bool detailed = false, CancellationToken cancellationToken = default)
     {
+        if (string.IsNullOrWhiteSpace(category) && string.IsNullOrWhiteSpace(tag))
+        {
+            return await GetTodayMarketsAsync(detailed, cancellationToken);
+        }
+
         await _db.Database.EnsureCreatedAsync(cancellationToken);
         await EnsureMarketsTableAsync(cancellationToken);
         var loweredCategory = category?.ToLowerInvariant();
@@ -203,6 +208,65 @@ public class KalshiService
         }
 
         return results;
+    }
+
+    public async Task<List<MarketCache>> GetTodayMarketsAsync(bool detailed = false, CancellationToken cancellationToken = default)
+    {
+        var nowUtc = DateTime.UtcNow;
+        var maxCloseTs = DateTimeOffset.UtcNow.AddHours(24).ToUnixTimeSeconds();
+        var fetchedAtUtc = nowUtc;
+        var results = new List<MarketCache>();
+        string? cursor = null;
+
+        do
+        {
+            var requestOptions = new RequestOptions
+            {
+                Operation = "MarketApi.GetMarkets"
+            };
+
+            requestOptions.QueryParameters.Add(ClientUtils.ParameterToMultiMap("", "limit", 1000));
+            requestOptions.QueryParameters.Add(ClientUtils.ParameterToMultiMap("", "status", "open"));
+            requestOptions.QueryParameters.Add(ClientUtils.ParameterToMultiMap("", "max_close_ts", maxCloseTs));
+            requestOptions.QueryParameters.Add(ClientUtils.ParameterToMultiMap("", "with_nested_markets", true));
+            if (!string.IsNullOrWhiteSpace(cursor))
+            {
+                requestOptions.QueryParameters.Add(ClientUtils.ParameterToMultiMap("", "cursor", cursor));
+            }
+
+            var response = await _kalshiClient.Markets.AsynchronousClient.GetAsync<GetMarketsResponse>(
+                    "/markets",
+                    requestOptions,
+                    _kalshiClient.Markets.Configuration,
+                    cancellationToken)
+                .ConfigureAwait(false);
+
+            var data = response?.Data;
+            if (data?.Markets != null)
+            {
+                var mapped = data.Markets
+                    .Where(m => m != null && m.CloseTime > nowUtc)
+                    .Select(m =>
+                    {
+                        var seriesKey = string.IsNullOrWhiteSpace(m!.EventTicker) ? m.Ticker : m.EventTicker;
+                        return MapMarket(seriesKey, m, fetchedAtUtc);
+                    })
+                    .ToList();
+                results.AddRange(mapped);
+            }
+
+            cursor = data?.Cursor;
+        } while (!string.IsNullOrWhiteSpace(cursor));
+
+        var ordered = results.OrderBy(m => m.CloseTime).ToList();
+
+        if (detailed) return ordered;
+
+        return ordered
+            .GroupBy(m => m.SeriesTicker, StringComparer.OrdinalIgnoreCase)
+            .Select(g => WithoutJsonResponse(g.OrderByDescending(x => x.Volume24h).First()))
+            .OrderBy(m => m.CloseTime)
+            .ToList();
     }
 
     private async Task EnsureMarketsTableAsync(CancellationToken cancellationToken)
