@@ -22,7 +22,8 @@ public class RedisCacheService : IRedisCacheService, IDisposable
     public RedisCacheService(IConfiguration configuration, ILogger<RedisCacheService> logger)
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-        _connectionString = configuration.GetValue<string>("Redis:ConnectionString");
+        _connectionString = Environment.GetEnvironmentVariable("KALSHI_REDIS_CONNECTION")
+            ?? configuration.GetValue<string>("Redis:ConnectionString");
 
         if (string.IsNullOrWhiteSpace(_connectionString))
         {

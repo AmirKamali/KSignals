@@ -29,8 +29,11 @@ services:
     environment:
       - ASPNETCORE_ENVIRONMENT=Development
       - ASPNETCORE_URLS=http://+:3006
-      - Redis__ConnectionString=redis:6379
-      - ConnectionStrings__KalshiMySql=Server=sydneyappdev.com;Database=sydneyap_ksignals;User ID=ksignalsUser;Password=DQ%h1Vnn9fas0@co;SslMode=Disabled
+      - KALSHI_REDIS_CONNECTION=${KALSHI_REDIS_CONNECTION:-redis:6379}
+      - KALSHI_DB_CONNECTION=${KALSHI_DB_CONNECTION:?Set KALSHI_DB_CONNECTION}
+      - KALSHI_API_KEY=${KALSHI_API_KEY:?Set KALSHI_API_KEY}
+      - KALSHI_PRIVATE_KEY_PATH=${KALSHI_PRIVATE_KEY_PATH:?Set KALSHI_PRIVATE_KEY_PATH}
+      - KALSHI_BASE_URL=${KALSHI_BASE_URL:?Set KALSHI_BASE_URL}
     depends_on:
       redis:
         condition: service_healthy

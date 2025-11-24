@@ -1,7 +1,10 @@
+import { Suspense } from "react";
 import { getHighVolumeMarkets, getTagsByCategories } from "@/lib/kalshi";
 import HeroSection from "@/components/HeroSection";
 import VolumeGrid from "@/components/VolumeGrid";
 import MarketTable from "@/components/MarketTable";
+
+export const dynamic = "force-dynamic";
 
 export default async function Home() {
   const markets = await getHighVolumeMarkets(100); // Fetch more to ensure we have coverage
@@ -14,7 +17,9 @@ export default async function Home() {
     <main>
       <HeroSection />
       <VolumeGrid markets={topMarkets} />
-      <MarketTable markets={tableMarkets} tagsByCategories={tagsByCategories} />
+      <Suspense fallback={null}>
+        <MarketTable markets={tableMarkets} tagsByCategories={tagsByCategories} />
+      </Suspense>
     </main>
   );
 }

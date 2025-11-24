@@ -19,7 +19,17 @@ builder.Services.AddSwaggerGen(c =>
     });
 });
 
-var connectionString = builder.Configuration.GetConnectionString("KalshiMySql");
+// Prefer environment variables for all settings; fall back to configuration placeholders only
+var envConnectionString = Environment.GetEnvironmentVariable("KALSHI_DB_CONNECTION");
+var connectionString = !string.IsNullOrWhiteSpace(envConnectionString)
+    ? envConnectionString
+    : builder.Configuration.GetConnectionString("KalshiMySql");
+
+if (string.IsNullOrWhiteSpace(connectionString))
+{
+    throw new InvalidOperationException("Database connection string is not configured. Set KALSHI_DB_CONNECTION.");
+}
+
 builder.Services.AddDbContext<KalshiDbContext>(options =>
     options.UseMySql(connectionString, ServerVersion.AutoDetect(connectionString)));
 
@@ -27,8 +37,9 @@ builder.Services.AddDbContext<KalshiDbContext>(options =>
 // For public endpoints, we can use without authentication
 // For authenticated endpoints, configure with API credentials from appsettings.json
 var kalshiConfig = builder.Configuration.GetSection("KalshiApi");
-var apiKey = kalshiConfig["ApiKey"];
-var privateKeyPath = kalshiConfig["PrivateKeyPath"];
+var apiKey = Environment.GetEnvironmentVariable("KALSHI_API_KEY") ?? kalshiConfig["ApiKey"];
+var privateKeyPath = Environment.GetEnvironmentVariable("KALSHI_PRIVATE_KEY_PATH") ?? kalshiConfig["PrivateKeyPath"];
+var baseUrl = Environment.GetEnvironmentVariable("KALSHI_BASE_URL") ?? kalshiConfig["BaseUrl"];
 
 string? privateKey = null;
 if (!string.IsNullOrWhiteSpace(privateKeyPath))
@@ -66,7 +77,7 @@ if (!string.IsNullOrWhiteSpace(apiKey) && !string.IsNullOrWhiteSpace(privateKey)
     {
         ApiKey = apiKey,
         PrivateKey = privateKey,
-        BaseUrl = kalshiConfig["BaseUrl"] ?? "https://api.elections.kalshi.com/trade-api/v2"
+        BaseUrl = baseUrl ?? throw new InvalidOperationException("Kalshi API base URL is not configured. Set KALSHI_BASE_URL.")
     };
     builder.Services.AddSingleton(new KalshiClient(apiConfig));
 }

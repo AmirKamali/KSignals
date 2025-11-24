@@ -5,20 +5,31 @@ on:
     branches: [main, master]
   pull_request:
     branches: [main, master]
+  workflow_dispatch:
+    inputs:
+      target:
+        description: "Which component(s) to build"
+        required: true
+        default: "both"
+        type: choice
+        options:
+          - both
+          - backend
+          - frontend
 
 jobs:
   changes:
     runs-on: ubuntu-latest
     outputs:
-      backend: ${{ steps.filter.outputs.backend }}
-      frontend: ${{ steps.filter.outputs.frontend }}
+      backend: ${{ github.event_name == 'workflow_dispatch' && steps.manual.outputs.backend || steps.filter.outputs.backend }}
+      frontend: ${{ github.event_name == 'workflow_dispatch' && steps.manual.outputs.frontend || steps.filter.outputs.frontend }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Detect changed paths
-        id: filter
+      - name: Check for changes
         uses: dorny/paths-filter@v2
+        id: filter
         with:
           filters: |
             backend:
@@ -26,9 +37,18 @@ jobs:
             frontend:
               - 'web/**'
 
+      - name: Set manual selection
+        id: manual
+        if: github.event_name == 'workflow_dispatch'
+        run: |
+          backend_selected="${{ inputs.target == 'backend' || inputs.target == 'both' }}"
+          frontend_selected="${{ inputs.target == 'frontend' || inputs.target == 'both' }}"
+          echo "backend=${backend_selected}" >> "$GITHUB_OUTPUT"
+          echo "frontend=${frontend_selected}" >> "$GITHUB_OUTPUT"
+
   build-backend:
     needs: changes
-    if: needs.changes.outputs.backend == 'true'
+    if: ${{ needs.changes.outputs.backend == 'true' }}
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
@@ -51,7 +71,7 @@ jobs:
 
   build-frontend:
     needs: changes
-    if: needs.changes.outputs.frontend == 'true'
+    if: ${{ needs.changes.outputs.frontend == 'true' }}
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
