@@ -20,15 +20,8 @@ builder.Services.AddSwaggerGen(c =>
 });
 
 // Prefer environment variables for all settings; fall back to configuration placeholders only
-var envConnectionString = Environment.GetEnvironmentVariable("KALSHI_DB_CONNECTION");
-var connectionString = !string.IsNullOrWhiteSpace(envConnectionString)
-    ? envConnectionString
-    : builder.Configuration.GetConnectionString("KalshiMySql");
-
-if (string.IsNullOrWhiteSpace(connectionString))
-{
-    throw new InvalidOperationException("Database connection string is not configured. Set KALSHI_DB_CONNECTION.");
-}
+var connectionString = BuildConnectionString(builder.Configuration);
+builder.Configuration["ConnectionStrings:KalshiMySql"] = connectionString;
 
 var dbVersionString = Environment.GetEnvironmentVariable("KALSHI_DB_VERSION");
 ServerVersion? dbServerVersion = null;
@@ -125,4 +118,37 @@ if (app.Environment.IsDevelopment())
 app.UseAuthorization();
 app.MapControllers();
 
+// Ensure the API is reachable from outside the container by binding to all interfaces
+app.Urls.Add("http://0.0.0.0:3006");
+app.Urls.Add("http://[::]:3006");
 app.Run();
+
+string BuildConnectionString(ConfigurationManager configuration)
+{
+    var dbHost = Environment.GetEnvironmentVariable("KALSHI_DB_HOST");
+    var dbUser = Environment.GetEnvironmentVariable("KALSHI_DB_USER");
+    var dbPassword = Environment.GetEnvironmentVariable("KALSHI_DB_PASSWORD");
+    var dbName = Environment.GetEnvironmentVariable("KALSHI_DB_NAME");
+    var dbSslMode = Environment.GetEnvironmentVariable("KALSHI_DB_SSL_MODE");
+
+    if (!string.IsNullOrWhiteSpace(dbHost)
+        && !string.IsNullOrWhiteSpace(dbUser)
+        && !string.IsNullOrWhiteSpace(dbPassword)
+        && !string.IsNullOrWhiteSpace(dbName))
+    {
+        var sslModeSegment = string.IsNullOrWhiteSpace(dbSslMode) ? "SslMode=Disabled" : $"SslMode={dbSslMode}";
+        return $"Server={dbHost};Database={dbName};User ID={dbUser};Password={dbPassword};{sslModeSegment}";
+    }
+
+    var envConnectionString = Environment.GetEnvironmentVariable("KALSHI_DB_CONNECTION");
+    var connectionString = !string.IsNullOrWhiteSpace(envConnectionString)
+        ? envConnectionString
+        : configuration.GetConnectionString("KalshiMySql");
+
+    if (string.IsNullOrWhiteSpace(connectionString))
+    {
+        throw new InvalidOperationException("Database connection string is not configured. Set KALSHI_DB_HOST, KALSHI_DB_USER, KALSHI_DB_PASSWORD, and KALSHI_DB_NAME or KALSHI_DB_CONNECTION.");
+    }
+
+    return connectionString;
+}

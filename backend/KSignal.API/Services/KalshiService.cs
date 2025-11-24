@@ -25,7 +25,7 @@ public class KalshiService
         var connectionString = configuration.GetConnectionString("KalshiMySql");
         if (string.IsNullOrWhiteSpace(connectionString))
         {
-            throw new InvalidOperationException("Connection string 'KalshiMySql' is missing.");
+            throw new InvalidOperationException("Database connection string is missing. Set KALSHI_DB_HOST, KALSHI_DB_USER, KALSHI_DB_PASSWORD, and KALSHI_DB_NAME or KALSHI_DB_CONNECTION.");
         }
     }
 
