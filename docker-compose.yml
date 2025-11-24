@@ -36,7 +36,17 @@ services:
         condition: service_healthy
     networks:
       - kalshi-network
+      - web
     restart: unless-stopped
+    labels:
+      - "com.centurylinklabs.watchtower.enable=true"
+      - "traefik.enable=true"
+      - "traefik.http.routers.ksignals-backend.rule=Host(`api.kalshisignals.com`)"
+      - "traefik.http.routers.ksignals-backend.entrypoints=web,websecure"
+      - "traefik.http.routers.ksignals-backend.tls=true"
+      - "traefik.http.routers.ksignals-backend.tls.certresolver=letsencrypt"
+      - "traefik.http.services.ksignals-backend.loadbalancer.server.port=3006"
+      - "traefik.http.routers.ksignals-backend.middlewares=default-secure-headers@file"
 
   # Web Client
   web:
@@ -54,11 +64,23 @@ services:
       - backend
     networks:
       - kalshi-network
+      - web
     restart: unless-stopped
+    labels:
+      - "com.centurylinklabs.watchtower.enable=true"
+      - "traefik.enable=true"
+      - "traefik.http.routers.ksignals-frontend.rule=Host(`kalshisignals.com`)"
+      - "traefik.http.routers.ksignals-frontend.entrypoints=web,websecure"
+      - "traefik.http.routers.ksignals-frontend.tls=true"
+      - "traefik.http.routers.ksignals-frontend.tls.certresolver=letsencrypt"
+      - "traefik.http.services.ksignals-frontend.loadbalancer.server.port=3000"
+      - "traefik.http.routers.ksignals-frontend.middlewares=default-secure-headers@file"
 
 networks:
   kalshi-network:
     driver: bridge
+  web:
+    external: true
 
 volumes:
   redis-data:
