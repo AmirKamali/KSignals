@@ -68,13 +68,19 @@ public class RedisCacheAttribute : Attribute, IAsyncActionFilter
 
     private string GenerateCacheKey(ActionExecutingContext context)
     {
+        var request = context.HttpContext.Request;
         var keyBuilder = new StringBuilder();
 
-        // Use custom prefix or action name
+        // Base prefix + normalized path keeps keys unique per endpoint
         var prefix = _cacheKeyPrefix ?? $"{context.Controller.GetType().Name}:{context.ActionDescriptor.DisplayName}";
         keyBuilder.Append(prefix);
 
-        // Add route values
+        if (request.Path.HasValue)
+        {
+            keyBuilder.Append($":{request.Path.Value?.TrimEnd('/')}");
+        }
+
+        // Add route values (excluding controller/action) for completeness
         foreach (var routeValue in context.RouteData.Values.OrderBy(x => x.Key))
         {
             if (routeValue.Key != "controller" && routeValue.Key != "action")
@@ -83,16 +89,17 @@ public class RedisCacheAttribute : Attribute, IAsyncActionFilter
             }
         }
 
-        // Add query parameters
-        var queryParams = context.HttpContext.Request.Query
-            .OrderBy(x => x.Key)
+        // Add normalized query parameters to avoid collisions between filtered requests
+        var queryParams = request.Query
             .Where(x => !string.IsNullOrWhiteSpace(x.Value))
+            .OrderBy(x => x.Key, StringComparer.OrdinalIgnoreCase)
+            .Select(kvp => $"{kvp.Key}={Uri.EscapeDataString(kvp.Value.ToString())}")
             .ToList();
 
-        if (queryParams.Any())
+        if (queryParams.Count > 0)
         {
             keyBuilder.Append("?");
-            keyBuilder.Append(string.Join("&", queryParams.Select(x => $"{x.Key}={x.Value}")));
+            keyBuilder.Append(string.Join("&", queryParams));
         }
 
         return keyBuilder.ToString();

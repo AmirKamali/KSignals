@@ -242,8 +242,10 @@ export default function MarketTable({ markets: initialMarkets, tagsByCategories 
                             </tr>
                         </thead>
                         <tbody>
-                                {displayedMarkets.slice(0, 20).map((market) => (
-                                <tr key={market.ticker}>
+                                {displayedMarkets.slice(0, 20).map((market, index) => {
+                                    const rowKey = market.ticker || market.event_ticker || `market-${index}`;
+                                    return (
+                                <tr key={rowKey}>
                                     <td className={styles.titleCell}>
                                         <Link href={`/trade/${market.ticker}`} className={styles.titleLink}>
                                             <div className={styles.marketTitle}>{market.title}</div>
@@ -260,7 +262,8 @@ export default function MarketTable({ markets: initialMarkets, tagsByCategories 
                                         </Link>
                                     </td>
                                 </tr>
-                            ))}
+                                    );
+                            })}
                                 {displayedMarkets.length === 0 && (
                                     <tr>
                                         <td colSpan={4} style={{ textAlign: "center", padding: "2rem" }}>

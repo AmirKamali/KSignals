@@ -12,6 +12,7 @@ public interface IRedisCacheService
 
 public class RedisCacheService : IRedisCacheService, IDisposable
 {
+    private static readonly JsonSerializerOptions SerializerOptions = new(JsonSerializerDefaults.Web);
     private readonly ILogger<RedisCacheService> _logger;
     private readonly string? _connectionString;
     private ConnectionMultiplexer? _redis;
@@ -86,7 +87,7 @@ public class RedisCacheService : IRedisCacheService, IDisposable
             }
 
             _logger.LogDebug("Cache hit for key: {Key}", key);
-            return JsonSerializer.Deserialize<T>(value!);
+            return JsonSerializer.Deserialize<T>(value!, SerializerOptions);
         }
         catch (Exception ex)
         {
@@ -104,7 +105,7 @@ public class RedisCacheService : IRedisCacheService, IDisposable
 
         try
         {
-            var serialized = JsonSerializer.Serialize(value);
+            var serialized = JsonSerializer.Serialize(value, SerializerOptions);
             await _db.StringSetAsync(key, serialized, expiration);
             _logger.LogDebug("Successfully cached value for key: {Key} with expiration: {Expiration}", key, expiration);
         }
