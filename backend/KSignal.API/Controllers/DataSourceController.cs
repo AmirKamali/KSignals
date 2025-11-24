@@ -46,15 +46,16 @@ public class DataSourceController : ControllerBase
         }
     }
 
-    [HttpGet("/api/markets")]
+    [HttpGet("markets")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status500InternalServerError)]
-    public async Task<IActionResult> GetMarkets([FromQuery] string? category = null, [FromQuery] string? tag = null, CancellationToken cancellationToken = default)
+    public async Task<IActionResult> GetMarkets([FromQuery] string? category = null, [FromQuery] string? tag = null, [FromQuery] bool detailed = false, CancellationToken cancellationToken = default)
     {
         try
         {
-            var markets = await _kalshiService.GetMarketsAsync(category, tag, cancellationToken);
-            return Ok(new { count = markets.Count, markets });
+            var markets = await _kalshiService.GetMarketsAsync(category, tag, detailed, cancellationToken);
+            var shaped = MarketResponseMapper.Shape(markets, detailed).ToList();
+            return Ok(new { count = shaped.Count, markets = shaped });
         }
         catch (ApiException apiEx)
         {

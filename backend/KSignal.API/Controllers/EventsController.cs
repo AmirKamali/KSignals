@@ -1,6 +1,8 @@
 using Kalshi.Api;
 using Kalshi.Api.Client;
 using Kalshi.Api.Model;
+using KSignal.API.Models;
+using KSignal.API.Services;
 using Microsoft.AspNetCore.Mvc;
 
 namespace KSignal.API.Controllers;
@@ -21,12 +23,15 @@ public class EventsController : ControllerBase
     /// </summary>
     /// <param name="kalshiClient">The Kalshi API client</param>
     /// <param name="logger">The logger</param>
-    public EventsController(KalshiClient kalshiClient, ILogger<EventsController> logger)
+    /// <param name="kalshiService">Market service for caching and filtering</param>
+    public EventsController(KalshiClient kalshiClient, ILogger<EventsController> logger, KalshiService kalshiService)
     {
         _kalshiClient = kalshiClient ?? throw new ArgumentNullException(nameof(kalshiClient));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+        _kalshiService = kalshiService ?? throw new ArgumentNullException(nameof(kalshiService));
     }
 
+    private readonly KalshiService _kalshiService;
 
     /// <summary>
     /// Get tags organized by series categories
@@ -79,12 +84,13 @@ public class EventsController : ControllerBase
     [HttpGet("/api/markets")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status500InternalServerError)]
-    public async Task<IActionResult> GetMarkets([FromQuery] string? category = null, [FromQuery] string? tag = null, CancellationToken cancellationToken = default)
+    public async Task<IActionResult> GetMarkets([FromQuery] string? category = null, [FromQuery] string? tag = null, [FromQuery] bool detailed = false, CancellationToken cancellationToken = default)
     {
         try
         {
-            var markets = await _kalshiService.GetMarketsAsync(category, tag, cancellationToken);
-            return Ok(new { count = markets.Count, markets });
+            var markets = await _kalshiService.GetMarketsAsync(category, tag, detailed, cancellationToken);
+            var shaped = MarketResponseMapper.Shape(markets, detailed).ToList();
+            return Ok(new { count = shaped.Count, markets = shaped });
         }
         catch (ApiException apiEx)
         {

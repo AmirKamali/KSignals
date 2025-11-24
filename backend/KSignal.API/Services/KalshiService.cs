@@ -110,7 +110,7 @@ public class KalshiService
         return seen.Count;
     }
 
-    public async Task<List<MarketCache>> GetMarketsAsync(string? category = null, string? tag = null, CancellationToken cancellationToken = default)
+    public async Task<List<MarketCache>> GetMarketsAsync(string? category = null, string? tag = null, bool detailed = false, CancellationToken cancellationToken = default)
     {
         await _db.Database.EnsureCreatedAsync(cancellationToken);
         await EnsureMarketsTableAsync(cancellationToken);
@@ -130,16 +130,20 @@ public class KalshiService
         var seriesTickers = await seriesQuery.Select(s => s.SeriesId).Distinct().ToListAsync(cancellationToken);
         if (seriesTickers.Count == 0) return new List<MarketCache>();
 
-        var now = DateTime.UtcNow;
-        var cutoff = now.AddHours(-1);
+        var nowUtc = DateTime.UtcNow;
+        var cutoffUtc = nowUtc.AddHours(-1);
         var results = new List<MarketCache>();
         var staleSeries = new List<string>();
 
         foreach (var series in seriesTickers)
         {
-            var cached = await _db.Markets
-                .AsNoTracking()
-                .Where(m => m.SeriesTicker == series && m.LastUpdate >= cutoff)
+            var cached = await ApplyProjection(
+                    _db.Markets
+                        .AsNoTracking()
+                        .Where(m => m.SeriesTicker == series && m.LastUpdate >= cutoffUtc && m.CloseTime > nowUtc),
+                    detailed)
+                .OrderByDescending(m => m.Volume24h)
+                .Take(detailed ? int.MaxValue : 1)
                 .ToListAsync(cancellationToken);
 
             if (cached.Count > 0)
@@ -154,6 +158,7 @@ public class KalshiService
 
         foreach (var series in staleSeries)
         {
+            var fetchedAtUtc = DateTime.UtcNow;
             try
             {
                 var response = await _kalshiClient.Markets.GetMarketsAsync(
@@ -165,8 +170,8 @@ public class KalshiService
                 if (response?.Markets == null) continue;
 
                 var entities = response.Markets
-                    .Where(m => m != null)
-                    .Select(m => MapMarket(series, m!, now))
+                    .Where(m => m != null && m.CloseTime > nowUtc)
+                    .Select(m => MapMarket(series, m!, fetchedAtUtc))
                     .ToList();
 
                 // Replace existing cache for series
@@ -178,7 +183,15 @@ public class KalshiService
                 if (entities.Count > 0)
                 {
                     await _db.Markets.AddRangeAsync(entities, cancellationToken);
-                    results.AddRange(entities);
+                    var ordered = entities.OrderByDescending(e => e.Volume24h).ToList();
+                    if (detailed)
+                    {
+                        results.AddRange(ordered);
+                    }
+                    else if (ordered.Count > 0)
+                    {
+                        results.Add(WithoutJsonResponse(ordered[0]));
+                    }
                 }
                 await _db.SaveChangesAsync(cancellationToken);
             }
@@ -239,6 +252,49 @@ CREATE TABLE IF NOT EXISTS Markets (
         await _db.Database.ExecuteSqlRawAsync(createSql, cancellationToken);
     }
 
+    private static IQueryable<MarketCache> ApplyProjection(IQueryable<MarketCache> query, bool includeJson)
+    {
+        return query.Select(m => new MarketCache
+        {
+            TickerId = m.TickerId,
+            SeriesTicker = m.SeriesTicker,
+            Title = m.Title,
+            Subtitle = m.Subtitle,
+            Volume = m.Volume,
+            Volume24h = m.Volume24h,
+            CreatedTime = m.CreatedTime,
+            ExpirationTime = m.ExpirationTime,
+            CloseTime = m.CloseTime,
+            LatestExpirationTime = m.LatestExpirationTime,
+            OpenTime = m.OpenTime,
+            Status = m.Status,
+            YesBid = m.YesBid,
+            YesBidDollars = m.YesBidDollars,
+            YesAsk = m.YesAsk,
+            YesAskDollars = m.YesAskDollars,
+            NoBid = m.NoBid,
+            NoBidDollars = m.NoBidDollars,
+            NoAsk = m.NoAsk,
+            NoAskDollars = m.NoAskDollars,
+            LastPrice = m.LastPrice,
+            LastPriceDollars = m.LastPriceDollars,
+            PreviousYesBid = m.PreviousYesBid,
+            PreviousYesBidDollars = m.PreviousYesBidDollars,
+            PreviousYesAsk = m.PreviousYesAsk,
+            PreviousYesAskDollars = m.PreviousYesAskDollars,
+            PreviousPrice = m.PreviousPrice,
+            PreviousPriceDollars = m.PreviousPriceDollars,
+            Liquidity = m.Liquidity,
+            LiquidityDollars = m.LiquidityDollars,
+            SettlementValue = m.SettlementValue,
+            SettlementValueDollars = m.SettlementValueDollars,
+            NotionalValue = m.NotionalValue,
+            NotionalValueDollars = m.NotionalValueDollars,
+            JsonResponse = includeJson ? m.JsonResponse : null,
+            LastUpdate = m.LastUpdate
+        });
+    }
+
     private static MarketCache MapMarket(string seriesTicker, Market market, DateTime lastUpdate)
     {
         return new MarketCache
@@ -279,6 +335,49 @@ CREATE TABLE IF NOT EXISTS Markets (
             NotionalValueDollars = market.NotionalValueDollars,
             JsonResponse = JsonConvert.SerializeObject(market),
             LastUpdate = lastUpdate
+        };
+    }
+
+    private static MarketCache WithoutJsonResponse(MarketCache market)
+    {
+        return new MarketCache
+        {
+            TickerId = market.TickerId,
+            SeriesTicker = market.SeriesTicker,
+            Title = market.Title,
+            Subtitle = market.Subtitle,
+            Volume = market.Volume,
+            Volume24h = market.Volume24h,
+            CreatedTime = market.CreatedTime,
+            ExpirationTime = market.ExpirationTime,
+            CloseTime = market.CloseTime,
+            LatestExpirationTime = market.LatestExpirationTime,
+            OpenTime = market.OpenTime,
+            Status = market.Status,
+            YesBid = market.YesBid,
+            YesBidDollars = market.YesBidDollars,
+            YesAsk = market.YesAsk,
+            YesAskDollars = market.YesAskDollars,
+            NoBid = market.NoBid,
+            NoBidDollars = market.NoBidDollars,
+            NoAsk = market.NoAsk,
+            NoAskDollars = market.NoAskDollars,
+            LastPrice = market.LastPrice,
+            LastPriceDollars = market.LastPriceDollars,
+            PreviousYesBid = market.PreviousYesBid,
+            PreviousYesBidDollars = market.PreviousYesBidDollars,
+            PreviousYesAsk = market.PreviousYesAsk,
+            PreviousYesAskDollars = market.PreviousYesAskDollars,
+            PreviousPrice = market.PreviousPrice,
+            PreviousPriceDollars = market.PreviousPriceDollars,
+            Liquidity = market.Liquidity,
+            LiquidityDollars = market.LiquidityDollars,
+            SettlementValue = market.SettlementValue,
+            SettlementValueDollars = market.SettlementValueDollars,
+            NotionalValue = market.NotionalValue,
+            NotionalValueDollars = market.NotionalValueDollars,
+            JsonResponse = null,
+            LastUpdate = market.LastUpdate
         };
     }
 
