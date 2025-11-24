@@ -1,0 +1,12 @@
+services:
+  backend:
+    build:
+      context: ./backend
+      dockerfile: KSignal.API/Dockerfile
+    image: ksignals-backend:dev
+
+  web:
+    build:
+      context: ./web
+      dockerfile: Dockerfile
+    image: ksignals-frontend:dev

@@ -20,9 +20,7 @@ services:
 
   # Backend API
   backend:
-    build:
-      context: ./backend
-      dockerfile: KSignal.API/Dockerfile
+    image: ghcr.io/amirkamali/ksignals-backend:latest
     container_name: kalshi-signals-backend
     ports:
       - "3006:3006"
@@ -53,9 +51,7 @@ services:
 
   # Web Client
   web:
-    build:
-      context: ./web
-      dockerfile: Dockerfile
+    image: ghcr.io/amirkamali/ksignals-frontend:latest
     container_name: kalshi-signals-web
     ports:
       - "3000:3000"
