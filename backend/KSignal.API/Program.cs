@@ -85,10 +85,11 @@ if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
     app.UseSwaggerUI();
+    // Don't force HTTPS redirect in development
 }
 
-app.UseHttpsRedirection();
 app.UseAuthorization();
 app.MapControllers();
 
+app.Urls.Add("http://localhost:3006");
 app.Run();

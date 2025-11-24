@@ -11,7 +11,7 @@ namespace KSignal.API.Controllers;
 /// Controller for events-related endpoints
 /// </summary>
 [ApiController]
-[Route("api/[controller]")]
+[Route("api/events")]
 [Produces("application/json")]
 public class EventsController : ControllerBase
 {
@@ -88,8 +88,8 @@ public class EventsController : ControllerBase
     {
         try
         {
-            var markets = await _kalshiService.GetMarketsAsync(category, tag, detailed, cancellationToken);
-            var shaped = MarketResponseMapper.Shape(markets, detailed).ToList();
+            var markets = await _kalshiService.GetMarketsAsync(category, tag, cancellationToken);
+            var shaped = MarketResponseMapper.Shape(markets).ToList();
             return Ok(new { count = shaped.Count, markets = shaped });
         }
         catch (ApiException apiEx)

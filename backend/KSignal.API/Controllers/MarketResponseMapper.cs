@@ -7,61 +7,18 @@ namespace KSignal.API.Controllers;
 
 internal static class MarketResponseMapper
 {
-    public static IEnumerable<object> Shape(IEnumerable<MarketCache> markets, bool detailed)
+    public static IEnumerable<object> Shape(IEnumerable<MarketCache> markets)
     {
         if (markets == null) yield break;
 
         foreach (var m in markets)
         {
-            yield return ToResponse(m, detailed);
+            yield return ToResponse(m);
         }
     }
 
-    public static object ToResponse(MarketCache market, bool detailed)
+    public static object ToResponse(MarketCache market)
     {
-        if (detailed)
-        {
-            return new
-            {
-                market.TickerId,
-                market.SeriesTicker,
-                market.Title,
-                market.Subtitle,
-                market.Volume,
-                market.Volume24h,
-                market.CreatedTime,
-                market.ExpirationTime,
-                market.CloseTime,
-                market.LatestExpirationTime,
-                market.OpenTime,
-                market.Status,
-                market.YesBid,
-                market.YesBidDollars,
-                market.YesAsk,
-                market.YesAskDollars,
-                market.NoBid,
-                market.NoBidDollars,
-                market.NoAsk,
-                market.NoAskDollars,
-                market.LastPrice,
-                market.LastPriceDollars,
-                market.PreviousYesBid,
-                market.PreviousYesBidDollars,
-                market.PreviousYesAsk,
-                market.PreviousYesAskDollars,
-                market.PreviousPrice,
-                market.PreviousPriceDollars,
-                market.Liquidity,
-                market.LiquidityDollars,
-                market.SettlementValue,
-                market.SettlementValueDollars,
-                market.NotionalValue,
-                market.NotionalValueDollars,
-                market.JsonResponse,
-                market.LastUpdate
-            };
-        }
-
         return new
         {
             market.TickerId,
