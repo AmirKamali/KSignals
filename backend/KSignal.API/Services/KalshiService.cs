@@ -190,11 +190,11 @@ public class KalshiService
                 break;
 
             case "this_year":
-                targetDate = new DateTime(nowUtc.Year + 1, DateTimeKind.Utc).AddSeconds(-1);
+                targetDate = new DateTime(nowUtc.Year, 12, 31, 23, 59, 59, DateTimeKind.Utc);
                 break;
 
             case "next_year":
-                targetDate = new DateTime(nowUtc.Year + 2, DateTimeKind.Utc).AddSeconds(-1);
+                targetDate = new DateTime(nowUtc.Year + 1, 12, 31, 23, 59, 59, DateTimeKind.Utc);
                 break;
 
             default:
