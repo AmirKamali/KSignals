@@ -8,7 +8,7 @@ namespace KSignal.API.Controllers;
 /// Private API for data source refresh
 /// </summary>
 [ApiController]
-[Route("api/private/data-source/[controller]")]
+[Route("api/private/data-source/")]
 [Produces("application/json")]
 public class BackendPrivateController : ControllerBase
 {
@@ -21,7 +21,7 @@ public class BackendPrivateController : ControllerBase
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
 
-    [HttpPost("refresh-market")]
+    [HttpPost("refresh-series-categories-tags")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status500InternalServerError)]
     public async Task<IActionResult> RefreshMarket([FromQuery] string? category = null, [FromQuery] string? tag = null, CancellationToken cancellationToken = default)
@@ -46,6 +46,46 @@ public class BackendPrivateController : ControllerBase
         {
             _logger.LogError(ex, "Failed to refresh market categories");
             return StatusCode(StatusCodes.Status500InternalServerError, new { error = "Failed to refresh market categories", message = ex.Message });
+        }
+    }
+
+    [HttpPost("refresh-market-data")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status502BadGateway)]
+    [ProducesResponseType(StatusCodes.Status500InternalServerError)]
+    public async Task<IActionResult> CacheMarketData([FromQuery] string? category = null, [FromQuery] string? tag = null, CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            _logger.LogInformation("Starting market data cache request for category={Category}, tag={Tag}", category, tag);
+
+            var cachedCount = await _kalshiService.CacheMarketDataAsync(category, tag, cancellationToken);
+
+            _logger.LogInformation("Successfully cached {Count} markets", cachedCount);
+
+            return Ok(new
+            {
+                cached = cachedCount,
+                cachedAt = DateTime.UtcNow,
+                category,
+                tag
+            });
+        }
+        catch (ApiException apiEx)
+        {
+            _logger.LogError(apiEx, "Kalshi API error during market data caching");
+            return StatusCode(StatusCodes.Status502BadGateway, new
+            {
+                error = "Kalshi API error",
+                message = apiEx.Message,
+                statusCode = apiEx.ErrorCode,
+                details = apiEx.ErrorContent
+            });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to cache market data");
+            return StatusCode(StatusCodes.Status500InternalServerError, new { error = "Failed to cache market data", message = ex.Message });
         }
     }
 }

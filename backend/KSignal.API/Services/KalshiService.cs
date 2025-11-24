@@ -204,6 +204,159 @@ public class KalshiService
         return targetDate;
     }
 
+    public async Task<int> CacheMarketDataAsync(string? category = null, string? tag = null, CancellationToken cancellationToken = default)
+    {
+        await _db.Database.EnsureCreatedAsync(cancellationToken);
+
+        // Read `marketcategories` to find series matching the filters and aggregate seriesIds
+        var seriesIds = _db.MarketCategories
+            .AsNoTracking()
+            .Where(mc =>
+                (string.IsNullOrWhiteSpace(category) || mc.Category == category) &&
+                (string.IsNullOrWhiteSpace(tag) || (mc.Tags != null && mc.Tags.Contains(tag))))
+            .Select(mc => mc.SeriesId)
+            .Distinct()
+            .ToList();
+
+        if (seriesIds == null || seriesIds.Count == 0)
+        {
+            _logger.LogWarning("No series found for category={Category}, tag={Tag}", category, tag);
+            return 0;
+        }
+
+        _logger.LogInformation("Caching market data for {SeriesCount} series (category={Category}, tag={Tag})",
+            seriesIds.Count, category, tag);
+
+        var nowUtc = DateTime.UtcNow;
+        var totalCached = 0;
+
+        // Fetch markets for each series ticker
+        foreach (var seriesTicker in seriesIds)
+        {
+            try
+            {
+                var marketCount = await FetchAndCacheMarketsForSeriesAsync(seriesTicker, nowUtc, cancellationToken);
+                totalCached += marketCount;
+                _logger.LogInformation("Cached {Count} markets for series {SeriesTicker}", marketCount, seriesTicker);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error caching markets for series {SeriesTicker}", seriesTicker);
+                // Continue with next series even if one fails
+            }
+        }
+
+        _logger.LogInformation("Successfully cached {TotalCount} markets across {SeriesCount} series",
+            totalCached, seriesIds.Count);
+
+        return totalCached;
+    }
+
+    private async Task<int> FetchAndCacheMarketsForSeriesAsync(string seriesTicker, DateTime fetchedAtUtc, CancellationToken cancellationToken)
+    {
+        var markets = new List<MarketCache>();
+        string? cursor = null;
+
+        do
+        {
+            var requestOptions = new RequestOptions
+            {
+                Operation = "MarketApi.GetMarkets"
+            };
+
+            requestOptions.QueryParameters.Add(ClientUtils.ParameterToMultiMap("", "limit", 1000));
+            requestOptions.QueryParameters.Add(ClientUtils.ParameterToMultiMap("", "status", "open"));
+            requestOptions.QueryParameters.Add(ClientUtils.ParameterToMultiMap("", "series_ticker", seriesTicker));
+
+            if (!string.IsNullOrWhiteSpace(cursor))
+            {
+                requestOptions.QueryParameters.Add(ClientUtils.ParameterToMultiMap("", "cursor", cursor));
+            }
+
+            var response = await _kalshiClient.Markets.AsynchronousClient.GetAsync<GetMarketsResponse>(
+                    "/markets",
+                    requestOptions,
+                    _kalshiClient.Markets.Configuration,
+                    cancellationToken)
+                .ConfigureAwait(false);
+
+            var data = response?.Data;
+            if (data?.Markets != null)
+            {
+                var mapped = data.Markets
+                    .Where(m => m != null)
+                    .Select(m => MapMarket(seriesTicker, m!, fetchedAtUtc))
+                    .ToList();
+                markets.AddRange(mapped);
+            }
+
+            cursor = data?.Cursor;
+        } while (!string.IsNullOrWhiteSpace(cursor));
+
+        // Upsert markets to database
+        if (markets.Count > 0)
+        {
+            await UpsertMarketsAsync(markets, cancellationToken);
+        }
+
+        return markets.Count;
+    }
+
+    private async Task UpsertMarketsAsync(List<MarketCache> markets, CancellationToken cancellationToken)
+    {
+        foreach (var market in markets)
+        {
+            var existing = await _db.Markets.FindAsync(new object[] { market.TickerId }, cancellationToken);
+            if (existing == null)
+            {
+                _db.Markets.Add(market);
+            }
+            else
+            {
+                // Update all properties
+                existing.SeriesTicker = market.SeriesTicker;
+                existing.Title = market.Title;
+                existing.Subtitle = market.Subtitle;
+                existing.Volume = market.Volume;
+                existing.Volume24h = market.Volume24h;
+                existing.CreatedTime = market.CreatedTime;
+                existing.ExpirationTime = market.ExpirationTime;
+                existing.CloseTime = market.CloseTime;
+                existing.LatestExpirationTime = market.LatestExpirationTime;
+                existing.OpenTime = market.OpenTime;
+                existing.Status = market.Status;
+                existing.YesBid = market.YesBid;
+                existing.YesBidDollars = market.YesBidDollars;
+                existing.YesAsk = market.YesAsk;
+                existing.YesAskDollars = market.YesAskDollars;
+                existing.NoBid = market.NoBid;
+                existing.NoBidDollars = market.NoBidDollars;
+                existing.NoAsk = market.NoAsk;
+                existing.NoAskDollars = market.NoAskDollars;
+                existing.LastPrice = market.LastPrice;
+                existing.LastPriceDollars = market.LastPriceDollars;
+                existing.PreviousYesBid = market.PreviousYesBid;
+                existing.PreviousYesBidDollars = market.PreviousYesBidDollars;
+                existing.PreviousYesAsk = market.PreviousYesAsk;
+                existing.PreviousYesAskDollars = market.PreviousYesAskDollars;
+                existing.PreviousPrice = market.PreviousPrice;
+                existing.PreviousPriceDollars = market.PreviousPriceDollars;
+                existing.Liquidity = market.Liquidity;
+                existing.LiquidityDollars = market.LiquidityDollars;
+                existing.SettlementValue = market.SettlementValue;
+                existing.SettlementValueDollars = market.SettlementValueDollars;
+                existing.NotionalValue = market.NotionalValue;
+                existing.NotionalValueDollars = market.NotionalValueDollars;
+                existing.JsonResponse = market.JsonResponse;
+                existing.LastUpdate = market.LastUpdate;
+
+                _db.Markets.Update(existing);
+            }
+        }
+
+        await _db.SaveChangesAsync(cancellationToken);
+    }
+
     public async Task<List<MarketCache>> GetTodayMarketsAsync(CancellationToken cancellationToken = default)
     {
         var nowUtc = DateTime.UtcNow;
