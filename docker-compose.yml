@@ -3,6 +3,7 @@ services:
   backend:
     image: ghcr.io/amirkamali/ksignals-backend:latest
     container_name: kalshi-signals-backend
+    platform: ${DOCKER_PLATFORM:-linux/amd64}
     ports:
       - "3006:3006"
     environment:
@@ -10,6 +11,7 @@ services:
       - ASPNETCORE_URLS=http://+:3006
       - KALSHI_REDIS_CONNECTION=${KALSHI_REDIS_CONNECTION:-redis:6379}
       - KALSHI_DB_CONNECTION=${KALSHI_DB_CONNECTION:?Set KALSHI_DB_CONNECTION}
+      - KALSHI_DB_VERSION=${KALSHI_DB_VERSION:-8.0.32}
       - KALSHI_API_KEY=${KALSHI_API_KEY:?Set KALSHI_API_KEY}
       - KALSHI_PRIVATE_KEY_PATH=${KALSHI_PRIVATE_KEY_PATH:?Set KALSHI_PRIVATE_KEY_PATH}
       - KALSHI_BASE_URL=${KALSHI_BASE_URL:?Set KALSHI_BASE_URL}
@@ -31,6 +33,7 @@ services:
   web:
     image: ghcr.io/amirkamali/ksignals-frontend:latest
     container_name: kalshi-signals-web
+    platform: ${DOCKER_PLATFORM:-linux/amd64}
     ports:
       - "3000:3000"
     environment:

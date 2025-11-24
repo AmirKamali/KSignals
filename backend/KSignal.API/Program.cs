@@ -30,8 +30,28 @@ if (string.IsNullOrWhiteSpace(connectionString))
     throw new InvalidOperationException("Database connection string is not configured. Set KALSHI_DB_CONNECTION.");
 }
 
+var dbVersionString = Environment.GetEnvironmentVariable("KALSHI_DB_VERSION");
+MySqlServerVersion? dbServerVersion = null;
+
+if (!string.IsNullOrWhiteSpace(dbVersionString) && Version.TryParse(dbVersionString, out var parsedVersion))
+{
+    dbServerVersion = new MySqlServerVersion(parsedVersion);
+}
+else
+{
+    try
+    {
+        dbServerVersion = ServerVersion.AutoDetect(connectionString);
+    }
+    catch
+    {
+        // Default to a recent MySQL 8 version when auto-detect fails (e.g., DB unreachable at startup)
+        dbServerVersion = new MySqlServerVersion(new Version(8, 0, 32));
+    }
+}
+
 builder.Services.AddDbContext<KalshiDbContext>(options =>
-    options.UseMySql(connectionString, ServerVersion.AutoDetect(connectionString)));
+    options.UseMySql(connectionString, dbServerVersion));
 
 // Register Kalshi API Client
 // For public endpoints, we can use without authentication

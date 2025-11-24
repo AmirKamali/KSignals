@@ -4,6 +4,7 @@ services:
   redis:
     image: redis:7-alpine
     container_name: kalshi-signals-redis
+    platform: ${DOCKER_PLATFORM:-linux/amd64}
     ports:
       - "6379:6379"
     volumes:
