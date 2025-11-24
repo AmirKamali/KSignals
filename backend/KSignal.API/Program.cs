@@ -31,7 +31,7 @@ if (string.IsNullOrWhiteSpace(connectionString))
 }
 
 var dbVersionString = Environment.GetEnvironmentVariable("KALSHI_DB_VERSION");
-MySqlServerVersion? dbServerVersion = null;
+ServerVersion? dbServerVersion = null;
 
 if (!string.IsNullOrWhiteSpace(dbVersionString) && Version.TryParse(dbVersionString, out var parsedVersion))
 {
