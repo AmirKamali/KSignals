@@ -1,23 +1,4 @@
-version: '3.8'
-
 services:
-  # Redis Cache
-  redis:
-    image: redis:7-alpine
-    container_name: kalshi-signals-redis
-    ports:
-      - "6379:6379"
-    volumes:
-      - redis-data:/data
-    command: redis-server --appendonly yes
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 10s
-      timeout: 3s
-      retries: 3
-    networks:
-      - kalshi-network
-
   # Backend API
   backend:
     image: ghcr.io/amirkamali/ksignals-backend:latest
@@ -32,9 +13,6 @@ services:
       - KALSHI_API_KEY=${KALSHI_API_KEY:?Set KALSHI_API_KEY}
       - KALSHI_PRIVATE_KEY_PATH=${KALSHI_PRIVATE_KEY_PATH:?Set KALSHI_PRIVATE_KEY_PATH}
       - KALSHI_BASE_URL=${KALSHI_BASE_URL:?Set KALSHI_BASE_URL}
-    depends_on:
-      redis:
-        condition: service_healthy
     networks:
       - kalshi-network
       - web
@@ -77,10 +55,6 @@ services:
 
 networks:
   kalshi-network:
-    driver: bridge
+    name: kalshi-network
   web:
     external: true
-
-volumes:
-  redis-data:
-    driver: local
