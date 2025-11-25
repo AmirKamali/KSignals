@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { useSearchParams, usePathname, useRouter } from "next/navigation";
-import { ArrowRight, Loader2, Calendar, Triangle } from "lucide-react";
+import { Loader2, Calendar, Triangle } from "lucide-react";
 import { Market, getBackendMarkets } from "@/lib/kalshi";
 import styles from "./MarketTable.module.css";
 
@@ -297,7 +297,6 @@ export default function MarketTable({ markets: initialMarkets, tagsByCategories 
                                 <th>Volume</th>
                                 <th>Yes Price</th>
                                 <th>No Price</th>
-                                <th>Action</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -348,17 +347,12 @@ export default function MarketTable({ markets: initialMarkets, tagsByCategories 
                                             )}
                                         </div>
                                     </td>
-                                    <td>
-                                        <Link href={`/trade/${market.ticker}`} className={styles.detailsBtn}>
-                                            Details <ArrowRight size={14} />
-                                        </Link>
-                                    </td>
                                 </tr>
                                     );
                             })}
                                 {displayedMarkets.length === 0 && (
                                     <tr>
-                                        <td colSpan={5} style={{ textAlign: "center", padding: "2rem" }}>
+                                        <td colSpan={4} style={{ textAlign: "center", padding: "2rem" }}>
                                             No markets found
                                         </td>
                                     </tr>
