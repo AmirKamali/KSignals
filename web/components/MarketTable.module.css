@@ -69,6 +69,31 @@
     border-bottom: 1px solid var(--border);
 }
 
+.sortButton {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    background: transparent;
+    border: none;
+    color: inherit;
+    font: inherit;
+    cursor: pointer;
+    padding: 0;
+}
+
+.sortButton:hover {
+    color: var(--text-primary);
+}
+
+.sortActive {
+    color: var(--primary);
+}
+
+.sortIcon {
+    color: currentColor;
+    transition: transform var(--transition-fast);
+}
+
 .table td {
     padding: 1.5rem;
     border-bottom: 1px solid var(--border);
@@ -174,6 +199,46 @@
 
 .spin {
     animation: spin 1s linear infinite;
+}
+
+.pagination {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    padding: 1rem 1.5rem;
+    margin-top: 1rem;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    box-shadow: 0 10px 30px rgba(15, 23, 42, 0.08);
+}
+
+.pageButton {
+    padding: 0.6rem 1.2rem;
+    border-radius: var(--radius-md);
+    border: 1px solid var(--border);
+    background: var(--surface-hover);
+    color: var(--text-primary);
+    font-weight: 600;
+    cursor: pointer;
+    transition: all var(--transition-fast);
+}
+
+.pageButton:hover:enabled {
+    border-color: var(--primary);
+    color: var(--primary);
+    box-shadow: 0 8px 20px rgba(15, 23, 42, 0.08);
+}
+
+.pageButton:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.pageIndicator {
+    color: var(--text-muted);
+    font-weight: 500;
 }
 
 .dateFilterContainer {

@@ -29,11 +29,17 @@ public class KalshiService
         }
     }
 
-    public async Task<List<MarketCache>> GetMarketsAsync(string? category = null, string? tag = null, string? closeDateType = null, CancellationToken cancellationToken = default)
+    public async Task<List<MarketCache>> GetMarketsAsync(
+        string? category = null,
+        string? tag = null,
+        string? closeDateType = null,
+        MarketSort sortBy = MarketSort.Volume,
+        SortDirection direction = SortDirection.Desc,
+        CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrWhiteSpace(category) && string.IsNullOrWhiteSpace(tag))
         {
-            return await GetTodayMarketsAsync(cancellationToken);
+            return await GetTodayMarketsAsync(sortBy, direction, cancellationToken);
         }
 
         // Read `marketcategories` to find series matching the filters and aggregate seriesIds
@@ -70,11 +76,11 @@ public class KalshiService
         
 
         // Group by series and take the market with highest 24h volume per series
-        return allMarkets
+        var selected = allMarkets
             .GroupBy(m => m.SeriesTicker, StringComparer.OrdinalIgnoreCase)
-            .Select(g => WithoutJsonResponse(g.OrderByDescending(x => x.Volume24h).First()))
-            .OrderByDescending(m => m.Volume24h)
-            .ToList();
+            .Select(g => WithoutJsonResponse(g.OrderByDescending(x => x.Volume24h).First()));
+
+        return ApplySorting(selected, sortBy, direction).ToList();
     }
 
     private static DateTime? GetMaxCloseTimeFromDateType(string? closeDateType, DateTime nowUtc)
@@ -124,7 +130,10 @@ public class KalshiService
     }
 
 
-    public async Task<List<MarketCache>> GetTodayMarketsAsync(CancellationToken cancellationToken = default)
+    public async Task<List<MarketCache>> GetTodayMarketsAsync(
+        MarketSort sortBy = MarketSort.Volume,
+        SortDirection direction = SortDirection.Desc,
+        CancellationToken cancellationToken = default)
     {
         var nowUtc = DateTime.UtcNow;
         var maxCloseTs = DateTimeOffset.UtcNow.AddHours(24).ToUnixTimeSeconds();
@@ -174,11 +183,11 @@ public class KalshiService
 
         var ordered = results.OrderBy(m => m.CloseTime).ToList();
 
-        return ordered
+        var selected = ordered
             .GroupBy(m => m.SeriesTicker, StringComparer.OrdinalIgnoreCase)
-            .Select(g => WithoutJsonResponse(g.OrderByDescending(x => x.Volume24h).First()))
-            .OrderBy(m => m.CloseTime)
-            .ToList();
+            .Select(g => WithoutJsonResponse(g.OrderByDescending(x => x.Volume24h).First()));
+
+        return ApplySorting(selected, sortBy, direction).ToList();
     }
 
     private async Task EnsureMarketsTableAsync(CancellationToken cancellationToken)
@@ -269,6 +278,19 @@ CREATE TABLE IF NOT EXISTS Markets (
             JsonResponse = JsonConvert.SerializeObject(market),
             LastUpdate = lastUpdate
         };
+    }
+
+    private static IEnumerable<MarketCache> ApplySorting(IEnumerable<MarketCache> markets, MarketSort sortBy, SortDirection direction)
+    {
+        var ordered = sortBy switch
+        {
+            MarketSort.Volume => direction == SortDirection.Asc
+                ? markets.OrderBy(m => m.Volume24h)
+                : markets.OrderByDescending(m => m.Volume24h),
+            _ => markets.OrderByDescending(m => m.Volume24h)
+        };
+
+        return ordered;
     }
 
     private static MarketCache WithoutJsonResponse(MarketCache market)

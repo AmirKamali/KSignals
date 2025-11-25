@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { useSearchParams, usePathname, useRouter } from "next/navigation";
 import { Loader2, Calendar, Triangle } from "lucide-react";
-import { Market, getBackendMarkets } from "@/lib/kalshi";
+import { Market, getBackendMarkets, MarketSort, SortDirection } from "@/lib/kalshi";
 import FormattedTitle from "./FormattedTitle";
 import styles from "./MarketTable.module.css";
 
@@ -14,45 +14,9 @@ interface MarketTableProps {
 }
 
 type DateFilterOption = "all_time" | "next_24_hr" | "next_48_hr" | "next_7_days" | "next_30_days" | "next_90_days" | "this_year" | "next_year";
+type SortOption = MarketSort;
 
-// Calculate max_close_ts Unix timestamp for Kalshi API based on date filter
-// This filters markets that close/expire before the target date
-function getMaxCloseTimestamp(dateFilter: DateFilterOption): number | null {
-    if (dateFilter === "all_time") return null;
-
-    const now = new Date();
-    const targetDate = new Date(now);
-
-    switch (dateFilter) {
-        case "next_24_hr":
-            targetDate.setHours(now.getHours() + 24);
-            break;
-        case "next_48_hr":
-            targetDate.setHours(now.getHours() + 48);
-            break;
-        case "next_7_days":
-            targetDate.setDate(now.getDate() + 7);
-            break;
-        case "next_30_days":
-            targetDate.setDate(now.getDate() + 30);
-            break;
-        case "next_90_days":
-            targetDate.setDate(now.getDate() + 90);
-            break;
-        case "this_year":
-            targetDate.setMonth(11, 31); // December 31st of current year
-            targetDate.setHours(23, 59, 59, 999);
-            break;
-        case "next_year":
-            targetDate.setFullYear(now.getFullYear() + 1);
-            targetDate.setMonth(11, 31); // December 31st of next year
-            targetDate.setHours(23, 59, 59, 999);
-            break;
-    }
-
-    // Return Unix timestamp (seconds since epoch)
-    return Math.floor(targetDate.getTime() / 1000);
-}
+const PAGE_SIZE = 20;
 
 function formatCloseTime(closeTime?: string): string {
     if (!closeTime) return "Close time unavailable";
@@ -120,10 +84,20 @@ export default function MarketTable({ markets: initialMarkets, tagsByCategories 
     const initialCategory = searchParams.get("category") || "All";
     const initialTag = searchParams.get("tag");
     const initialDate = (searchParams.get("date") as DateFilterOption) || "all_time";
+    const initialSort = (searchParams.get("sort") as SortOption) || "volume";
+    const initialDirection = (searchParams.get("direction") as SortDirection) || "desc";
+    const initialPage = Math.max(1, parseInt(searchParams.get("page") || "1", 10));
+    const initialPageSize = Math.max(1, parseInt(searchParams.get("pageSize") || `${PAGE_SIZE}`, 10));
 
     const [activeCategory, setActiveCategory] = useState(initialCategory);
     const [activeSubTag, setActiveSubTag] = useState<string | null>(initialTag);
     const [activeDate, setActiveDate] = useState<DateFilterOption>(initialDate);
+    const [activeSort, setActiveSort] = useState<SortOption>(initialSort);
+    const [sortDirection, setSortDirection] = useState<SortDirection>(initialDirection);
+    const [currentPage, setCurrentPage] = useState(initialPage);
+    const [pageSize] = useState(initialPageSize);
+    const [totalPages, setTotalPages] = useState(1);
+    const [totalCount, setTotalCount] = useState(0);
     
     // Initialize displayed markets based on synchronous category filtering
     // Only use initialMarkets fallback if we are on "All" or if we want to show *something* while fetching
@@ -139,29 +113,48 @@ export default function MarketTable({ markets: initialMarkets, tagsByCategories 
     });
     
     // We are loading if there is a tag OR a category (that is not All) because now we fetch for categories too
-    const [isLoading, setIsLoading] = useState(!!initialTag || (initialCategory !== "All"));
+    const [isLoading, setIsLoading] = useState(true);
 
     const categories = ["All", ...Object.keys(tagsByCategories).sort()];
 
-    const fetchMarkets = useCallback(async (category: string, tag: string | null, dateFilter: DateFilterOption) => {
+    const fetchMarkets = useCallback(async (
+        category: string,
+        tag: string | null,
+        dateFilter: DateFilterOption,
+        sort: SortOption,
+        direction: SortDirection,
+        page: number,
+        size: number
+    ) => {
         setIsLoading(true);
         try {
-            const markets = await getBackendMarkets({
+            const response = await getBackendMarkets({
                 category: category !== "All" ? category : null,
                 tag,
                 close_date_type: dateFilter !== "all_time" ? dateFilter : null,
+                sort,
+                direction,
+                page,
+                pageSize: size
             });
 
-            // Sort by volume descending for consistency
-            markets.sort((a, b) => b.volume - a.volume);
-
-            setDisplayedMarkets(markets);
+            setDisplayedMarkets(response.markets);
+            setTotalPages(Math.max(1, response.totalPages || 1));
+            setTotalCount(response.totalCount || response.markets.length);
+            setCurrentPage(response.currentPage || 1);
+            setActiveSort(response.sort || sort);
+            setSortDirection(response.direction || direction);
         } catch (error) {
             console.error("Error loading markets:", error);
             // Fallback to local filtering if fetch fails
-             if (!tag && category !== "All") {
+            if (!tag && category !== "All") {
                 const filtered = initialMarkets.filter(m => m.category === category || (!m.category && category === "Other"));
                 setDisplayedMarkets(filtered);
+                setTotalPages(1);
+                setTotalCount(filtered.length);
+            } else {
+                setTotalPages(1);
+                setTotalCount(initialMarkets.length);
             }
         } finally {
             setIsLoading(false);
@@ -172,21 +165,22 @@ export default function MarketTable({ markets: initialMarkets, tagsByCategories 
         const cat = searchParams.get("category") || "All";
         const tag = searchParams.get("tag");
         const date = (searchParams.get("date") as DateFilterOption) || "all_time";
+        const sort = (searchParams.get("sort") as SortOption) || "volume";
+        const direction = (searchParams.get("direction") as SortDirection) || "desc";
+        const page = Math.max(1, parseInt(searchParams.get("page") || "1", 10));
+        const size = Math.max(1, parseInt(searchParams.get("pageSize") || `${pageSize}`, 10));
 
         setActiveCategory(cat);
         setActiveSubTag(tag);
         setActiveDate(date);
+        setActiveSort(sort);
+        setSortDirection(direction);
+        setCurrentPage(page);
 
-        // Always fetch from backend with filters (including for "All" category)
-        if (tag || cat !== "All" || date !== "all_time") {
-            fetchMarkets(cat, tag, date);
-        } else {
-            // Only use initial markets if no filters are applied at all
-            setDisplayedMarkets(initialMarkets);
-        }
-    }, [searchParams, initialMarkets, fetchMarkets]);
+        fetchMarkets(cat, tag, date, sort, direction, page, size);
+    }, [searchParams, fetchMarkets, pageSize]);
 
-    const updateUrl = (newCategory: string, newTag: string | null, newDate?: DateFilterOption) => {
+    const updateUrl = (newCategory: string, newTag: string | null, newDate?: DateFilterOption, options?: { sort?: SortOption; direction?: SortDirection; page?: number; resetPage?: boolean }) => {
         const params = new URLSearchParams(searchParams);
 
         if (newCategory && newCategory !== "All") {
@@ -208,20 +202,49 @@ export default function MarketTable({ markets: initialMarkets, tagsByCategories 
             params.delete("date");
         }
 
+        const sortToUse = options?.sort ?? activeSort;
+        const directionToUse = options?.direction ?? sortDirection;
+        const pageToUse = options?.resetPage ? 1 : (options?.page ?? currentPage);
+
+        params.set("sort", sortToUse);
+        params.set("direction", directionToUse);
+
+        if (pageToUse && pageToUse > 1) {
+            params.set("page", String(pageToUse));
+        } else {
+            params.delete("page");
+        }
+
+        if (pageSize && pageSize !== PAGE_SIZE) {
+            params.set("pageSize", String(pageSize));
+        } else {
+            params.delete("pageSize");
+        }
+
         replace(`${pathname}?${params.toString()}`, { scroll: false });
     };
 
     const handleCategoryClick = (cat: string) => {
         // When category changes, clear the tag
-        updateUrl(cat, null);
+        updateUrl(cat, null, undefined, { resetPage: true });
     };
 
     const handleSubTagClick = (tag: string) => {
-        updateUrl(activeCategory, tag);
+        updateUrl(activeCategory, tag, undefined, { resetPage: true });
     };
 
     const handleDateChange = (date: DateFilterOption) => {
-        updateUrl(activeCategory, activeSubTag, date);
+        updateUrl(activeCategory, activeSubTag, date, { resetPage: true });
+    };
+
+    const handleSortClick = (sort: SortOption) => {
+        const nextDirection: SortDirection = sort === activeSort && sortDirection === "desc" ? "asc" : "desc";
+        updateUrl(activeCategory, activeSubTag, undefined, { sort, direction: nextDirection, resetPage: true });
+    };
+
+    const handlePageChange = (page: number) => {
+        const safePage = Math.max(1, Math.min(page, totalPages));
+        updateUrl(activeCategory, activeSubTag, undefined, { page: safePage });
     };
 
     const subTags = activeCategory !== "All" && tagsByCategories[activeCategory]
@@ -295,13 +318,26 @@ export default function MarketTable({ markets: initialMarkets, tagsByCategories 
                         <thead>
                             <tr>
                                 <th>Market</th>
-                                <th>Volume</th>
+                                <th>
+                                    <button
+                                        className={`${styles.sortButton} ${activeSort === "volume" ? styles.sortActive : ""}`}
+                                        onClick={() => handleSortClick("volume")}
+                                        aria-label={`Sort by volume ${sortDirection === "desc" ? "descending" : "ascending"}`}
+                                    >
+                                        Volume
+                                        <Triangle
+                                            size={12}
+                                            className={styles.sortIcon}
+                                            style={sortDirection === "desc" ? undefined : { transform: "rotate(180deg)" }}
+                                        />
+                                    </button>
+                                </th>
                                 <th>Yes Price</th>
                                 <th>No Price</th>
                             </tr>
                         </thead>
                         <tbody>
-                                {displayedMarkets.slice(0, 20).map((market, index) => {
+                                {displayedMarkets.map((market, index) => {
                                     const rowKey = market.ticker || market.event_ticker || `market-${index}`;
                                     const closeLabel = formatCloseTime(market.close_time || market.closeTime);
                                     const noPrice = market.no_price ?? Math.max(0, 100 - market.yes_price);
@@ -364,20 +400,28 @@ export default function MarketTable({ markets: initialMarkets, tagsByCategories 
                     </table>
                     )}
                 </div>
+                {!isLoading && totalPages > 1 && (
+                    <div className={styles.pagination}>
+                        <button
+                            className={styles.pageButton}
+                            onClick={() => handlePageChange(currentPage - 1)}
+                            disabled={currentPage <= 1}
+                        >
+                            Previous
+                        </button>
+                        <span className={styles.pageIndicator}>
+                            Page {currentPage} of {totalPages} {totalCount > 0 ? `• ${totalCount} markets` : ""}
+                        </span>
+                        <button
+                            className={styles.pageButton}
+                            onClick={() => handlePageChange(currentPage + 1)}
+                            disabled={currentPage >= totalPages}
+                        >
+                            Next
+                        </button>
+                    </div>
+                )}
             </div>
         </section>
     );
-}
-
-function applyDateFilter(markets: Market[], maxCloseTs: number | null): Market[] {
-    if (!maxCloseTs) return markets;
-
-    const cutoffMs = maxCloseTs * 1000;
-    return markets.filter(m => {
-        const close = m.close_time || m.closeTime;
-        if (!close) return true;
-        const closeMs = new Date(close).getTime();
-        if (Number.isNaN(closeMs)) return true;
-        return closeMs <= cutoffMs;
-    });
 }

@@ -39,10 +39,23 @@ export interface Series {
     tags: string[];
 }
 
+export type MarketSort = "volume";
+export type SortDirection = "asc" | "desc";
+
+export interface BackendMarketsResponse {
+    markets: Market[];
+    totalPages: number;
+    totalCount: number;
+    currentPage: number;
+    pageSize: number;
+    sort?: MarketSort;
+    direction?: SortDirection;
+}
+
 export async function getHighVolumeMarkets(limit = 100): Promise<Market[]> {
-    const fromBackend = await getBackendMarkets();
-    if (fromBackend.length > 0) {
-        return fromBackend.sort((a, b) => b.volume - a.volume).slice(0, limit);
+    const backend = await getBackendMarkets({ pageSize: limit });
+    if (backend.markets.length > 0) {
+        return backend.markets.sort((a, b) => b.volume - a.volume).slice(0, limit);
     }
 
     // Fallback to Kalshi directly if backend is unavailable
@@ -176,7 +189,11 @@ export async function getBackendMarkets(params?: {
     category?: string | null;
     tag?: string | null;
     close_date_type?: string | null;
-}): Promise<Market[]> {
+    sort?: MarketSort;
+    direction?: SortDirection;
+    page?: number;
+    pageSize?: number;
+}): Promise<BackendMarketsResponse> {
     // Use Next.js API route for client-side calls, direct backend for server-side
     const isServer = typeof window === 'undefined';
     const baseUrl = isServer ? BACKEND_BASE_URL : '';
@@ -186,6 +203,10 @@ export async function getBackendMarkets(params?: {
     if (params?.category) url.searchParams.set("category", params.category);
     if (params?.tag) url.searchParams.set("tag", params.tag);
     if (params?.close_date_type) url.searchParams.set("close_date_type", params.close_date_type);
+    url.searchParams.set("sort", params?.sort ?? "volume");
+    url.searchParams.set("direction", params?.direction ?? "desc");
+    if (params?.page && params.page > 1) url.searchParams.set("page", params.page.toString());
+    if (params?.pageSize) url.searchParams.set("pageSize", params.pageSize.toString());
 
     try {
         const response = await fetch(url.toString(), {
@@ -193,15 +214,39 @@ export async function getBackendMarkets(params?: {
         });
         if (!response.ok) {
             console.warn(`Backend markets response ${response.status}`);
-            return [];
+            return {
+                markets: [],
+                totalPages: 0,
+                totalCount: 0,
+                currentPage: params?.page ?? 1,
+                pageSize: params?.pageSize ?? 50,
+            };
         }
 
         const data = await response.json();
         const markets: Market[] = (data.markets || []).map(normalizeBackendMarket);
-        return markets;
+        const totalPages = Number(data.totalPages ?? 0);
+        const totalCount = Number(data.count ?? markets.length);
+        const currentPage = Number(data.currentPage ?? params?.page ?? 1);
+        const pageSize = Number(data.pageSize ?? params?.pageSize ?? 50);
+        return {
+            markets,
+            totalPages,
+            totalCount,
+            currentPage,
+            pageSize,
+            sort: data.sort ?? (params?.sort ?? "volume"),
+            direction: data.direction ?? (params?.direction ?? "desc"),
+        };
     } catch (error) {
         console.warn("Falling back: unable to fetch backend markets", error instanceof Error ? error.message : error);
-        return [];
+        return {
+            markets: [],
+            totalPages: 0,
+            totalCount: 0,
+            currentPage: params?.page ?? 1,
+            pageSize: params?.pageSize ?? 50,
+        };
     }
 }
 
