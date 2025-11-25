@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useSearchParams, usePathname, useRouter } from "next/navigation";
 import { Loader2, Calendar, Triangle } from "lucide-react";
 import { Market, getBackendMarkets } from "@/lib/kalshi";
+import FormattedTitle from "./FormattedTitle";
 import styles from "./MarketTable.module.css";
 
 interface MarketTableProps {
@@ -312,7 +313,9 @@ export default function MarketTable({ markets: initialMarkets, tagsByCategories 
                                 <tr key={rowKey}>
                                     <td className={styles.titleCell}>
                                         <Link href={`/trade/${market.ticker}`} className={styles.titleLink}>
-                                            <div className={styles.marketTitle}>{market.title}</div>
+                                            <div className={styles.marketTitle}>
+                                                <FormattedTitle text={market.title} />
+                                            </div>
                                             <div className={styles.marketSubtitle}>{closeLabel}</div>
                                         </Link>
                                     </td>

@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { ArrowUpRight, BarChart3 } from "lucide-react";
 import { Market } from "@/lib/kalshi";
+import FormattedTitle from "./FormattedTitle";
 import styles from "./MarketCard.module.css";
 
 interface MarketCardProps {
@@ -15,7 +16,9 @@ export default function MarketCard({ market }: MarketCardProps) {
                 <ArrowUpRight size={18} className={styles.icon} />
             </div>
 
-            <h3 className={styles.title}>{market.title}</h3>
+            <h3 className={styles.title}>
+                <FormattedTitle text={market.title} />
+            </h3>
 
             <div className={styles.stats}>
                 <div className={styles.stat}>
