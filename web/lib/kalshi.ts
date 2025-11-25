@@ -11,6 +11,9 @@ export interface Market {
     close_time?: string;
     closeTime?: string;
     yes_price: number;
+    no_price?: number;
+    previous_yes_price?: number;
+    previous_no_price?: number;
     volume: number;
     open_interest: number;
     liquidity: number;
@@ -197,7 +200,7 @@ export async function getBackendMarkets(params?: {
         const markets: Market[] = (data.markets || []).map(normalizeBackendMarket);
         return markets;
     } catch (error) {
-        console.error("Error fetching backend markets:", error);
+        console.warn("Falling back: unable to fetch backend markets", error instanceof Error ? error.message : error);
         return [];
     }
 }
@@ -209,8 +212,19 @@ function normalizeBackendMarket(raw: BackendMarket): Market {
     const seriesTicker = (raw.seriesTicker ?? raw.eventTicker ?? ticker) as string | undefined;
     // Prefer lastPrice over yesBid as yesBid is often 0
     const lastPrice = raw.lastPrice as number | undefined;
-    const yesBid = raw.yesBid as number | undefined;
-    const yesPrice = lastPrice ?? yesBid ?? 0;
+    const noBid = (raw.noBid as number | undefined) ?? (raw.no_price as number | undefined) ?? (raw.noPrice as number | undefined);
+    const noAsk = (raw.noAsk as number | undefined) ?? (raw.no_ask as number | undefined);
+    const noPrice = noBid ?? noAsk;
+    const yesBid = (raw.yesBid as number | undefined) ?? (raw.yes_price as number | undefined) ?? (raw.yesPrice as number | undefined);
+    const yesPrice = lastPrice ?? yesBid ?? (typeof noPrice === "number" ? Math.max(0, 100 - noPrice) : 0);
+    const previousYesPrice = (raw.previousPrice as number | undefined)
+        ?? (raw.previousYesBid as number | undefined)
+        ?? (raw.previous_yes_price as number | undefined)
+        ?? (raw.previous_yes_bid as number | undefined);
+    const previousNoPrice = (raw.previousNoBid as number | undefined)
+        ?? (raw.previous_no_price as number | undefined)
+        ?? (raw.previous_no_bid as number | undefined)
+        ?? (typeof previousYesPrice === "number" ? 100 - previousYesPrice : undefined);
     const liquidity = raw.liquidity as number | undefined;
     const volume = raw.volume as number | undefined;
     const closeTime = (raw.closeTime ?? raw.close_time) as string | undefined;
@@ -221,6 +235,9 @@ function normalizeBackendMarket(raw: BackendMarket): Market {
         title: (raw.title as string) ?? "",
         subtitle: (raw.subtitle as string) ?? "",
         yes_price: yesPrice,
+        no_price: noPrice ?? (typeof yesPrice === "number" ? Math.max(0, 100 - yesPrice) : undefined),
+        previous_yes_price: previousYesPrice,
+        previous_no_price: previousNoPrice,
         volume: volume ?? 0,
         open_interest: liquidity ?? 0,
         liquidity: liquidity ?? 0,

@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { useSearchParams, usePathname, useRouter } from "next/navigation";
-import { ArrowRight, Loader2, Calendar } from "lucide-react";
+import { ArrowRight, Loader2, Calendar, Triangle } from "lucide-react";
 import { Market, getBackendMarkets } from "@/lib/kalshi";
 import styles from "./MarketTable.module.css";
 
@@ -51,6 +51,64 @@ function getMaxCloseTimestamp(dateFilter: DateFilterOption): number | null {
 
     // Return Unix timestamp (seconds since epoch)
     return Math.floor(targetDate.getTime() / 1000);
+}
+
+function formatCloseTime(closeTime?: string): string {
+    if (!closeTime) return "Close time unavailable";
+
+    const close = new Date(closeTime);
+    if (Number.isNaN(close.getTime())) return "Close time unavailable";
+
+    const now = new Date();
+    const diffMs = close.getTime() - now.getTime();
+    const absMinutes = Math.max(1, Math.round(Math.abs(diffMs) / (1000 * 60)));
+
+    let value = absMinutes;
+    let unit = "minutes";
+
+    if (absMinutes >= 60) {
+        const hours = Math.round(absMinutes / 60);
+        if (hours < 48) {
+            value = hours;
+            unit = hours === 1 ? "hour" : "hours";
+        } else {
+            const days = Math.round(hours / 24);
+            value = days;
+            unit = days === 1 ? "day" : "days";
+        }
+    } else if (absMinutes === 1) {
+        unit = "minute";
+    }
+
+    if (diffMs >= 0) {
+        return `Close time in ${value} ${unit}`;
+    }
+
+    return `Closed ${value} ${unit} ago`;
+}
+
+type TrendDirection = "up" | "down" | "flat";
+
+function getTrendInfo(current?: number, previous?: number): { direction: TrendDirection; diff: number } | null {
+    if (current === undefined || current === null) return null;
+    if (previous === undefined || previous === null) return null;
+
+    const diff = current - previous;
+    if (!Number.isFinite(diff)) return null;
+
+    if (diff === 0) {
+        return { direction: "flat", diff };
+    }
+
+    return { direction: diff > 0 ? "up" : "down", diff };
+}
+
+function formatDelta(diff: number): string {
+    const abs = Math.abs(diff);
+    if (abs >= 1) {
+        return Math.round(abs).toString();
+    }
+    return abs.toFixed(2);
 }
 
 export default function MarketTable({ markets: initialMarkets, tagsByCategories }: MarketTableProps) {
@@ -238,23 +296,57 @@ export default function MarketTable({ markets: initialMarkets, tagsByCategories 
                                 <th>Market</th>
                                 <th>Volume</th>
                                 <th>Yes Price</th>
+                                <th>No Price</th>
                                 <th>Action</th>
                             </tr>
                         </thead>
                         <tbody>
                                 {displayedMarkets.slice(0, 20).map((market, index) => {
                                     const rowKey = market.ticker || market.event_ticker || `market-${index}`;
+                                    const closeLabel = formatCloseTime(market.close_time || market.closeTime);
+                                    const noPrice = market.no_price ?? Math.max(0, 100 - market.yes_price);
+                                    const previousYes = market.previous_yes_price;
+                                    const previousNo = market.previous_no_price ?? (typeof previousYes === "number" ? 100 - previousYes : undefined);
+                                    const yesTrend = getTrendInfo(market.yes_price, previousYes);
+                                    const noTrend = getTrendInfo(noPrice, previousNo);
                                     return (
                                 <tr key={rowKey}>
                                     <td className={styles.titleCell}>
                                         <Link href={`/trade/${market.ticker}`} className={styles.titleLink}>
                                             <div className={styles.marketTitle}>{market.title}</div>
-                                            <div className={styles.marketSubtitle}>{market.event_ticker}</div>
+                                            <div className={styles.marketSubtitle}>{closeLabel}</div>
                                         </Link>
                                     </td>
                                     <td>{market.volume.toLocaleString()}</td>
                                     <td>
-                                        <span className={styles.price}>{market.yes_price}¢</span>
+                                        <div className={styles.priceCell}>
+                                            <span className={styles.price}>{market.yes_price}¢</span>
+                                            {yesTrend && yesTrend.diff !== 0 && (
+                                                <span className={`${styles.trend} ${yesTrend.direction === "up" ? styles.trendUp : styles.trendDown}`}>
+                                                    <Triangle
+                                                        size={10}
+                                                        className={styles.trendIcon}
+                                                        style={yesTrend.direction === "down" ? { transform: "rotate(180deg)" } : undefined}
+                                                    />
+                                                    <span className={styles.delta}>{formatDelta(yesTrend.diff)}¢</span>
+                                                </span>
+                                            )}
+                                        </div>
+                                    </td>
+                                    <td>
+                                        <div className={styles.priceCell}>
+                                            <span className={styles.noPrice}>{noPrice}¢</span>
+                                            {noTrend && noTrend.diff !== 0 && (
+                                                <span className={`${styles.trend} ${noTrend.direction === "up" ? styles.trendUp : styles.trendDown}`}>
+                                                    <Triangle
+                                                        size={10}
+                                                        className={styles.trendIcon}
+                                                        style={noTrend.direction === "down" ? { transform: "rotate(180deg)" } : undefined}
+                                                    />
+                                                    <span className={styles.delta}>{formatDelta(noTrend.diff)}¢</span>
+                                                </span>
+                                            )}
+                                        </div>
                                     </td>
                                     <td>
                                         <Link href={`/trade/${market.ticker}`} className={styles.detailsBtn}>
@@ -266,7 +358,7 @@ export default function MarketTable({ markets: initialMarkets, tagsByCategories 
                             })}
                                 {displayedMarkets.length === 0 && (
                                     <tr>
-                                        <td colSpan={4} style={{ textAlign: "center", padding: "2rem" }}>
+                                        <td colSpan={5} style={{ textAlign: "center", padding: "2rem" }}>
                                             No markets found
                                         </td>
                                     </tr>

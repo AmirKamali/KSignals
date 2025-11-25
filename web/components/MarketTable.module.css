@@ -115,6 +115,41 @@
     color: var(--success);
 }
 
+.noPrice {
+    font-weight: 700;
+    color: var(--danger);
+}
+
+.priceCell {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.trend {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    font-weight: 600;
+    font-size: 0.85rem;
+}
+
+.trendUp {
+    color: var(--success);
+}
+
+.trendDown {
+    color: var(--danger);
+}
+
+.trendIcon {
+    flex-shrink: 0;
+}
+
+.delta {
+    font-variant-numeric: tabular-nums;
+}
+
 .detailsBtn {
     display: inline-flex;
     align-items: center;
