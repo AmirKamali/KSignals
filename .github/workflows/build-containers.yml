@@ -87,6 +87,11 @@ jobs:
             ${{ steps.meta.outputs.backend_tag_latest }}
             ${{ steps.meta.outputs.backend_tag_sha }}
 
+      - name: Refresh Watchtower
+        run: |
+          curl --location --request POST 'https://watchtower.nextate.ai/refresh' \
+            --header 'Authorization: Bearer VPS_SERVER_REFRESH'
+
   build-frontend:
     needs: changes
     if: ${{ needs.changes.outputs.frontend == 'true' }}
@@ -123,3 +128,8 @@ jobs:
           tags: |
             ${{ steps.meta.outputs.frontend_tag_latest }}
             ${{ steps.meta.outputs.frontend_tag_sha }}
+
+      - name: Refresh Watchtower
+        run: |
+          curl --location --request POST 'https://watchtower.nextate.ai/refresh' \
+            --header 'Authorization: Bearer VPS_SERVER_REFRESH'
