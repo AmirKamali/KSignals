@@ -887,58 +887,81 @@ public class RefreshService
     {
         using var scope = _scopeFactory.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<KalshiDbContext>();
-        
+
+        const int batchSize = 200;
+        var allTickers = markets.Select(m => m.TickerId).Distinct().ToList();
+
+        var existingMarkets = await db.Markets
+            .Where(m => allTickers.Contains(m.TickerId))
+            .ToListAsync(cancellationToken);
+
+        var existingLookup = existingMarkets.ToDictionary(m => m.TickerId);
+        var toInsert = new List<MarketCache>();
+        var toUpdate = new List<MarketCache>();
+
         foreach (var market in markets)
         {
-            var existing = await db.Markets.FindAsync(new object[] { market.TickerId }, cancellationToken);
-            if (existing == null)
+            if (existingLookup.TryGetValue(market.TickerId, out var existing))
             {
-                db.Markets.Add(market);
+                CopyMarket(existing, market);
+                toUpdate.Add(existing);
             }
             else
             {
-                // Update all properties
-                existing.SeriesTicker = market.SeriesTicker;
-                existing.Title = market.Title;
-                existing.Subtitle = market.Subtitle;
-                existing.Volume = market.Volume;
-                existing.Volume24h = market.Volume24h;
-                existing.CreatedTime = market.CreatedTime;
-                existing.ExpirationTime = market.ExpirationTime;
-                existing.CloseTime = market.CloseTime;
-                existing.LatestExpirationTime = market.LatestExpirationTime;
-                existing.OpenTime = market.OpenTime;
-                existing.Status = market.Status;
-                existing.YesBid = market.YesBid;
-                existing.YesBidDollars = market.YesBidDollars;
-                existing.YesAsk = market.YesAsk;
-                existing.YesAskDollars = market.YesAskDollars;
-                existing.NoBid = market.NoBid;
-                existing.NoBidDollars = market.NoBidDollars;
-                existing.NoAsk = market.NoAsk;
-                existing.NoAskDollars = market.NoAskDollars;
-                existing.LastPrice = market.LastPrice;
-                existing.LastPriceDollars = market.LastPriceDollars;
-                existing.PreviousYesBid = market.PreviousYesBid;
-                existing.PreviousYesBidDollars = market.PreviousYesBidDollars;
-                existing.PreviousYesAsk = market.PreviousYesAsk;
-                existing.PreviousYesAskDollars = market.PreviousYesAskDollars;
-                existing.PreviousPrice = market.PreviousPrice;
-                existing.PreviousPriceDollars = market.PreviousPriceDollars;
-                existing.Liquidity = market.Liquidity;
-                existing.LiquidityDollars = market.LiquidityDollars;
-                existing.SettlementValue = market.SettlementValue;
-                existing.SettlementValueDollars = market.SettlementValueDollars;
-                existing.NotionalValue = market.NotionalValue;
-                existing.NotionalValueDollars = market.NotionalValueDollars;
-                existing.JsonResponse = market.JsonResponse;
-                existing.LastUpdate = market.LastUpdate;
-
-                db.Markets.Update(existing);
+                toInsert.Add(market);
             }
         }
 
+        foreach (var batch in toUpdate.Chunk(batchSize))
+        {
+            db.Markets.UpdateRange(batch);
+        }
         await db.SaveChangesAsync(cancellationToken);
+
+        foreach (var batch in toInsert.Chunk(batchSize))
+        {
+            db.Markets.AddRange(batch);
+        }
+        await db.SaveChangesAsync(cancellationToken);
+    }
+
+    private static void CopyMarket(MarketCache target, MarketCache source)
+    {
+        target.SeriesTicker = source.SeriesTicker;
+        target.Title = source.Title;
+        target.Subtitle = source.Subtitle;
+        target.Volume = source.Volume;
+        target.Volume24h = source.Volume24h;
+        target.CreatedTime = source.CreatedTime;
+        target.ExpirationTime = source.ExpirationTime;
+        target.CloseTime = source.CloseTime;
+        target.LatestExpirationTime = source.LatestExpirationTime;
+        target.OpenTime = source.OpenTime;
+        target.Status = source.Status;
+        target.YesBid = source.YesBid;
+        target.YesBidDollars = source.YesBidDollars;
+        target.YesAsk = source.YesAsk;
+        target.YesAskDollars = source.YesAskDollars;
+        target.NoBid = source.NoBid;
+        target.NoBidDollars = source.NoBidDollars;
+        target.NoAsk = source.NoAsk;
+        target.NoAskDollars = source.NoAskDollars;
+        target.LastPrice = source.LastPrice;
+        target.LastPriceDollars = source.LastPriceDollars;
+        target.PreviousYesBid = source.PreviousYesBid;
+        target.PreviousYesBidDollars = source.PreviousYesBidDollars;
+        target.PreviousYesAsk = source.PreviousYesAsk;
+        target.PreviousYesAskDollars = source.PreviousYesAskDollars;
+        target.PreviousPrice = source.PreviousPrice;
+        target.PreviousPriceDollars = source.PreviousPriceDollars;
+        target.Liquidity = source.Liquidity;
+        target.LiquidityDollars = source.LiquidityDollars;
+        target.SettlementValue = source.SettlementValue;
+        target.SettlementValueDollars = source.SettlementValueDollars;
+        target.NotionalValue = source.NotionalValue;
+        target.NotionalValueDollars = source.NotionalValueDollars;
+        target.JsonResponse = source.JsonResponse;
+        target.LastUpdate = source.LastUpdate;
     }
 
     private sealed class QueueItem
