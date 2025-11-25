@@ -46,6 +46,78 @@ public class RefreshService
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _scopeFactory = scopeFactory ?? throw new ArgumentNullException(nameof(scopeFactory));
     }
+
+    public async Task GetTodayMarketsAsync(
+        int days = 1,
+        int maxPages = 5,
+        MarketSort sortBy = MarketSort.Volume,
+        SortDirection direction = SortDirection.Desc,
+        CancellationToken cancellationToken = default)
+    {
+        var nowUtc = DateTime.UtcNow;
+        var safeDays = Math.Max(1, days);
+        var safeMaxPages = Math.Max(1, maxPages);
+        var maxCloseTs = DateTimeOffset.UtcNow.AddDays(safeDays).ToUnixTimeSeconds();
+        var fetchedAtUtc = nowUtc;
+        var results = new List<MarketCache>();
+        string? cursor = null;
+        var pageCounter = 0;
+
+        do
+        {
+            var requestOptions = new RequestOptions
+            {
+                Operation = "MarketApi.GetMarkets"
+            };
+
+            requestOptions.QueryParameters.Add(ClientUtils.ParameterToMultiMap("", "limit", 1000));
+            requestOptions.QueryParameters.Add(ClientUtils.ParameterToMultiMap("", "status", "open"));
+            requestOptions.QueryParameters.Add(ClientUtils.ParameterToMultiMap("", "max_close_ts", maxCloseTs));
+            requestOptions.QueryParameters.Add(ClientUtils.ParameterToMultiMap("", "with_nested_markets", true));
+            if (!string.IsNullOrWhiteSpace(cursor))
+            {
+                requestOptions.QueryParameters.Add(ClientUtils.ParameterToMultiMap("", "cursor", cursor));
+            }
+
+            var response = await _kalshiClient.Markets.AsynchronousClient.GetAsync<GetMarketsResponse>(
+                    "/markets",
+                    requestOptions,
+                    _kalshiClient.Markets.Configuration,
+                    cancellationToken)
+                .ConfigureAwait(false);
+
+            var data = response?.Data;
+            if (data?.Markets != null)
+            {
+                var mapped = data.Markets
+                    .Where(m => m != null && m.CloseTime > nowUtc)
+                    .Select(m =>
+                    {
+                        var seriesKey = string.IsNullOrWhiteSpace(m!.EventTicker) ? m.Ticker : m.EventTicker;
+                        return KalshiService.MapMarket(seriesKey, m, fetchedAtUtc);
+                    })
+                    .ToList();
+                results.AddRange(mapped);
+            }
+
+            cursor = data?.Cursor;
+            pageCounter++;
+        } while (!string.IsNullOrWhiteSpace(cursor) && pageCounter < safeMaxPages);
+
+        var ordered = results.OrderBy(m => m.CloseTime).ToList();
+
+        if (results.Count > 0)
+        {
+            try
+            {
+                await UpsertMarketsAsync(results, cancellationToken);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to upsert {Count} today markets for next {Days} day(s)", results.Count, safeDays);
+            }
+        }
+    }
     
     public CacheMarketStatus GetCacheMarketStatus()
     {
@@ -876,4 +948,3 @@ public class RefreshService
         public string? Cursor { get; set; }
     }
 }
-

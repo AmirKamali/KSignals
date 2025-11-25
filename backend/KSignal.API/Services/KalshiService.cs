@@ -36,7 +36,7 @@ public class KalshiService
         MarketSort sortBy = MarketSort.Volume,
         SortDirection direction = SortDirection.Desc,
         CancellationToken cancellationToken = default)
-
+    {
         // Read `marketcategories` to find series matching the filters and aggregate seriesIds
         var seriesIds = new HashSet<string>(_db.MarketCategories
             .AsNoTracking()
@@ -124,66 +124,6 @@ public class KalshiService
         return targetDate;
     }
 
-
-    public async Task<List<MarketCache>> GetTodayMarketsAsync(
-        MarketSort sortBy = MarketSort.Volume,
-        SortDirection direction = SortDirection.Desc,
-        CancellationToken cancellationToken = default)
-    {
-        var nowUtc = DateTime.UtcNow;
-        var maxCloseTs = DateTimeOffset.UtcNow.AddHours(24).ToUnixTimeSeconds();
-        var fetchedAtUtc = nowUtc;
-        var results = new List<MarketCache>();
-        string? cursor = null;
-
-        do
-        {
-            var requestOptions = new RequestOptions
-            {
-                Operation = "MarketApi.GetMarkets"
-            };
-
-            requestOptions.QueryParameters.Add(ClientUtils.ParameterToMultiMap("", "limit", 1000));
-            requestOptions.QueryParameters.Add(ClientUtils.ParameterToMultiMap("", "status", "open"));
-            requestOptions.QueryParameters.Add(ClientUtils.ParameterToMultiMap("", "max_close_ts", maxCloseTs));
-            requestOptions.QueryParameters.Add(ClientUtils.ParameterToMultiMap("", "with_nested_markets", true));
-            if (!string.IsNullOrWhiteSpace(cursor))
-            {
-                requestOptions.QueryParameters.Add(ClientUtils.ParameterToMultiMap("", "cursor", cursor));
-            }
-
-            var response = await _kalshiClient.Markets.AsynchronousClient.GetAsync<GetMarketsResponse>(
-                    "/markets",
-                    requestOptions,
-                    _kalshiClient.Markets.Configuration,
-                    cancellationToken)
-                .ConfigureAwait(false);
-
-            var data = response?.Data;
-            if (data?.Markets != null)
-            {
-                var mapped = data.Markets
-                    .Where(m => m != null && m.CloseTime > nowUtc)
-                    .Select(m =>
-                    {
-                        var seriesKey = string.IsNullOrWhiteSpace(m!.EventTicker) ? m.Ticker : m.EventTicker;
-                        return MapMarket(seriesKey, m, fetchedAtUtc);
-                    })
-                    .ToList();
-                results.AddRange(mapped);
-            }
-
-            cursor = data?.Cursor;
-        } while (!string.IsNullOrWhiteSpace(cursor));
-
-        var ordered = results.OrderBy(m => m.CloseTime).ToList();
-
-        var selected = ordered
-            .GroupBy(m => m.SeriesTicker, StringComparer.OrdinalIgnoreCase)
-            .Select(g => WithoutJsonResponse(g.OrderByDescending(x => x.Volume24h).First()));
-
-        return ApplySorting(selected, sortBy, direction).ToList();
-    }
 
     private async Task EnsureMarketsTableAsync(CancellationToken cancellationToken)
     {

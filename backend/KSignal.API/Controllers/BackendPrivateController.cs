@@ -132,4 +132,38 @@ public class BackendPrivateController : ControllerBase
             return StatusCode(StatusCodes.Status500InternalServerError, new { error = "Failed to get cache market status", message = ex.Message });
         }
     }
+
+    [HttpPost("refresh-today-market")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status500InternalServerError)]
+    public async Task<IActionResult> RefreshTodayMarkets([FromQuery] int days = 1, [FromQuery] int max_pages = 5)
+    {
+        try
+        {
+            var safeDays = Math.Max(1, days);
+            var safeMaxPages = Math.Max(1, max_pages);
+            await _refreshService.GetTodayMarketsAsync(
+                safeDays,
+                safeMaxPages,
+                cancellationToken: HttpContext.RequestAborted);
+
+            return Ok();
+        }
+        catch (ApiException apiEx)
+        {
+            _logger.LogError(apiEx, "Kalshi API error during today market refresh");
+            return StatusCode(StatusCodes.Status502BadGateway, new
+            {
+                error = "Kalshi API error",
+                message = apiEx.Message,
+                statusCode = apiEx.ErrorCode,
+                details = apiEx.ErrorContent
+            });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to refresh today markets");
+            return StatusCode(StatusCodes.Status500InternalServerError, new { error = "Failed to refresh today markets", message = ex.Message });
+        }
+    }
 }
