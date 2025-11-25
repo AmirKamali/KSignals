@@ -523,6 +523,7 @@ public class RefreshService
                 return null;
             }
 
+            var records = new List<MarketCategoryRecord>();
             foreach (var series in data.Series)
             {
                 if (series == null || string.IsNullOrWhiteSpace(series.Ticker)) continue;
@@ -530,9 +531,14 @@ public class RefreshService
                 var agg = new SeriesAggregation(series.Ticker);
                 agg.Merge(series);
                 var record = agg.ToRecord(lastUpdate);
-                await UpsertSeriesAsync(db, record, cancellationToken);
+                records.Add(record);
                 seen.Add(series.Ticker);
                 existingIds.Remove(series.Ticker);
+            }
+
+            if (records.Count > 0)
+            {
+                await UpsertSeriesAsync(db, records, cancellationToken);
             }
 
             // Check if response has cursor field (may be in the raw response)
@@ -561,37 +567,62 @@ public class RefreshService
         }
     }
 
-    private async Task UpsertSeriesAsync(KalshiDbContext db, MarketCategoryRecord record, CancellationToken cancellationToken)
+    private async Task UpsertSeriesAsync(KalshiDbContext db, List<MarketCategoryRecord> records, CancellationToken cancellationToken)
     {
-        var existing = await db.MarketCategories.FindAsync(new object[] { record.SeriesId }, cancellationToken);
-        if (existing == null)
+        if (records.Count == 0)
         {
-            db.MarketCategories.Add(new MarketCategory
+            return;
+        }
+
+        const int batchSize = 200;
+        var ids = records.Select(r => r.SeriesId).Distinct().ToList();
+
+        var existing = await db.MarketCategories
+            .Where(mc => ids.Contains(mc.SeriesId))
+            .ToListAsync(cancellationToken);
+
+        var existingLookup = existing.ToDictionary(mc => mc.SeriesId);
+        var toInsert = new List<MarketCategory>();
+        var toUpdate = new List<MarketCategory>();
+
+        foreach (var record in records)
+        {
+            if (existingLookup.TryGetValue(record.SeriesId, out var existingItem))
             {
-                SeriesId = record.SeriesId,
-                Category = record.Category,
-                Tags = record.Tags,
-                Ticker = record.Ticker,
-                Title = record.Title,
-                Frequency = record.Frequency,
-                JsonResponse = record.JsonResponse,
-                LastUpdate = record.LastUpdate
-            });
+                CopyMarketCategory(existingItem, record);
+                toUpdate.Add(existingItem);
+            }
+            else
+            {
+                var newItem = new MarketCategory();
+                CopyMarketCategory(newItem, record);
+                toInsert.Add(newItem);
+            }
         }
-        else
+
+        foreach (var batch in toUpdate.Chunk(batchSize))
         {
-            existing.Category = record.Category;
-            existing.Tags = record.Tags;
-            existing.Ticker = record.Ticker;
-            existing.Title = record.Title;
-            existing.Frequency = record.Frequency;
-            existing.JsonResponse = record.JsonResponse;
-            existing.LastUpdate = record.LastUpdate;
-
-            db.MarketCategories.Update(existing);
+            db.MarketCategories.UpdateRange(batch);
         }
-
         await db.SaveChangesAsync(cancellationToken);
+
+        foreach (var batch in toInsert.Chunk(batchSize))
+        {
+            db.MarketCategories.AddRange(batch);
+        }
+        await db.SaveChangesAsync(cancellationToken);
+    }
+
+    private static void CopyMarketCategory(MarketCategory target, MarketCategoryRecord source)
+    {
+        target.SeriesId = source.SeriesId;
+        target.Category = source.Category;
+        target.Tags = source.Tags;
+        target.Ticker = source.Ticker;
+        target.Title = source.Title;
+        target.Frequency = source.Frequency;
+        target.JsonResponse = source.JsonResponse;
+        target.LastUpdate = source.LastUpdate;
     }
 
     private async Task CleanupMissingAsync(KalshiDbContext db, HashSet<string> remainingIds, CancellationToken cancellationToken)
