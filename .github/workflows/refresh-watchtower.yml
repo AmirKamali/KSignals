@@ -1,0 +1,14 @@
+name: Refresh Watchtower
+
+on:
+  workflow_dispatch:
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Refresh Watchtower
+        run: |
+          curl --location --request POST 'https://watchtower.nextate.ai/refresh' \
+            --header 'Authorization: Bearer VPS_SERVER_REFRESH'
+
