@@ -29,6 +29,14 @@ export default function HeroSection() {
                             exchange dedicated to trading event outcomes.
                         </p>
 
+                        <div className={styles.metaRow}>
+                            <div className={styles.pillGroup}>
+                                <span className={styles.pill}>AI probability shifts</span>
+                                <span className={styles.pill}>Order book pressure</span>
+                                <span className={styles.pill}>Headline-aware signals</span>
+                            </div>
+                        </div>
+
                         <div className={styles.actions}>
                             <button className="btn btn-primary">
                                 Start Trading <ArrowRight size={18} style={{ marginLeft: "0.5rem" }} />
@@ -36,6 +44,48 @@ export default function HeroSection() {
                             <button className="btn btn-outline">
                                 View All Markets
                             </button>
+                        </div>
+
+                        <div className={styles.statRow}>
+                            <div className={styles.statCard}>
+                                <div className={styles.statValue}>120+</div>
+                                <div className={styles.statLabel}>Markets tracked live</div>
+                            </div>
+                            <div className={styles.statCard}>
+                                <div className={styles.statValue}>93%</div>
+                                <div className={styles.statLabel}>Signal coverage on volume</div>
+                            </div>
+                            <div className={styles.statCard}>
+                                <div className={styles.statValue}><span className={styles.positive}>+7.2%</span></div>
+                                <div className={styles.statLabel}>Avg. edge vs. raw order book</div>
+                            </div>
+                        </div>
+
+                        <div className={styles.previewPanel}>
+                            <div className={styles.previewHeader}>
+                                <div>
+                                    <div className={styles.previewLabel}>Signal preview</div>
+                                    <div className={styles.previewSub}>Micro-moves we are watching right now</div>
+                                </div>
+                                <div className={styles.previewTag}>Live feed</div>
+                            </div>
+                            <div className={styles.previewGrid}>
+                                <div className={styles.previewItem}>
+                                    <div className={styles.previewTitle}>Election turnout</div>
+                                    <div className={styles.previewMeta}>Yes probability 58%</div>
+                                    <div className={styles.previewDelta}>+2.3% in last hour</div>
+                                </div>
+                                <div className={styles.previewItem}>
+                                    <div className={styles.previewTitle}>Rate cut by June</div>
+                                    <div className={styles.previewMeta}>Order book leaning NO</div>
+                                    <div className={styles.previewDelta}>Spread tightening</div>
+                                </div>
+                                <div className={styles.previewItem}>
+                                    <div className={styles.previewTitle}>Weekly jobless claims</div>
+                                    <div className={styles.previewMeta}>Signal confidence High</div>
+                                    <div className={styles.previewDelta}>Volatility watchlist</div>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>

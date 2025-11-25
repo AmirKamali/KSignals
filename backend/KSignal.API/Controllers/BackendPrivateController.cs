@@ -13,11 +13,13 @@ namespace KSignal.API.Controllers;
 public class BackendPrivateController : ControllerBase
 {
     private readonly KalshiService _kalshiService;
+    private readonly RefreshService _refreshService;
     private readonly ILogger<BackendPrivateController> _logger;
 
-    public BackendPrivateController(KalshiService kalshiService, ILogger<BackendPrivateController> logger)
+    public BackendPrivateController(KalshiService kalshiService, RefreshService refreshService, ILogger<BackendPrivateController> logger)
     {
         _kalshiService = kalshiService ?? throw new ArgumentNullException(nameof(kalshiService));
+        _refreshService = refreshService ?? throw new ArgumentNullException(nameof(refreshService));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
 
@@ -28,7 +30,7 @@ public class BackendPrivateController : ControllerBase
     {
         try
         {
-            var updated = await _kalshiService.RefreshMarketCategoriesAsync(category, tag, cancellationToken);
+            var updated = await _refreshService.RefreshMarketCategoriesAsync(category, tag, cancellationToken);
             return Ok(new { updated, refreshedAt = DateTime.UtcNow });
         }
         catch (ApiException apiEx)
@@ -59,7 +61,7 @@ public class BackendPrivateController : ControllerBase
         {
             _logger.LogInformation("Starting market data cache request for category={Category}, tag={Tag}", category, tag);
 
-            var cachedCount = await _kalshiService.CacheMarketDataAsync(category, tag, cancellationToken);
+            var cachedCount = await _refreshService.CacheMarketDataAsync(category, tag, cancellationToken);
 
             _logger.LogInformation("Successfully cached {Count} markets", cachedCount);
 
