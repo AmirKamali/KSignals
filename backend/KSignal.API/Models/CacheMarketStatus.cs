@@ -12,3 +12,4 @@ public class CacheMarketStatus
     public string? Tag { get; set; }
 }
 
+

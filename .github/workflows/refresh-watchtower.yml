@@ -12,3 +12,4 @@ jobs:
           curl --location --request POST 'https://watchtower.nextate.ai/refresh' \
             --header 'Authorization: Bearer VPS_SERVER_REFRESH'
 
+
