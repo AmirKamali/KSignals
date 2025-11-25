@@ -37,20 +37,26 @@ public class KalshiService
         SortDirection direction = SortDirection.Desc,
         CancellationToken cancellationToken = default)
     {
-        // Read `marketcategories` to find series matching the filters and aggregate seriesIds
-        var seriesIds = new HashSet<string>(_db.MarketCategories
-            .AsNoTracking()
-            .Where(mc =>
-                (string.IsNullOrWhiteSpace(category) || mc.Category == category) &&
-                (string.IsNullOrWhiteSpace(tag) || (mc.Tags != null && mc.Tags.Contains(tag))))
-            .Select(mc => mc.SeriesId)
-            .Distinct()
-            .ToList());
+        var hasCategoryOrTag = !string.IsNullOrWhiteSpace(category) || !string.IsNullOrWhiteSpace(tag);
+        HashSet<string>? seriesIds = null;
 
-        if (seriesIds == null || seriesIds.Count == 0)
+        if (hasCategoryOrTag)
         {
-            _logger.LogWarning("No series found for category={Category}, tag={Tag}", category, tag);
-            return new List<MarketCache>();
+            // Read `marketcategories` to find series matching the filters and aggregate seriesIds
+            seriesIds = new HashSet<string>(_db.MarketCategories
+                .AsNoTracking()
+                .Where(mc =>
+                    (string.IsNullOrWhiteSpace(category) || mc.Category == category) &&
+                    (string.IsNullOrWhiteSpace(tag) || (mc.Tags != null && mc.Tags.Contains(tag))))
+                .Select(mc => mc.SeriesId)
+                .Distinct()
+                .ToList());
+
+            if (seriesIds.Count == 0)
+            {
+                _logger.LogWarning("No series found for category={Category}, tag={Tag}", category, tag);
+                return new List<MarketCache>();
+            }
         }
 
         var nowUtc = DateTime.UtcNow;
@@ -58,17 +64,19 @@ public class KalshiService
 
         var query = _db.Markets
             .AsNoTracking()
-            .Where(p => seriesIds.Contains(p.SeriesTicker) && p.CloseTime > nowUtc);
+            .Where(p => p.CloseTime > nowUtc);
+
+        if (seriesIds != null && (!string.IsNullOrWhiteSpace(category) || !string.IsNullOrWhiteSpace(tag)))
+        {
+            query = query.Where(p => seriesIds.Contains(p.SeriesTicker));
+        }
 
         if (maxCloseTime.HasValue)
         {
             query = query.Where(p => p.CloseTime <= maxCloseTime.Value);
         }
 
-        var allMarkets = query.ToList();
-        var fetchedAtUtc = nowUtc;
-
-        
+        var allMarkets = await query.ToListAsync(cancellationToken);
 
         // Group by series and take the market with highest 24h volume per series
         var selected = allMarkets
