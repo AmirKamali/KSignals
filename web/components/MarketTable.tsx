@@ -83,8 +83,8 @@ export default function MarketTable({ markets: initialMarkets, tagsByCategories 
 
     const initialCategory = searchParams.get("category") || "All";
     const initialTag = searchParams.get("tag");
-    const initialDate = (searchParams.get("date") as DateFilterOption) || "all_time";
-    const initialSort = (searchParams.get("sort") as SortOption) || "volume";
+    const initialDate = (searchParams.get("date") as DateFilterOption) || "next_24_hr";
+    const initialSort = (searchParams.get("sort_type") as SortOption) || "volume";
     const initialDirection = (searchParams.get("direction") as SortDirection) || "desc";
     const initialPage = Math.max(1, parseInt(searchParams.get("page") || "1", 10));
     const initialPageSize = Math.max(1, parseInt(searchParams.get("pageSize") || `${PAGE_SIZE}`, 10));
@@ -164,8 +164,8 @@ export default function MarketTable({ markets: initialMarkets, tagsByCategories 
     useEffect(() => {
         const cat = searchParams.get("category") || "All";
         const tag = searchParams.get("tag");
-        const date = (searchParams.get("date") as DateFilterOption) || "all_time";
-        const sort = (searchParams.get("sort") as SortOption) || "volume";
+        const date = (searchParams.get("date") as DateFilterOption) || "next_24_hr";
+        const sort = (searchParams.get("sort_type") as SortOption) || "volume";
         const direction = (searchParams.get("direction") as SortDirection) || "desc";
         const page = Math.max(1, parseInt(searchParams.get("page") || "1", 10));
         const size = Math.max(1, parseInt(searchParams.get("pageSize") || `${pageSize}`, 10));
@@ -206,7 +206,7 @@ export default function MarketTable({ markets: initialMarkets, tagsByCategories 
         const directionToUse = options?.direction ?? sortDirection;
         const pageToUse = options?.resetPage ? 1 : (options?.page ?? currentPage);
 
-        params.set("sort", sortToUse);
+        params.set("sort_type", sortToUse);
         params.set("direction", directionToUse);
 
         if (pageToUse && pageToUse > 1) {
@@ -239,6 +239,9 @@ export default function MarketTable({ markets: initialMarkets, tagsByCategories 
 
     const handleSortClick = (sort: SortOption) => {
         const nextDirection: SortDirection = sort === activeSort && sortDirection === "desc" ? "asc" : "desc";
+        setActiveSort(sort);
+        setSortDirection(nextDirection);
+        setCurrentPage(1);
         updateUrl(activeCategory, activeSubTag, undefined, { sort, direction: nextDirection, resetPage: true });
     };
 
@@ -320,6 +323,7 @@ export default function MarketTable({ markets: initialMarkets, tagsByCategories 
                                 <th>Market</th>
                                 <th>
                                     <button
+                                        type="button"
                                         className={`${styles.sortButton} ${activeSort === "volume" ? styles.sortActive : ""}`}
                                         onClick={() => handleSortClick("volume")}
                                         aria-label={`Sort by volume ${sortDirection === "desc" ? "descending" : "ascending"}`}

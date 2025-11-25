@@ -7,11 +7,19 @@ export async function GET(request: Request) {
     const category = searchParams.get('category');
     const tag = searchParams.get('tag');
     const closeDateType = searchParams.get('close_date_type');
+    const sortType = searchParams.get('sort_type');
+    const direction = searchParams.get('direction');
+    const page = searchParams.get('page');
+    const pageSize = searchParams.get('pageSize');
 
     const backendUrl = new URL(`${BACKEND_BASE_URL}/api/markets`);
     if (category) backendUrl.searchParams.set('category', category);
     if (tag) backendUrl.searchParams.set('tag', tag);
     if (closeDateType) backendUrl.searchParams.set('close_date_type', closeDateType);
+    if (sortType) backendUrl.searchParams.set('sort_type', sortType);
+    if (direction) backendUrl.searchParams.set('direction', direction);
+    if (page) backendUrl.searchParams.set('page', page);
+    if (pageSize) backendUrl.searchParams.set('pageSize', pageSize);
 
     try {
         const response = await fetch(backendUrl.toString(), {

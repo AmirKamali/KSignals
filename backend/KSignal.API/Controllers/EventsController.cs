@@ -90,15 +90,18 @@ public class EventsController : ControllerBase
         [FromQuery] string? category = null,
         [FromQuery] string? tag = null,
         [FromQuery] string? close_date_type = null,
-        [FromQuery] MarketSort sort = MarketSort.Volume,
-        [FromQuery] SortDirection direction = SortDirection.Desc,
+        [FromQuery(Name = "sort_type")] string? sortType = "volume",
+        [FromQuery] string? direction = "desc",
         [FromQuery] int page = 1,
         [FromQuery] int pageSize = 50,
         CancellationToken cancellationToken = default)
     {
         try
         {
-            var markets = await _kalshiService.GetMarketsAsync(category, tag, close_date_type, sort, direction, cancellationToken);
+            var parsedSort = Enum.TryParse<MarketSort>(sortType, true, out var sortEnum) ? sortEnum : MarketSort.Volume;
+            var parsedDirection = Enum.TryParse<SortDirection>(direction, true, out var dirEnum) ? dirEnum : SortDirection.Desc;
+
+            var markets = await _kalshiService.GetMarketsAsync(category, tag, close_date_type, parsedSort, parsedDirection, cancellationToken);
             var safePageSize = Math.Max(1, pageSize);
             var requestedPage = Math.Max(1, page);
             var totalCount = markets.Count;
@@ -113,8 +116,8 @@ public class EventsController : ControllerBase
                 totalPages,
                 currentPage = safePage,
                 pageSize = safePageSize,
-                sort = sort.ToString().ToLowerInvariant(),
-                direction = direction.ToString().ToLowerInvariant(),
+                sort_type = parsedSort.ToString().ToLowerInvariant(),
+                direction = parsedDirection.ToString().ToLowerInvariant(),
                 markets = shaped
             });
         }

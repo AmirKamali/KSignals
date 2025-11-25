@@ -36,11 +36,6 @@ public class KalshiService
         MarketSort sortBy = MarketSort.Volume,
         SortDirection direction = SortDirection.Desc,
         CancellationToken cancellationToken = default)
-    {
-        if (string.IsNullOrWhiteSpace(category) && string.IsNullOrWhiteSpace(tag))
-        {
-            return await GetTodayMarketsAsync(sortBy, direction, cancellationToken);
-        }
 
         // Read `marketcategories` to find series matching the filters and aggregate seriesIds
         var seriesIds = new HashSet<string>(_db.MarketCategories

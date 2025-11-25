@@ -203,7 +203,7 @@ export async function getBackendMarkets(params?: {
     if (params?.category) url.searchParams.set("category", params.category);
     if (params?.tag) url.searchParams.set("tag", params.tag);
     if (params?.close_date_type) url.searchParams.set("close_date_type", params.close_date_type);
-    url.searchParams.set("sort", params?.sort ?? "volume");
+    url.searchParams.set("sort_type", params?.sort ?? "volume");
     url.searchParams.set("direction", params?.direction ?? "desc");
     if (params?.page && params.page > 1) url.searchParams.set("page", params.page.toString());
     if (params?.pageSize) url.searchParams.set("pageSize", params.pageSize.toString());
@@ -235,7 +235,7 @@ export async function getBackendMarkets(params?: {
             totalCount,
             currentPage,
             pageSize,
-            sort: data.sort ?? (params?.sort ?? "volume"),
+            sort: (data.sort_type ?? data.sort ?? params?.sort ?? "volume") as MarketSort,
             direction: data.direction ?? (params?.direction ?? "desc"),
         };
     } catch (error) {
