@@ -1,27 +1,27 @@
 :root {
   /* Color Palette */
-  --background: #0a0e17;
-  --surface: #111827;
-  --surface-hover: #1f2937;
-  --primary: #00f2ff;
-  --primary-glow: rgba(0, 242, 255, 0.3);
+  --background: #f5f7fb;
+  --surface: #ffffff;
+  --surface-hover: #eef2f7;
+  --primary: #2563eb;
+  --primary-glow: rgba(37, 99, 235, 0.2);
   --secondary: #7c3aed;
-  --accent: #ec4899;
+  --accent: #f97316;
   
-  --text-primary: #ffffff;
-  --text-secondary: #9ca3af;
-  --text-muted: #6b7280;
+  --text-primary: #0f172a;
+  --text-secondary: #475569;
+  --text-muted: #64748b;
   
   --success: #10b981;
-  --danger: #ef4444;
+  --danger: #dc2626;
   --warning: #f59e0b;
   
-  --border: #1f2937;
-  --border-hover: #374151;
+  --border: #e2e8f0;
+  --border-hover: #cbd5e1;
 
   /* Gradients */
-  --gradient-primary: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
-  --gradient-surface: linear-gradient(180deg, rgba(17, 24, 39, 0.8) 0%, rgba(17, 24, 39, 0.4) 100%);
+  --gradient-primary: linear-gradient(135deg, #2563eb 0%, #06b6d4 100%);
+  --gradient-surface: linear-gradient(180deg, rgba(255, 255, 255, 0.9) 0%, rgba(255, 255, 255, 0.7) 100%);
   
   /* Spacing & Radius */
   --radius-sm: 0.375rem;
@@ -63,10 +63,11 @@ a {
 }
 
 .glass-panel {
-  background: rgba(17, 24, 39, 0.7);
-  backdrop-filter: blur(12px);
-  border: 1px solid rgba(255, 255, 255, 0.05);
+  background: rgba(255, 255, 255, 0.9);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(226, 232, 240, 0.8);
   border-radius: var(--radius-lg);
+  box-shadow: 0 12px 40px rgba(15, 23, 42, 0.08);
 }
 
 .text-gradient {
@@ -91,7 +92,7 @@ a {
 
 .btn-primary {
   background: var(--primary);
-  color: #000;
+  color: #fff;
   box-shadow: 0 0 15px var(--primary-glow);
 }
 
@@ -101,7 +102,7 @@ a {
 }
 
 .btn-outline {
-  background: transparent;
+  background: #fff;
   border: 1px solid var(--border);
   color: var(--text-primary);
 }

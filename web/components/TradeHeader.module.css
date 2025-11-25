@@ -1,7 +1,7 @@
 .header {
     padding: 3rem 0;
-    background: linear-gradient(180deg, rgba(17, 24, 39, 0.8) 0%, var(--background) 100%);
-    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    background: linear-gradient(180deg, #ffffff 0%, var(--background) 100%);
+    border-bottom: 1px solid var(--border);
 }
 
 .breadcrumbs {
@@ -30,9 +30,10 @@
     display: flex;
     gap: 3rem;
     padding: 1.5rem;
-    background: rgba(255, 255, 255, 0.03);
+    background: var(--surface);
     border-radius: var(--radius-lg);
-    border: 1px solid rgba(255, 255, 255, 0.05);
+    border: 1px solid var(--border);
+    box-shadow: 0 12px 30px rgba(15, 23, 42, 0.08);
     width: fit-content;
 }
 

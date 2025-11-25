@@ -1,6 +1,6 @@
 .card {
-    background: rgba(255, 255, 255, 0.03);
-    border: 1px solid rgba(255, 255, 255, 0.05);
+    background: var(--surface);
+    border: 1px solid var(--border);
     border-radius: var(--radius-lg);
     padding: 1.5rem;
     display: flex;
@@ -9,13 +9,14 @@
     position: relative;
     overflow: hidden;
     height: 100%;
+    box-shadow: 0 10px 30px rgba(15, 23, 42, 0.06);
 }
 
 .card:hover {
-    background: rgba(255, 255, 255, 0.06);
-    border-color: rgba(255, 255, 255, 0.1);
+    background: var(--surface-hover);
+    border-color: var(--border-hover);
     transform: translateY(-4px);
-    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+    box-shadow: 0 16px 40px rgba(15, 23, 42, 0.12);
 }
 
 .header {
@@ -30,9 +31,10 @@
     text-transform: uppercase;
     letter-spacing: 0.05em;
     color: var(--text-muted);
-    background: rgba(255, 255, 255, 0.05);
+    background: var(--surface-hover);
     padding: 0.25rem 0.5rem;
     border-radius: var(--radius-sm);
+    border: 1px solid var(--border);
 }
 
 .icon {
@@ -79,7 +81,7 @@
 
 .progressContainer {
     height: 4px;
-    background: rgba(255, 255, 255, 0.1);
+    background: var(--border);
     border-radius: 2px;
     overflow: hidden;
 }
