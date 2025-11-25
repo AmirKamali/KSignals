@@ -25,29 +25,56 @@ public class BackendPrivateController : ControllerBase
 
     [HttpPost("refresh-series-categories-tags")]
     [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status409Conflict)]
     [ProducesResponseType(StatusCodes.Status500InternalServerError)]
-    public async Task<IActionResult> RefreshMarket([FromQuery] string? category = null, [FromQuery] string? tag = null, CancellationToken cancellationToken = default)
+    public IActionResult RefreshCategoriesTagsSeriers([FromQuery] string? category = null, [FromQuery] string? tag = null)
     {
         try
         {
-            var updated = await _refreshService.RefreshMarketCategoriesAsync(category, tag, cancellationToken);
-            return Ok(new { updated, refreshedAt = DateTime.UtcNow });
-        }
-        catch (ApiException apiEx)
-        {
-            _logger.LogError(apiEx, "Kalshi API error during market category refresh");
-            return StatusCode(StatusCodes.Status502BadGateway, new
+            _logger.LogInformation("Starting category refresh request for category={Category}, tag={Tag}", category, tag);
+
+            var started = _refreshService.RefreshMarketCategoriesAsync(category, tag);
+
+            if (!started)
             {
-                error = "Kalshi API error",
-                message = apiEx.Message,
-                statusCode = apiEx.ErrorCode,
-                details = apiEx.ErrorContent
+                return StatusCode(StatusCodes.Status409Conflict, new
+                {
+                    error = "Category refresh is already processing",
+                    message = "Another category refresh operation is currently in progress. Check the status endpoint for progress."
+                });
+            }
+
+            _logger.LogInformation("Category refresh task started in background");
+
+            return Ok(new
+            {
+                started = true,
+                message = "Category refresh task started in background",
+                startedAt = DateTime.UtcNow,
+                category,
+                tag
             });
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Failed to refresh market categories");
-            return StatusCode(StatusCodes.Status500InternalServerError, new { error = "Failed to refresh market categories", message = ex.Message });
+            _logger.LogError(ex, "Failed to start category refresh task");
+            return StatusCode(StatusCodes.Status500InternalServerError, new { error = "Failed to start category refresh task", message = ex.Message });
+        }
+    }
+
+    [HttpGet("category-refresh-status")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    public IActionResult GetCategoryRefreshStatus()
+    {
+        try
+        {
+            var status = _refreshService.GetCategoryRefreshStatus();
+            return Ok(status);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to get category refresh status");
+            return StatusCode(StatusCodes.Status500InternalServerError, new { error = "Failed to get category refresh status", message = ex.Message });
         }
     }
 

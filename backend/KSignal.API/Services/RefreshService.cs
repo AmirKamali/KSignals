@@ -8,6 +8,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
+using System.Collections.Concurrent;
 using System.Net;
 using System.Threading;
 
@@ -28,6 +29,16 @@ public class RefreshService
     private DateTime? _lastUpdatedAt;
     private string? _currentCategory;
     private string? _currentTag;
+
+    // Thread-safe status tracking for category refresh
+    private readonly object _categoryRefreshStatusLock = new object();
+    private bool _isCategoryRefreshProcessing = false;
+    private int _categoryRefreshTotalJobs = 0;
+    private int _categoryRefreshRemainingJobs = 0;
+    private DateTime? _categoryRefreshStartedAt;
+    private DateTime? _categoryRefreshLastUpdatedAt;
+    private string? _categoryRefreshCategory;
+    private string? _categoryRefreshTag;
 
     public RefreshService(KalshiClient kalshiClient, ILogger<RefreshService> logger, IServiceScopeFactory scopeFactory)
     {
@@ -53,12 +64,72 @@ public class RefreshService
         }
     }
 
-    public async Task<int> RefreshMarketCategoriesAsync(string? category = null, string? tag = null, CancellationToken cancellationToken = default)
+    public CategoryRefreshStatus GetCategoryRefreshStatus()
+    {
+        lock (_categoryRefreshStatusLock)
+        {
+            return new CategoryRefreshStatus
+            {
+                IsProcessing = _isCategoryRefreshProcessing,
+                TotalJobs = _categoryRefreshTotalJobs,
+                RemainingJobs = _categoryRefreshRemainingJobs,
+                StartedAt = _categoryRefreshStartedAt,
+                LastUpdatedAt = _categoryRefreshLastUpdatedAt,
+                Category = _categoryRefreshCategory,
+                Tag = _categoryRefreshTag
+            };
+        }
+    }
+
+    public bool RefreshMarketCategoriesAsync(string? category = null, string? tag = null)
+    {
+        lock (_categoryRefreshStatusLock)
+        {
+            if (_isCategoryRefreshProcessing)
+            {
+                _logger.LogWarning("Category refresh is already processing. Request ignored.");
+                return false;
+            }
+
+            _isCategoryRefreshProcessing = true;
+            _categoryRefreshStartedAt = DateTime.UtcNow;
+            _categoryRefreshLastUpdatedAt = DateTime.UtcNow;
+            _categoryRefreshCategory = category;
+            _categoryRefreshTag = tag;
+            _categoryRefreshTotalJobs = 0;
+            _categoryRefreshRemainingJobs = 0;
+        }
+
+        // Start background task
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                await RefreshMarketCategoriesInternalAsync(category, tag);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error in background category refresh task");
+            }
+            finally
+            {
+                lock (_categoryRefreshStatusLock)
+                {
+                    _isCategoryRefreshProcessing = false;
+                    _categoryRefreshLastUpdatedAt = DateTime.UtcNow;
+                }
+            }
+        });
+
+        return true;
+    }
+
+    private async Task RefreshMarketCategoriesInternalAsync(string? category = null, string? tag = null)
     {
         using var scope = _scopeFactory.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<KalshiDbContext>();
         
-        await db.Database.EnsureCreatedAsync(cancellationToken);
+        await db.Database.EnsureCreatedAsync();
 
         var now = DateTime.UtcNow;
         var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
@@ -74,14 +145,20 @@ public class RefreshService
             var existingIds = (await db.MarketCategories
                     .AsNoTracking()
                     .Select(x => x.SeriesId)
-                    .ToListAsync(cancellationToken))
+                    .ToListAsync())
                 .ToHashSet(StringComparer.OrdinalIgnoreCase);
 
-            var tagsResponse = await _kalshiClient.Search.GetTagsForSeriesCategoriesAsync(cancellationToken: cancellationToken);
+            var tagsResponse = await _kalshiClient.Search.GetTagsForSeriesCategoriesAsync();
             if (tagsResponse?.TagsByCategories == null)
             {
                 _logger.LogWarning("Tags by categories response was null or empty.");
-                return 0;
+                lock (_categoryRefreshStatusLock)
+                {
+                    _categoryRefreshTotalJobs = 0;
+                    _categoryRefreshRemainingJobs = 0;
+                    _categoryRefreshLastUpdatedAt = DateTime.UtcNow;
+                }
+                return;
             }
 
             _logger.LogInformation("Fetched {CategoryCount} categories from tags endpoint", tagsResponse.TagsByCategories.Count);
@@ -102,70 +179,227 @@ public class RefreshService
                 }
             }
 
-            // Process queue items one by one
-            while (queue.Count > 0)
+            // Convert to ConcurrentQueue for thread-safe parallel processing
+            var concurrentQueue = new ConcurrentQueue<QueueItem>();
+            foreach (var item in queue)
             {
-                var item = queue.Dequeue();
-                _logger.LogInformation("Processing queue item: category={Category}, tag={Tag}, cursor={Cursor}", 
-                    item.Category ?? "null", item.Tag ?? "null", item.Cursor ?? "null");
+                concurrentQueue.Enqueue(item);
+            }
 
-                var cursor = await FetchSeriesIntoLookupAsync(db, existingIds, seen, now, item.Category, item.Tag, item.Cursor, cancellationToken);
+            // Update status with total jobs
+            lock (_categoryRefreshStatusLock)
+            {
+                _categoryRefreshTotalJobs = concurrentQueue.Count;
+                _categoryRefreshRemainingJobs = concurrentQueue.Count;
+                _categoryRefreshLastUpdatedAt = DateTime.UtcNow;
+            }
 
-                // If response has cursor, add the same category/tag with cursor to the queue
-                if (!string.IsNullOrWhiteSpace(cursor))
+            // Process queue items in parallel
+            var cancellationTokenSource = new CancellationTokenSource();
+            var semaphore = new SemaphoreSlim(10, 10); // Max 10 concurrent operations
+            var activeCount = 0;
+            var activeCountLock = new object();
+
+            async Task ProcessQueueItemAsync()
+            {
+                while (!cancellationTokenSource.Token.IsCancellationRequested)
                 {
-                    queue.Enqueue(new QueueItem { Category = item.Category, Tag = item.Tag, Cursor = cursor });
+                    if (!concurrentQueue.TryDequeue(out var item))
+                    {
+                        // Queue is empty, wait a bit and check again
+                        await Task.Delay(100, cancellationTokenSource.Token);
+                        continue;
+                    }
+
+                    Interlocked.Increment(ref activeCount);
+                    await semaphore.WaitAsync(cancellationTokenSource.Token);
+                    try
+                    {
+                        var cursor = await FetchSeriesIntoLookupAsync(db, existingIds, seen, now, item.Category, item.Tag, item.Cursor, cancellationTokenSource.Token);
+
+                        // If response has cursor, add the same category/tag with cursor to the queue
+                        if (!string.IsNullOrWhiteSpace(cursor))
+                        {
+                            concurrentQueue.Enqueue(new QueueItem { Category = item.Category, Tag = item.Tag, Cursor = cursor });
+                            
+                            lock (_categoryRefreshStatusLock)
+                            {
+                                _categoryRefreshTotalJobs++;
+                                _categoryRefreshRemainingJobs++;
+                                _categoryRefreshLastUpdatedAt = DateTime.UtcNow;
+                            }
+                        }
+
+                        // Update remaining jobs
+                        lock (_categoryRefreshStatusLock)
+                        {
+                            _categoryRefreshRemainingJobs = Math.Max(0, _categoryRefreshRemainingJobs - 1);
+                            _categoryRefreshLastUpdatedAt = DateTime.UtcNow;
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogError(ex, "Error processing queue item: category={Category}, tag={Tag}, cursor={Cursor}", 
+                            item.Category ?? "null", item.Tag ?? "null", item.Cursor ?? "null");
+                        
+                        // Update remaining jobs even on error
+                        lock (_categoryRefreshStatusLock)
+                        {
+                            _categoryRefreshRemainingJobs = Math.Max(0, _categoryRefreshRemainingJobs - 1);
+                            _categoryRefreshLastUpdatedAt = DateTime.UtcNow;
+                        }
+                    }
+                    finally
+                    {
+                        semaphore.Release();
+                        Interlocked.Decrement(ref activeCount);
+                    }
                 }
             }
 
-            await CleanupMissingAsync(db, existingIds, cancellationToken);
-            return seen.Count;
-        }
-
-        // Filtered refresh
-        var existingFiltered = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        if (requestedCategory != null)
-        {
-            var ids = await db.MarketCategories
-                .AsNoTracking()
-                .Where(x => x.Category == requestedCategory)
-                .Select(x => x.SeriesId)
-                .ToListAsync(cancellationToken);
-            foreach (var id in ids) existingFiltered.Add(id);
-
-            queue.Enqueue(new QueueItem { Category = requestedCategory, Tag = null, Cursor = null });
-        }
-
-        if (requestedTag != null)
-        {
-            var ids = await db.MarketCategories
-                .AsNoTracking()
-                .Where(x => x.Tags != null && x.Tags.Contains(requestedTag))
-                .Select(x => x.SeriesId)
-                .ToListAsync(cancellationToken);
-            foreach (var id in ids) existingFiltered.Add(id);
-
-            queue.Enqueue(new QueueItem { Category = null, Tag = requestedTag, Cursor = null });
-        }
-
-        // Process queue items one by one
-        while (queue.Count > 0)
-        {
-            var item = queue.Dequeue();
-            _logger.LogInformation("Processing queue item: category={Category}, tag={Tag}, cursor={Cursor}", 
-                item.Category ?? "null", item.Tag ?? "null", item.Cursor ?? "null");
-
-            var cursor = await FetchSeriesIntoLookupAsync(db, existingFiltered, seen, now, item.Category, item.Tag, item.Cursor, cancellationToken);
-
-            // If response has cursor, add the same category/tag with cursor to the queue
-            if (!string.IsNullOrWhiteSpace(cursor))
+            // Start multiple parallel tasks to process the queue
+            var tasks = new List<Task>();
+            for (int i = 0; i < 10; i++)
             {
-                queue.Enqueue(new QueueItem { Category = item.Category, Tag = item.Tag, Cursor = cursor });
+                tasks.Add(ProcessQueueItemAsync());
             }
+
+            // Wait for queue to be empty and all tasks to finish
+            while (concurrentQueue.Count > 0 || Volatile.Read(ref activeCount) > 0)
+            {
+                await Task.Delay(100, cancellationTokenSource.Token);
+            }
+
+            cancellationTokenSource.Cancel();
+            await Task.WhenAll(tasks);
+
+            await CleanupMissingAsync(db, existingIds, cancellationTokenSource.Token);
+        }
+        else
+        {
+            // Filtered refresh
+            var existingFiltered = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            if (requestedCategory != null)
+            {
+                var ids = await db.MarketCategories
+                    .AsNoTracking()
+                    .Where(x => x.Category == requestedCategory)
+                    .Select(x => x.SeriesId)
+                    .ToListAsync();
+                foreach (var id in ids) existingFiltered.Add(id);
+
+                queue.Enqueue(new QueueItem { Category = requestedCategory, Tag = null, Cursor = null });
+            }
+
+            if (requestedTag != null)
+            {
+                var ids = await db.MarketCategories
+                    .AsNoTracking()
+                    .Where(x => x.Tags != null && x.Tags.Contains(requestedTag))
+                    .Select(x => x.SeriesId)
+                    .ToListAsync();
+                foreach (var id in ids) existingFiltered.Add(id);
+
+                queue.Enqueue(new QueueItem { Category = null, Tag = requestedTag, Cursor = null });
+            }
+
+            // Convert to ConcurrentQueue for thread-safe parallel processing
+            var concurrentQueue = new ConcurrentQueue<QueueItem>();
+            foreach (var item in queue)
+            {
+                concurrentQueue.Enqueue(item);
+            }
+
+            // Update status with total jobs
+            lock (_categoryRefreshStatusLock)
+            {
+                _categoryRefreshTotalJobs = concurrentQueue.Count;
+                _categoryRefreshRemainingJobs = concurrentQueue.Count;
+                _categoryRefreshLastUpdatedAt = DateTime.UtcNow;
+            }
+
+            // Process queue items in parallel
+            var cancellationTokenSource = new CancellationTokenSource();
+            var semaphore = new SemaphoreSlim(10, 10); // Max 10 concurrent operations
+            var activeCount = 0;
+
+            async Task ProcessQueueItemAsync()
+            {
+                while (!cancellationTokenSource.Token.IsCancellationRequested)
+                {
+                    if (!concurrentQueue.TryDequeue(out var item))
+                    {
+                        // Queue is empty, wait a bit and check again
+                        await Task.Delay(100, cancellationTokenSource.Token);
+                        continue;
+                    }
+
+                    Interlocked.Increment(ref activeCount);
+                    await semaphore.WaitAsync(cancellationTokenSource.Token);
+                    try
+                    {
+                        var cursor = await FetchSeriesIntoLookupAsync(db, existingFiltered, seen, now, item.Category, item.Tag, item.Cursor, cancellationTokenSource.Token);
+
+                        // If response has cursor, add the same category/tag with cursor to the queue
+                        if (!string.IsNullOrWhiteSpace(cursor))
+                        {
+                            concurrentQueue.Enqueue(new QueueItem { Category = item.Category, Tag = item.Tag, Cursor = cursor });
+                            
+                            lock (_categoryRefreshStatusLock)
+                            {
+                                _categoryRefreshTotalJobs++;
+                                _categoryRefreshRemainingJobs++;
+                                _categoryRefreshLastUpdatedAt = DateTime.UtcNow;
+                            }
+                        }
+
+                        // Update remaining jobs
+                        lock (_categoryRefreshStatusLock)
+                        {
+                            _categoryRefreshRemainingJobs = Math.Max(0, _categoryRefreshRemainingJobs - 1);
+                            _categoryRefreshLastUpdatedAt = DateTime.UtcNow;
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogError(ex, "Error processing queue item: category={Category}, tag={Tag}, cursor={Cursor}", 
+                            item.Category ?? "null", item.Tag ?? "null", item.Cursor ?? "null");
+                        
+                        // Update remaining jobs even on error
+                        lock (_categoryRefreshStatusLock)
+                        {
+                            _categoryRefreshRemainingJobs = Math.Max(0, _categoryRefreshRemainingJobs - 1);
+                            _categoryRefreshLastUpdatedAt = DateTime.UtcNow;
+                        }
+                    }
+                    finally
+                    {
+                        semaphore.Release();
+                        Interlocked.Decrement(ref activeCount);
+                    }
+                }
+            }
+
+            // Start multiple parallel tasks to process the queue
+            var tasks = new List<Task>();
+            for (int i = 0; i < 10; i++)
+            {
+                tasks.Add(ProcessQueueItemAsync());
+            }
+
+            // Wait for queue to be empty and all tasks to finish
+            while (concurrentQueue.Count > 0 || Volatile.Read(ref activeCount) > 0)
+            {
+                await Task.Delay(100, cancellationTokenSource.Token);
+            }
+
+            cancellationTokenSource.Cancel();
+            await Task.WhenAll(tasks);
+
+            await CleanupMissingAsync(db, existingFiltered, cancellationTokenSource.Token);
         }
 
-        await CleanupMissingAsync(db, existingFiltered, cancellationToken);
-        return seen.Count;
+        _logger.LogInformation("Successfully refreshed {Count} categories/tags", seen.Count);
     }
 
     private async Task<string?> FetchSeriesIntoLookupAsync(
