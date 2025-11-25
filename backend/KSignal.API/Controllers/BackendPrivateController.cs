@@ -53,41 +53,56 @@ public class BackendPrivateController : ControllerBase
 
     [HttpPost("refresh-market-data")]
     [ProducesResponseType(StatusCodes.Status200OK)]
-    [ProducesResponseType(StatusCodes.Status502BadGateway)]
+    [ProducesResponseType(StatusCodes.Status409Conflict)]
     [ProducesResponseType(StatusCodes.Status500InternalServerError)]
-    public async Task<IActionResult> CacheMarketData([FromQuery] string? category = null, [FromQuery] string? tag = null, CancellationToken cancellationToken = default)
+    public IActionResult CacheMarketData([FromQuery] string? category = null, [FromQuery] string? tag = null)
     {
         try
         {
             _logger.LogInformation("Starting market data cache request for category={Category}, tag={Tag}", category, tag);
 
-            var cachedCount = await _refreshService.CacheMarketDataAsync(category, tag, cancellationToken);
+            var started = _refreshService.CacheMarketDataAsync(category, tag);
 
-            _logger.LogInformation("Successfully cached {Count} markets", cachedCount);
+            if (!started)
+            {
+                return StatusCode(StatusCodes.Status409Conflict, new
+                {
+                    error = "Cache market data is already processing",
+                    message = "Another cache operation is currently in progress. Check the status endpoint for progress."
+                });
+            }
+
+            _logger.LogInformation("Market data cache task started in background");
 
             return Ok(new
             {
-                cached = cachedCount,
-                cachedAt = DateTime.UtcNow,
+                started = true,
+                message = "Cache market data task started in background",
+                startedAt = DateTime.UtcNow,
                 category,
                 tag
             });
         }
-        catch (ApiException apiEx)
+        catch (Exception ex)
         {
-            _logger.LogError(apiEx, "Kalshi API error during market data caching");
-            return StatusCode(StatusCodes.Status502BadGateway, new
-            {
-                error = "Kalshi API error",
-                message = apiEx.Message,
-                statusCode = apiEx.ErrorCode,
-                details = apiEx.ErrorContent
-            });
+            _logger.LogError(ex, "Failed to start cache market data task");
+            return StatusCode(StatusCodes.Status500InternalServerError, new { error = "Failed to start cache market data task", message = ex.Message });
+        }
+    }
+
+    [HttpGet("cache-market-status")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    public IActionResult GetCacheMarketStatus()
+    {
+        try
+        {
+            var status = _refreshService.GetCacheMarketStatus();
+            return Ok(status);
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Failed to cache market data");
-            return StatusCode(StatusCodes.Status500InternalServerError, new { error = "Failed to cache market data", message = ex.Message });
+            _logger.LogError(ex, "Failed to get cache market status");
+            return StatusCode(StatusCodes.Status500InternalServerError, new { error = "Failed to get cache market status", message = ex.Message });
         }
     }
 }

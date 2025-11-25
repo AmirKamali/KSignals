@@ -4,9 +4,12 @@ using Kalshi.Api.Model;
 using KSignal.API.Data;
 using KSignal.API.Models;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
+using System.Net;
+using System.Threading;
 
 namespace KSignal.API.Services;
 
@@ -14,18 +17,48 @@ public class RefreshService
 {
     private readonly KalshiClient _kalshiClient;
     private readonly ILogger<RefreshService> _logger;
-    private readonly KalshiDbContext _db;
+    private readonly IServiceScopeFactory _scopeFactory;
+    
+    // Thread-safe status tracking for cache market data
+    private readonly object _statusLock = new object();
+    private bool _isCacheMarketDataProcessing = false;
+    private int _totalJobs = 0;
+    private int _remainingJobs = 0;
+    private DateTime? _startedAt;
+    private DateTime? _lastUpdatedAt;
+    private string? _currentCategory;
+    private string? _currentTag;
 
-    public RefreshService(KalshiClient kalshiClient, ILogger<RefreshService> logger, KalshiDbContext db)
+    public RefreshService(KalshiClient kalshiClient, ILogger<RefreshService> logger, IServiceScopeFactory scopeFactory)
     {
         _kalshiClient = kalshiClient ?? throw new ArgumentNullException(nameof(kalshiClient));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-        _db = db ?? throw new ArgumentNullException(nameof(db));
+        _scopeFactory = scopeFactory ?? throw new ArgumentNullException(nameof(scopeFactory));
+    }
+    
+    public CacheMarketStatus GetCacheMarketStatus()
+    {
+        lock (_statusLock)
+        {
+            return new CacheMarketStatus
+            {
+                IsProcessing = _isCacheMarketDataProcessing,
+                TotalJobs = _totalJobs,
+                RemainingJobs = _remainingJobs,
+                StartedAt = _startedAt,
+                LastUpdatedAt = _lastUpdatedAt,
+                Category = _currentCategory,
+                Tag = _currentTag
+            };
+        }
     }
 
     public async Task<int> RefreshMarketCategoriesAsync(string? category = null, string? tag = null, CancellationToken cancellationToken = default)
     {
-        await _db.Database.EnsureCreatedAsync(cancellationToken);
+        using var scope = _scopeFactory.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<KalshiDbContext>();
+        
+        await db.Database.EnsureCreatedAsync(cancellationToken);
 
         var now = DateTime.UtcNow;
         var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
@@ -38,7 +71,7 @@ public class RefreshService
         // Full refresh when no filters are provided
         if (requestedCategory == null && requestedTag == null)
         {
-            var existingIds = (await _db.MarketCategories
+            var existingIds = (await db.MarketCategories
                     .AsNoTracking()
                     .Select(x => x.SeriesId)
                     .ToListAsync(cancellationToken))
@@ -76,7 +109,7 @@ public class RefreshService
                 _logger.LogInformation("Processing queue item: category={Category}, tag={Tag}, cursor={Cursor}", 
                     item.Category ?? "null", item.Tag ?? "null", item.Cursor ?? "null");
 
-                var cursor = await FetchSeriesIntoLookupAsync(existingIds, seen, now, item.Category, item.Tag, item.Cursor, cancellationToken);
+                var cursor = await FetchSeriesIntoLookupAsync(db, existingIds, seen, now, item.Category, item.Tag, item.Cursor, cancellationToken);
 
                 // If response has cursor, add the same category/tag with cursor to the queue
                 if (!string.IsNullOrWhiteSpace(cursor))
@@ -85,7 +118,7 @@ public class RefreshService
                 }
             }
 
-            await CleanupMissingAsync(existingIds, cancellationToken);
+            await CleanupMissingAsync(db, existingIds, cancellationToken);
             return seen.Count;
         }
 
@@ -93,7 +126,7 @@ public class RefreshService
         var existingFiltered = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         if (requestedCategory != null)
         {
-            var ids = await _db.MarketCategories
+            var ids = await db.MarketCategories
                 .AsNoTracking()
                 .Where(x => x.Category == requestedCategory)
                 .Select(x => x.SeriesId)
@@ -105,7 +138,7 @@ public class RefreshService
 
         if (requestedTag != null)
         {
-            var ids = await _db.MarketCategories
+            var ids = await db.MarketCategories
                 .AsNoTracking()
                 .Where(x => x.Tags != null && x.Tags.Contains(requestedTag))
                 .Select(x => x.SeriesId)
@@ -122,7 +155,7 @@ public class RefreshService
             _logger.LogInformation("Processing queue item: category={Category}, tag={Tag}, cursor={Cursor}", 
                 item.Category ?? "null", item.Tag ?? "null", item.Cursor ?? "null");
 
-            var cursor = await FetchSeriesIntoLookupAsync(existingFiltered, seen, now, item.Category, item.Tag, item.Cursor, cancellationToken);
+            var cursor = await FetchSeriesIntoLookupAsync(db, existingFiltered, seen, now, item.Category, item.Tag, item.Cursor, cancellationToken);
 
             // If response has cursor, add the same category/tag with cursor to the queue
             if (!string.IsNullOrWhiteSpace(cursor))
@@ -131,11 +164,12 @@ public class RefreshService
             }
         }
 
-        await CleanupMissingAsync(existingFiltered, cancellationToken);
+        await CleanupMissingAsync(db, existingFiltered, cancellationToken);
         return seen.Count;
     }
 
     private async Task<string?> FetchSeriesIntoLookupAsync(
+        KalshiDbContext db,
         HashSet<string> existingIds,
         HashSet<string> seen,
         DateTime lastUpdate,
@@ -190,7 +224,7 @@ public class RefreshService
                 var agg = new SeriesAggregation(series.Ticker);
                 agg.Merge(series);
                 var record = agg.ToRecord(lastUpdate);
-                await UpsertSeriesAsync(record, cancellationToken);
+                await UpsertSeriesAsync(db, record, cancellationToken);
                 seen.Add(series.Ticker);
                 existingIds.Remove(series.Ticker);
             }
@@ -221,12 +255,12 @@ public class RefreshService
         }
     }
 
-    private async Task UpsertSeriesAsync(MarketCategoryRecord record, CancellationToken cancellationToken)
+    private async Task UpsertSeriesAsync(KalshiDbContext db, MarketCategoryRecord record, CancellationToken cancellationToken)
     {
-        var existing = await _db.MarketCategories.FindAsync(new object[] { record.SeriesId }, cancellationToken);
+        var existing = await db.MarketCategories.FindAsync(new object[] { record.SeriesId }, cancellationToken);
         if (existing == null)
         {
-            _db.MarketCategories.Add(new MarketCategory
+            db.MarketCategories.Add(new MarketCategory
             {
                 SeriesId = record.SeriesId,
                 Category = record.Category,
@@ -248,27 +282,27 @@ public class RefreshService
             existing.JsonResponse = record.JsonResponse;
             existing.LastUpdate = record.LastUpdate;
 
-            _db.MarketCategories.Update(existing);
+            db.MarketCategories.Update(existing);
         }
 
-        await _db.SaveChangesAsync(cancellationToken);
+        await db.SaveChangesAsync(cancellationToken);
     }
 
-    private async Task CleanupMissingAsync(HashSet<string> remainingIds, CancellationToken cancellationToken)
+    private async Task CleanupMissingAsync(KalshiDbContext db, HashSet<string> remainingIds, CancellationToken cancellationToken)
     {
         var now = DateTime.UtcNow;
         var sevenDaysAgo = now.AddDays(-7);
 
         // Remove MarketCache records where CloseTime is more than 7 days ago
-        var oldMarkets = await _db.Markets
+        var oldMarkets = await db.Markets
             .Where(m => m.CloseTime <= sevenDaysAgo)
             .ToListAsync(cancellationToken);
 
         if (oldMarkets.Count > 0)
         {
             _logger.LogInformation("Removing {Count} MarketCache records with CloseTime older than 7 days", oldMarkets.Count);
-            _db.Markets.RemoveRange(oldMarkets);
-            await _db.SaveChangesAsync(cancellationToken);
+            db.Markets.RemoveRange(oldMarkets);
+            await db.SaveChangesAsync(cancellationToken);
         }
     }
 
@@ -331,12 +365,58 @@ public class RefreshService
         public DateTime LastUpdate { get; set; }
     }
 
-    public async Task<int> CacheMarketDataAsync(string? category = null, string? tag = null, CancellationToken cancellationToken = default)
+    public bool CacheMarketDataAsync(string? category = null, string? tag = null)
     {
-        await _db.Database.EnsureCreatedAsync(cancellationToken);
+        lock (_statusLock)
+        {
+            if (_isCacheMarketDataProcessing)
+            {
+                _logger.LogWarning("Cache market data is already processing. Request ignored.");
+                return false;
+            }
+
+            _isCacheMarketDataProcessing = true;
+            _startedAt = DateTime.UtcNow;
+            _lastUpdatedAt = DateTime.UtcNow;
+            _currentCategory = category;
+            _currentTag = tag;
+            _totalJobs = 0;
+            _remainingJobs = 0;
+        }
+
+        // Start background task
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                await CacheMarketDataInternalAsync(category, tag);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error in background cache market data task");
+            }
+            finally
+            {
+                lock (_statusLock)
+                {
+                    _isCacheMarketDataProcessing = false;
+                    _lastUpdatedAt = DateTime.UtcNow;
+                }
+            }
+        });
+
+        return true;
+    }
+
+    private async Task CacheMarketDataInternalAsync(string? category = null, string? tag = null)
+    {
+        using var scope = _scopeFactory.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<KalshiDbContext>();
+        
+        await db.Database.EnsureCreatedAsync();
 
         // Read `marketcategories` to find series matching the filters and aggregate seriesIds
-        var seriesIds = _db.MarketCategories
+        var seriesIds = db.MarketCategories
             .AsNoTracking()
             .Where(mc =>
                 (string.IsNullOrWhiteSpace(category) || mc.Category == category) &&
@@ -348,35 +428,67 @@ public class RefreshService
         if (seriesIds == null || seriesIds.Count == 0)
         {
             _logger.LogWarning("No series found for category={Category}, tag={Tag}", category, tag);
-            return 0;
+            lock (_statusLock)
+            {
+                _totalJobs = 0;
+                _remainingJobs = 0;
+                _lastUpdatedAt = DateTime.UtcNow;
+            }
+            return;
         }
 
         _logger.LogInformation("Caching market data for {SeriesCount} series (category={Category}, tag={Tag})",
             seriesIds.Count, category, tag);
 
+        // Update status with total jobs
+        lock (_statusLock)
+        {
+            _totalJobs = seriesIds.Count;
+            _remainingJobs = seriesIds.Count;
+            _lastUpdatedAt = DateTime.UtcNow;
+        }
+
         var nowUtc = DateTime.UtcNow;
         var totalCached = 0;
+        var cancellationTokenSource = new CancellationTokenSource();
+        var parallelOptions = new ParallelOptions
+        {
+            MaxDegreeOfParallelism = 10,
+            CancellationToken = cancellationTokenSource.Token
+        };
 
-        // Fetch markets for each series ticker
-        foreach (var seriesTicker in seriesIds)
+        // Fetch markets for each series ticker in parallel
+        await Parallel.ForEachAsync(seriesIds, parallelOptions, async (seriesTicker, ct) =>
         {
             try
             {
-                var marketCount = await FetchAndCacheMarketsForSeriesAsync(seriesTicker, nowUtc, cancellationToken);
-                totalCached += marketCount;
+                var marketCount = await FetchAndCacheMarketsForSeriesAsync(seriesTicker, nowUtc, ct);
+                Interlocked.Add(ref totalCached, marketCount);
                 _logger.LogInformation("Cached {Count} markets for series {SeriesTicker}", marketCount, seriesTicker);
+                
+                // Update remaining jobs
+                lock (_statusLock)
+                {
+                    _remainingJobs = Math.Max(0, _remainingJobs - 1);
+                    _lastUpdatedAt = DateTime.UtcNow;
+                }
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error caching markets for series {SeriesTicker}", seriesTicker);
                 // Continue with next series even if one fails
+                
+                // Update remaining jobs even on error
+                lock (_statusLock)
+                {
+                    _remainingJobs = Math.Max(0, _remainingJobs - 1);
+                    _lastUpdatedAt = DateTime.UtcNow;
+                }
             }
-        }
+        });
 
         _logger.LogInformation("Successfully cached {TotalCount} markets across {SeriesCount} series",
             totalCached, seriesIds.Count);
-
-        return totalCached;
     }
 
     private async Task<int> FetchAndCacheMarketsForSeriesAsync(string seriesTicker, DateTime fetchedAtUtc, CancellationToken cancellationToken)
@@ -386,38 +498,74 @@ public class RefreshService
 
         do
         {
-            var requestOptions = new RequestOptions
+            try
             {
-                Operation = "MarketApi.GetMarkets"
-            };
+                var requestOptions = new RequestOptions
+                {
+                    Operation = "MarketApi.GetMarkets"
+                };
 
-            requestOptions.QueryParameters.Add(ClientUtils.ParameterToMultiMap("", "limit", 1000));
-            requestOptions.QueryParameters.Add(ClientUtils.ParameterToMultiMap("", "status", "open"));
-            requestOptions.QueryParameters.Add(ClientUtils.ParameterToMultiMap("", "series_ticker", seriesTicker));
+                requestOptions.QueryParameters.Add(ClientUtils.ParameterToMultiMap("", "limit", 1000));
+                requestOptions.QueryParameters.Add(ClientUtils.ParameterToMultiMap("", "status", "open"));
+                requestOptions.QueryParameters.Add(ClientUtils.ParameterToMultiMap("", "series_ticker", seriesTicker));
 
-            if (!string.IsNullOrWhiteSpace(cursor))
-            {
-                requestOptions.QueryParameters.Add(ClientUtils.ParameterToMultiMap("", "cursor", cursor));
+                if (!string.IsNullOrWhiteSpace(cursor))
+                {
+                    requestOptions.QueryParameters.Add(ClientUtils.ParameterToMultiMap("", "cursor", cursor));
+                }
+
+                var response = await _kalshiClient.Markets.AsynchronousClient.GetAsync<GetMarketsResponse>(
+                        "/markets",
+                        requestOptions,
+                        _kalshiClient.Markets.Configuration,
+                        cancellationToken)
+                    .ConfigureAwait(false);
+
+                // Check if response is successful
+                if (response?.StatusCode != HttpStatusCode.OK)
+                {
+                    _logger.LogWarning("Non-OK status code {StatusCode} for series {SeriesTicker}. Response: {RawContent}",
+                        response?.StatusCode, seriesTicker, response?.RawContent);
+                    break; // Exit pagination loop
+                }
+
+                var data = response?.Data;
+                if (data?.Markets != null && data.Markets.Count > 0)
+                {
+                    var mapped = data.Markets
+                        .Where(m => m != null)
+                        .Select(m => KalshiService.MapMarket(seriesTicker, m!, fetchedAtUtc))
+                        .ToList();
+                    markets.AddRange(mapped);
+                }
+
+                cursor = data?.Cursor;
             }
-
-            var response = await _kalshiClient.Markets.AsynchronousClient.GetAsync<GetMarketsResponse>(
-                    "/markets",
-                    requestOptions,
-                    _kalshiClient.Markets.Configuration,
-                    cancellationToken)
-                .ConfigureAwait(false);
-
-            var data = response?.Data;
-            if (data?.Markets != null)
+            catch (ApiException apiEx)
             {
-                var mapped = data.Markets
-                    .Where(m => m != null)
-                    .Select(m => KalshiService.MapMarket(seriesTicker, m!, fetchedAtUtc))
-                    .ToList();
-                markets.AddRange(mapped);
+                // Log the API exception with details
+                _logger.LogWarning(apiEx, 
+                    "API exception for series {SeriesTicker}. ErrorCode: {ErrorCode}, Message: {Message}, ErrorContent: {ErrorContent}",
+                    seriesTicker, apiEx.ErrorCode, apiEx.Message, apiEx.ErrorContent);
+                
+                // If it's a client error (4xx), break the loop as retrying won't help
+                // If it's a server error (5xx), we could potentially retry, but for now we'll break
+                if (apiEx.ErrorCode >= 400 && apiEx.ErrorCode < 500)
+                {
+                    _logger.LogInformation("Client error for series {SeriesTicker}, stopping pagination", seriesTicker);
+                    break;
+                }
+                
+                // For server errors, we'll break to avoid infinite loops
+                // In a production system, you might want to implement retry logic here
+                _logger.LogWarning("Server error for series {SeriesTicker}, stopping pagination", seriesTicker);
+                break;
             }
-
-            cursor = data?.Cursor;
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Unexpected error fetching markets for series {SeriesTicker}", seriesTicker);
+                break; // Exit pagination loop on unexpected errors
+            }
         } while (!string.IsNullOrWhiteSpace(cursor));
 
         // Upsert markets to database
@@ -431,12 +579,15 @@ public class RefreshService
 
     private async Task UpsertMarketsAsync(List<MarketCache> markets, CancellationToken cancellationToken)
     {
+        using var scope = _scopeFactory.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<KalshiDbContext>();
+        
         foreach (var market in markets)
         {
-            var existing = await _db.Markets.FindAsync(new object[] { market.TickerId }, cancellationToken);
+            var existing = await db.Markets.FindAsync(new object[] { market.TickerId }, cancellationToken);
             if (existing == null)
             {
-                _db.Markets.Add(market);
+                db.Markets.Add(market);
             }
             else
             {
@@ -477,11 +628,11 @@ public class RefreshService
                 existing.JsonResponse = market.JsonResponse;
                 existing.LastUpdate = market.LastUpdate;
 
-                _db.Markets.Update(existing);
+                db.Markets.Update(existing);
             }
         }
 
-        await _db.SaveChangesAsync(cancellationToken);
+        await db.SaveChangesAsync(cancellationToken);
     }
 
     private sealed class QueueItem

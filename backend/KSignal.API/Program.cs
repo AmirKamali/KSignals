@@ -101,7 +101,7 @@ else
 }
 
 builder.Services.AddScoped<KalshiService>();
-builder.Services.AddScoped<RefreshService>();
+builder.Services.AddSingleton<RefreshService>();
 
 // Register Redis cache service as singleton (connection pooling)
 builder.Services.AddSingleton<IRedisCacheService, RedisCacheService>();

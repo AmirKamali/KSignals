@@ -39,35 +39,26 @@ namespace Kalshi.Api.Model
         /// <summary>
         /// Initializes a new instance of the <see cref="GetMarketsResponse" /> class.
         /// </summary>
-        /// <param name="markets">markets (required).</param>
-        /// <param name="cursor">cursor (required).</param>
-        public GetMarketsResponse(List<Market> markets = default, string cursor = default)
+        /// <param name="markets">markets (optional, defaults to empty list).</param>
+        /// <param name="cursor">cursor (optional).</param>
+        public GetMarketsResponse(List<Market>? markets = default, string? cursor = default)
         {
-            // to ensure "markets" is required (not null)
-            if (markets == null)
-            {
-                throw new ArgumentNullException("markets is a required property for GetMarketsResponse and cannot be null");
-            }
-            this.Markets = markets;
-            // to ensure "cursor" is required (not null)
-            if (cursor == null)
-            {
-                throw new ArgumentNullException("cursor is a required property for GetMarketsResponse and cannot be null");
-            }
+            // The upstream API occasionally returns error payloads without market data; fall back gracefully.
+            this.Markets = markets ?? new List<Market>();
             this.Cursor = cursor;
         }
 
         /// <summary>
         /// Gets or Sets Markets
         /// </summary>
-        [DataMember(Name = "markets", IsRequired = true, EmitDefaultValue = true)]
-        public List<Market> Markets { get; set; }
+        [DataMember(Name = "markets", IsRequired = false, EmitDefaultValue = false)]
+        public List<Market> Markets { get; set; } = new();
 
         /// <summary>
         /// Gets or Sets Cursor
         /// </summary>
-        [DataMember(Name = "cursor", IsRequired = true, EmitDefaultValue = true)]
-        public string Cursor { get; set; }
+        [DataMember(Name = "cursor", IsRequired = false, EmitDefaultValue = false)]
+        public string? Cursor { get; set; }
 
         /// <summary>
         /// Returns the string presentation of the object
