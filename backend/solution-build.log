@@ -2586,3 +2586,12 @@ Logging verbosity is set to: Detailed.     0>Terminal Logger was not used becaus
      2>Target "_CheckContainersPackage" in file "/usr/local/share/dotnet/sdk/10.0.100-rc.1.25451.107/Containers/build/Microsoft.NET.Build.Containers.targets" from project "/Users/amir/Documents/dev/kalshi-signals/backend/Kalshi.Api/Kalshi.Api.csproj" (entry point):
      2>Done building target "_CheckContainersPackage" in project "Kalshi.Api.csproj".
      2>Done Building Project "/Users/amir/Documents/dev/kalshi-signals/backend/Kalshi.Api/Kalshi.Api.csproj" (default targets).
+     1>Done executing task "MSBuild" -- FAILED.
+     1>Done building target "Build" in project "KalshiSignals.sln" -- FAILED.
+     1>Done Building Project "/Users/amir/Documents/dev/kalshi-signals/backend/KalshiSignals.sln" (default targets) -- FAILED.
+
+Build FAILED.
+    0 Warning(s)
+    0 Error(s)
+
+Time Elapsed 00:05:00.35

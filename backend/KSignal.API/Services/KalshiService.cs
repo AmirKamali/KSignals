@@ -86,20 +86,8 @@ public class KalshiService
             query = query.Where(p => p.CloseTime <= maxCloseTime.Value);
         }
 
-        // Get one market per SeriesTicker (DistinctBy is not translatable by EF Core)
-        var distinctMarketIds = query
-            .GroupBy(p => p.SeriesTicker)
-            .Select(g => g.Max(x => x.TickerId));
-
-        query = _db.Markets
-            .AsNoTracking()
-            .Where(m => distinctMarketIds.Contains(m.TickerId));
-
-        var safePageSize = Math.Max(1, pageSize);
-        var totalCount = await query.Select(m => m.TickerId).CountAsync();
-        var totalPages = (int)Math.Ceiling(totalCount / (double)safePageSize);
-        var safePage = totalPages > 0 ? Math.Min(Math.Max(1, page), totalPages) : 1;
-        var skip = (safePage - 1) * safePageSize;
+       // query = query.GroupBy(m => new {m.TickerId, m.Volume24h})
+         //   .Select(g => g.OrderByDescending(m => m.Volume24h).First());
 
         if (sortBy == MarketSort.Volume)
         {
@@ -107,6 +95,14 @@ public class KalshiService
                 ? query.OrderBy(m => m.Volume24h)
                 : query.OrderByDescending(m => m.Volume24h);
         }
+
+
+
+        var safePageSize = Math.Max(1, pageSize);
+        var totalCount = await query.Select(m => m.TickerId).CountAsync();
+        var totalPages = (int)Math.Ceiling(totalCount / (double)safePageSize);
+        var safePage = totalPages > 0 ? Math.Min(Math.Max(1, page), totalPages) : 1;
+        var skip = (safePage - 1) * safePageSize;
 
         var markets = await query
             .Skip(skip)
