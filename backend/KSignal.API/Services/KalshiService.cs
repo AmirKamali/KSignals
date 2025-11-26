@@ -86,8 +86,17 @@ public class KalshiService
             query = query.Where(p => p.CloseTime <= maxCloseTime.Value);
         }
 
-       // query = query.GroupBy(m => new {m.TickerId, m.Volume24h})
-         //   .Select(g => g.OrderByDescending(m => m.Volume24h).First());
+        // Get the TickerId with the highest Volume24h for each SeriesTicker to avoid duplicates
+        var maxVolumePerSeries = query
+            .GroupBy(m => m.SeriesTicker)
+            .Select(g => new { SeriesTicker = g.Key, MaxVolume = g.Max(m => m.Volume24h) });
+
+        // Join back to get full records - only markets with max volume per series
+        query = from m in query
+                join mv in maxVolumePerSeries
+                on new { m.SeriesTicker, Volume = m.Volume24h }
+                equals new { mv.SeriesTicker, Volume = mv.MaxVolume }
+                select m;
 
         if (sortBy == MarketSort.Volume)
         {
