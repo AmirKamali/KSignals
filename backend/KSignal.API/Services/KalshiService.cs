@@ -92,11 +92,11 @@ public class KalshiService
             .Select(g => new { SeriesTicker = g.Key, MaxVolume = g.Max(m => m.Volume24h) });
 
         // Join back to get full records - only markets with max volume per series
-        query = from m in query
-                join mv in maxVolumePerSeries
-                on new { m.SeriesTicker, Volume = m.Volume24h }
-                equals new { mv.SeriesTicker, Volume = mv.MaxVolume }
-                select m;
+        query = query.Join(
+            maxVolumePerSeries,
+            m => new { m.SeriesTicker, Volume = m.Volume24h },
+            mv => new { mv.SeriesTicker, Volume = mv.MaxVolume },
+            (m, mv) => m);
 
         if (sortBy == MarketSort.Volume)
         {

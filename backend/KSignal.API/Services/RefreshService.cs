@@ -19,7 +19,8 @@ public class RefreshService
     private readonly KalshiClient _kalshiClient;
     private readonly ILogger<RefreshService> _logger;
     private readonly IServiceScopeFactory _scopeFactory;
-    
+    private readonly IRedisCacheService _redisCacheService;
+
     // Thread-safe status tracking for cache market data
     private readonly object _statusLock = new object();
     private bool _isCacheMarketDataProcessing = false;
@@ -40,11 +41,12 @@ public class RefreshService
     private string? _categoryRefreshCategory;
     private string? _categoryRefreshTag;
 
-    public RefreshService(KalshiClient kalshiClient, ILogger<RefreshService> logger, IServiceScopeFactory scopeFactory)
+    public RefreshService(KalshiClient kalshiClient, ILogger<RefreshService> logger, IServiceScopeFactory scopeFactory, IRedisCacheService redisCacheService)
     {
         _kalshiClient = kalshiClient ?? throw new ArgumentNullException(nameof(kalshiClient));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _scopeFactory = scopeFactory ?? throw new ArgumentNullException(nameof(scopeFactory));
+        _redisCacheService = redisCacheService ?? throw new ArgumentNullException(nameof(redisCacheService));
     }
 
     public async Task GetTodayMarketsAsync(
@@ -54,6 +56,13 @@ public class RefreshService
         SortDirection direction = SortDirection.Desc,
         CancellationToken cancellationToken = default)
     {
+        // Clear Redis cache if available
+        if (await _redisCacheService.IsAvailableAsync())
+        {
+            _logger.LogInformation("Clearing Redis cache for markets");
+            await _redisCacheService.DeleteByPatternAsync("markets*", cancellationToken);
+        }
+
         var nowUtc = DateTime.UtcNow;
         var safeDays = Math.Max(1, days);
         var safeMaxPages = Math.Max(1, maxPages);
@@ -747,9 +756,16 @@ public class RefreshService
 
     private async Task CacheMarketDataInternalAsync(string? category = null, string? tag = null)
     {
+        // Clear Redis cache if available
+        if (await _redisCacheService.IsAvailableAsync())
+        {
+            _logger.LogInformation("Clearing Redis cache for markets");
+            await _redisCacheService.DeleteByPatternAsync("markets*", CancellationToken.None);
+        }
+
         using var scope = _scopeFactory.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<KalshiDbContext>();
-        
+
         await db.Database.EnsureCreatedAsync();
 
         // Read `marketcategories` to find series matching the filters and aggregate seriesIds

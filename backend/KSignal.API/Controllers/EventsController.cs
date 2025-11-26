@@ -45,7 +45,7 @@ public class EventsController : ControllerBase
     /// <response code="200">Tags retrieved successfully</response>
     /// <response code="500">Internal server error</response>
     [HttpGet("categories")]
-    [RedisCache(durationMinutes: 5, cacheKeyPrefix: "tags_by_categories")]
+    [RedisCache(durationMinutes: 5, cacheKeyPrefix: "markets_tags_categories")]
     [ProducesResponseType(typeof(GetTagsForSeriesCategoriesResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status500InternalServerError)]
     public async Task<ActionResult<GetTagsForSeriesCategoriesResponse>> GetTagsByCategories()
