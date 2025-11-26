@@ -24,6 +24,7 @@ export default function RootLayout({
       <body className={`${outfit.variable} antialiased`}>
         <SiteHeader />
         {children}
+        <script src="/date-redirect.js" />
       </body>
     </html>
   );
