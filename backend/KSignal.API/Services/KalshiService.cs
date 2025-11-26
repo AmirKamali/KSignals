@@ -33,6 +33,7 @@ public class KalshiService
     public async Task<MarketPageResult> GetMarketsAsync(
         string? category = null,
         string? tag = null,
+        string? query = null,
         string? closeDateType = "next_30_days",
         MarketSort sortBy = MarketSort.Volume,
         SortDirection direction = SortDirection.Desc,
@@ -42,6 +43,7 @@ public class KalshiService
     {
         // Default to 30-day window when caller does not provide a filter
         closeDateType ??= "next_30_days";
+        var searchTerm = string.IsNullOrWhiteSpace(query) ? null : query.Trim();
 
         var hasCategoryOrTag = !string.IsNullOrWhiteSpace(category) || !string.IsNullOrWhiteSpace(tag);
         HashSet<string>? seriesIds = null;
@@ -75,27 +77,37 @@ public class KalshiService
         var nowUtc = DateTime.UtcNow;
         var maxCloseTime = GetMaxCloseTimeFromDateType(closeDateType, nowUtc);
 
-        var query = _db.Markets
+        var marketsQuery = _db.Markets
             .AsNoTracking()
             .Where(p => p.CloseTime > nowUtc);
 
          if (seriesIds != null)
         {
-            query = query.Where(p => seriesIds.Contains(p.SeriesTicker));
+            marketsQuery = marketsQuery.Where(p => seriesIds.Contains(p.SeriesTicker));
         }
 
         if (maxCloseTime.HasValue)
         {
-            query = query.Where(p => p.CloseTime <= maxCloseTime.Value);
+            marketsQuery = marketsQuery.Where(p => p.CloseTime <= maxCloseTime.Value);
+        }
+
+        if (searchTerm != null)
+        {
+            var likePattern = $"%{searchTerm}%";
+            marketsQuery = marketsQuery.Where(p =>
+                (p.Title != null && EF.Functions.Like(p.Title, likePattern)) ||
+                (p.Subtitle != null && EF.Functions.Like(p.Subtitle, likePattern)) ||
+                (p.SeriesTicker != null && EF.Functions.Like(p.SeriesTicker, likePattern)) ||
+                (p.TickerId != null && EF.Functions.Like(p.TickerId, likePattern)));
         }
 
         // Get the TickerId with the highest Volume24h for each SeriesTicker to avoid duplicates
-        var maxVolumePerSeries = query
+        var maxVolumePerSeries = marketsQuery
             .GroupBy(m => m.SeriesTicker)
             .Select(g => new { SeriesTicker = g.Key, MaxVolume = g.Max(m => m.Volume24h) });
 
         // Join back to get full records - only markets with max volume per series
-        query = query.Join(
+        marketsQuery = marketsQuery.Join(
             maxVolumePerSeries,
             m => new { m.SeriesTicker, Volume = m.Volume24h },
             mv => new { mv.SeriesTicker, Volume = mv.MaxVolume },
@@ -103,20 +115,20 @@ public class KalshiService
 
         if (sortBy == MarketSort.Volume)
         {
-            query = direction == SortDirection.Asc
-                ? query.OrderBy(m => m.Volume24h)
-                : query.OrderByDescending(m => m.Volume24h);
+            marketsQuery = direction == SortDirection.Asc
+                ? marketsQuery.OrderBy(m => m.Volume24h)
+                : marketsQuery.OrderByDescending(m => m.Volume24h);
         }
 
 
 
         var safePageSize = Math.Max(1, pageSize);
-        var totalCount = await query.Select(m => m.TickerId).CountAsync();
+        var totalCount = await marketsQuery.Select(m => m.TickerId).CountAsync();
         var totalPages = (int)Math.Ceiling(totalCount / (double)safePageSize);
         var safePage = totalPages > 0 ? Math.Min(Math.Max(1, page), totalPages) : 1;
         var skip = (safePage - 1) * safePageSize;
 
-        var markets = await query
+        var markets = await marketsQuery
             .Skip(skip)
             .Take(safePageSize)
             .SelectWithoutJsonResponse()

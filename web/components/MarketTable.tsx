@@ -1,9 +1,9 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, FormEvent } from "react";
 import Link from "next/link";
 import { useSearchParams, usePathname, useRouter } from "next/navigation";
-import { Loader2, Calendar, Triangle } from "lucide-react";
+import { Loader2, Calendar, Triangle, Search } from "lucide-react";
 import { Market, getBackendMarkets, MarketSort, SortDirection } from "@/lib/kalshi";
 import FormattedTitle from "./FormattedTitle";
 import styles from "./MarketTable.module.css";
@@ -88,6 +88,7 @@ export default function MarketTable({ markets: initialMarkets, tagsByCategories 
     const initialDirection = (searchParams.get("direction") as SortDirection) || "desc";
     const initialPage = Math.max(1, parseInt(searchParams.get("page") || "1", 10));
     const initialPageSize = Math.max(1, parseInt(searchParams.get("pageSize") || `${PAGE_SIZE}`, 10));
+    const initialQuery = searchParams.get("query") || "";
 
     const [activeCategory, setActiveCategory] = useState(initialCategory);
     const [activeSubTag, setActiveSubTag] = useState<string | null>(initialTag);
@@ -98,6 +99,8 @@ export default function MarketTable({ markets: initialMarkets, tagsByCategories 
     const [pageSize] = useState(initialPageSize);
     const [totalPages, setTotalPages] = useState(1);
     const [totalCount, setTotalCount] = useState(0);
+    const [searchValue, setSearchValue] = useState(initialQuery);
+    const [activeQuery, setActiveQuery] = useState(initialQuery);
     
     // Initialize displayed markets based on synchronous category filtering
     // Only use initialMarkets fallback if we are on "All" or if we want to show *something* while fetching
@@ -120,6 +123,7 @@ export default function MarketTable({ markets: initialMarkets, tagsByCategories 
     const fetchMarkets = useCallback(async (
         category: string,
         tag: string | null,
+        query: string | null,
         dateFilter: DateFilterOption,
         sort: SortOption,
         direction: SortDirection,
@@ -131,6 +135,7 @@ export default function MarketTable({ markets: initialMarkets, tagsByCategories 
             const response = await getBackendMarkets({
                 category: category !== "All" ? category : null,
                 tag,
+                query: query && query.trim().length > 0 ? query : null,
                 close_date_type: dateFilter !== "all_time" ? dateFilter : null,
                 sort,
                 direction,
@@ -169,6 +174,7 @@ export default function MarketTable({ markets: initialMarkets, tagsByCategories 
         const direction = (searchParams.get("direction") as SortDirection) || "desc";
         const page = Math.max(1, parseInt(searchParams.get("page") || "1", 10));
         const size = Math.max(1, parseInt(searchParams.get("pageSize") || `${pageSize}`, 10));
+        const query = searchParams.get("query") || "";
 
         setActiveCategory(cat);
         setActiveSubTag(tag);
@@ -176,11 +182,13 @@ export default function MarketTable({ markets: initialMarkets, tagsByCategories 
         setActiveSort(sort);
         setSortDirection(direction);
         setCurrentPage(page);
+        setActiveQuery(query);
+        setSearchValue(query);
 
-        fetchMarkets(cat, tag, date, sort, direction, page, size);
+        fetchMarkets(cat, tag, query, date, sort, direction, page, size);
     }, [searchParams, fetchMarkets, pageSize]);
 
-    const updateUrl = (newCategory: string, newTag: string | null, newDate?: DateFilterOption, options?: { sort?: SortOption; direction?: SortDirection; page?: number; resetPage?: boolean }) => {
+    const updateUrl = (newCategory: string, newTag: string | null, newDate?: DateFilterOption, options?: { sort?: SortOption; direction?: SortDirection; page?: number; resetPage?: boolean; query?: string | null }) => {
         const params = new URLSearchParams(searchParams);
 
         if (newCategory && newCategory !== "All") {
@@ -205,6 +213,7 @@ export default function MarketTable({ markets: initialMarkets, tagsByCategories 
         const sortToUse = options?.sort ?? activeSort;
         const directionToUse = options?.direction ?? sortDirection;
         const pageToUse = options?.resetPage ? 1 : (options?.page ?? currentPage);
+        const queryToUse = options && "query" in options ? options.query : activeQuery;
 
         params.set("sort_type", sortToUse);
         params.set("direction", directionToUse);
@@ -219,6 +228,12 @@ export default function MarketTable({ markets: initialMarkets, tagsByCategories 
             params.set("pageSize", String(pageSize));
         } else {
             params.delete("pageSize");
+        }
+
+        if (queryToUse && queryToUse.trim().length > 0) {
+            params.set("query", queryToUse.trim());
+        } else {
+            params.delete("query");
         }
 
         replace(`${pathname}?${params.toString()}`, { scroll: false });
@@ -248,6 +263,21 @@ export default function MarketTable({ markets: initialMarkets, tagsByCategories 
     const handlePageChange = (page: number) => {
         const safePage = Math.max(1, Math.min(page, totalPages));
         updateUrl(activeCategory, activeSubTag, undefined, { page: safePage });
+    };
+
+    const handleSearchSubmit = (event: FormEvent<HTMLFormElement>) => {
+        event.preventDefault();
+        const trimmed = searchValue.trim();
+        setActiveQuery(trimmed);
+        setCurrentPage(1);
+        updateUrl(activeCategory, activeSubTag, activeDate, { resetPage: true, query: trimmed.length > 0 ? trimmed : null });
+    };
+
+    const handleSearchClear = () => {
+        setSearchValue("");
+        setActiveQuery("");
+        setCurrentPage(1);
+        updateUrl(activeCategory, activeSubTag, activeDate, { resetPage: true, query: null });
     };
 
     const subTags = activeCategory !== "All" && tagsByCategories[activeCategory]
@@ -310,6 +340,29 @@ export default function MarketTable({ markets: initialMarkets, tagsByCategories 
                         </select>
                     </div>
                 </div>
+
+                <form className={styles.searchBar} onSubmit={handleSearchSubmit}>
+                    <Search size={18} className={styles.searchIcon} />
+                    <input
+                        type="text"
+                        value={searchValue}
+                        onChange={(e) => setSearchValue(e.target.value)}
+                        placeholder="Search markets by title or ticker"
+                        className={styles.searchInput}
+                    />
+                    {searchValue && (
+                        <button
+                            type="button"
+                            onClick={handleSearchClear}
+                            className={styles.clearButton}
+                        >
+                            Clear
+                        </button>
+                    )}
+                    <button type="submit" className={styles.searchButton}>
+                        Search
+                    </button>
+                </form>
 
                 <div className={styles.tableContainer}>
                     {isLoading ? (

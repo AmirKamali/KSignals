@@ -6,6 +6,7 @@ export async function GET(request: Request) {
     const { searchParams } = new URL(request.url);
     const category = searchParams.get('category');
     const tag = searchParams.get('tag');
+    const query = searchParams.get('query');
     const closeDateType = searchParams.get('close_date_type');
     const sortType = searchParams.get('sort_type');
     const direction = searchParams.get('direction');
@@ -15,6 +16,7 @@ export async function GET(request: Request) {
     const backendUrl = new URL(`${BACKEND_BASE_URL}/api/markets`);
     if (category) backendUrl.searchParams.set('category', category);
     if (tag) backendUrl.searchParams.set('tag', tag);
+    if (query) backendUrl.searchParams.set('query', query);
     if (closeDateType) backendUrl.searchParams.set('close_date_type', closeDateType);
     if (sortType) backendUrl.searchParams.set('sort_type', sortType);
     if (direction) backendUrl.searchParams.set('direction', direction);
