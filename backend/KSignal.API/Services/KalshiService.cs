@@ -2,6 +2,7 @@ using Kalshi.Api;
 using Kalshi.Api.Client;
 using Kalshi.Api.Model;
 using KSignal.API.Data;
+using KSignal.API.Extensions;
 using KSignal.API.Models;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
@@ -75,7 +76,7 @@ public class KalshiService
             .AsNoTracking()
             .Where(p => p.CloseTime > nowUtc);
 
-        if (seriesIds != null && (!string.IsNullOrWhiteSpace(category) || !string.IsNullOrWhiteSpace(tag)))
+        // if (seriesIds != null)
         {
             query = query.Where(p => seriesIds.Contains(p.SeriesTicker));
         }
@@ -85,9 +86,9 @@ public class KalshiService
             query = query.Where(p => p.CloseTime <= maxCloseTime.Value);
         }
 
-        query = query
-            .GroupBy(m => m.SeriesTicker)
-            .Select(g => g.OrderByDescending(x => x.Volume24h).First());
+        // query = query
+        //     .GroupBy(m => m.SeriesTicker)
+        //     .Select(g => g.OrderByDescending(x => x.Volume24h).First());
 
         var safePageSize = Math.Max(1, pageSize);
         var totalCount = await query.Select(m => m.TickerId).CountAsync();
@@ -102,7 +103,49 @@ public class KalshiService
                 : query.OrderByDescending(m => m.Volume24h);
         }
 
-        var markets = await query.Skip(skip).Take(safePageSize).Select(WithoutJsonResponse).ToListAsync(cancellationToken);
+        var markets = await query
+            .Skip(skip)
+            .Take(safePageSize)
+            .Select(m => new MarketCache
+            {
+                TickerId = m.TickerId,
+                SeriesTicker = m.SeriesTicker,
+                Title = m.Title,
+                Subtitle = m.Subtitle,
+                Volume = m.Volume,
+                Volume24h = m.Volume24h,
+                CreatedTime = m.CreatedTime,
+                ExpirationTime = m.ExpirationTime,
+                CloseTime = m.CloseTime,
+                LatestExpirationTime = m.LatestExpirationTime,
+                OpenTime = m.OpenTime,
+                Status = m.Status,
+                YesBid = m.YesBid,
+                YesBidDollars = m.YesBidDollars,
+                YesAsk = m.YesAsk,
+                YesAskDollars = m.YesAskDollars,
+                NoBid = m.NoBid,
+                NoBidDollars = m.NoBidDollars,
+                NoAsk = m.NoAsk,
+                NoAskDollars = m.NoAskDollars,
+                LastPrice = m.LastPrice,
+                LastPriceDollars = m.LastPriceDollars,
+                PreviousYesBid = m.PreviousYesBid,
+                PreviousYesBidDollars = m.PreviousYesBidDollars,
+                PreviousYesAsk = m.PreviousYesAsk,
+                PreviousYesAskDollars = m.PreviousYesAskDollars,
+                PreviousPrice = m.PreviousPrice,
+                PreviousPriceDollars = m.PreviousPriceDollars,
+                Liquidity = m.Liquidity,
+                LiquidityDollars = m.LiquidityDollars,
+                SettlementValue = m.SettlementValue,
+                SettlementValueDollars = m.SettlementValueDollars,
+                NotionalValue = m.NotionalValue,
+                NotionalValueDollars = m.NotionalValueDollars,
+                JsonResponse = null,
+                LastUpdate = m.LastUpdate
+            })
+            .ToListAsync(cancellationToken);
         return new MarketPageResult
             {
                 Markets = markets,
@@ -250,60 +293,5 @@ CREATE TABLE IF NOT EXISTS Markets (
         };
     }
 
-    private static IEnumerable<MarketCache> ApplySorting(IEnumerable<MarketCache> markets, MarketSort sortBy, SortDirection direction)
-    {
-        var ordered = sortBy switch
-        {
-            MarketSort.Volume => direction == SortDirection.Asc
-                ? markets.OrderBy(m => m.Volume24h)
-                : markets.OrderByDescending(m => m.Volume24h),
-            _ => markets.OrderByDescending(m => m.Volume24h)
-        };
-
-        return ordered;
-    }
-
-    private static MarketCache WithoutJsonResponse(MarketCache market)
-    {
-        return new MarketCache
-        {
-            TickerId = market.TickerId,
-            SeriesTicker = market.SeriesTicker,
-            Title = market.Title,
-            Subtitle = market.Subtitle,
-            Volume = market.Volume,
-            Volume24h = market.Volume24h,
-            CreatedTime = market.CreatedTime,
-            ExpirationTime = market.ExpirationTime,
-            CloseTime = market.CloseTime,
-            LatestExpirationTime = market.LatestExpirationTime,
-            OpenTime = market.OpenTime,
-            Status = market.Status,
-            YesBid = market.YesBid,
-            YesBidDollars = market.YesBidDollars,
-            YesAsk = market.YesAsk,
-            YesAskDollars = market.YesAskDollars,
-            NoBid = market.NoBid,
-            NoBidDollars = market.NoBidDollars,
-            NoAsk = market.NoAsk,
-            NoAskDollars = market.NoAskDollars,
-            LastPrice = market.LastPrice,
-            LastPriceDollars = market.LastPriceDollars,
-            PreviousYesBid = market.PreviousYesBid,
-            PreviousYesBidDollars = market.PreviousYesBidDollars,
-            PreviousYesAsk = market.PreviousYesAsk,
-            PreviousYesAskDollars = market.PreviousYesAskDollars,
-            PreviousPrice = market.PreviousPrice,
-            PreviousPriceDollars = market.PreviousPriceDollars,
-            Liquidity = market.Liquidity,
-            LiquidityDollars = market.LiquidityDollars,
-            SettlementValue = market.SettlementValue,
-            SettlementValueDollars = market.SettlementValueDollars,
-            NotionalValue = market.NotionalValue,
-            NotionalValueDollars = market.NotionalValueDollars,
-            JsonResponse = null,
-            LastUpdate = market.LastUpdate
-        };
-    }
 
 }
