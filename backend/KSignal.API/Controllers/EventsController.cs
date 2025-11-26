@@ -101,21 +101,15 @@ public class EventsController : ControllerBase
             var parsedSort = Enum.TryParse<MarketSort>(sortType, true, out var sortEnum) ? sortEnum : MarketSort.Volume;
             var parsedDirection = Enum.TryParse<SortDirection>(direction, true, out var dirEnum) ? dirEnum : SortDirection.Desc;
 
-            var markets = await _kalshiService.GetMarketsAsync(category, tag, close_date_type, parsedSort, parsedDirection, cancellationToken);
-            var safePageSize = Math.Max(1, pageSize);
-            var requestedPage = Math.Max(1, page);
-            var totalCount = markets.Count;
-            var totalPages = (int)Math.Ceiling(totalCount / (double)safePageSize);
-            var safePage = totalPages > 0 ? Math.Min(requestedPage, totalPages) : 1;
-            var paged = markets.Skip((safePage - 1) * safePageSize).Take(safePageSize).ToList();
-            var shaped = MarketResponseMapper.Shape(paged).ToList();
+            var result = await _kalshiService.GetMarketsAsync(category, tag, close_date_type, parsedSort, parsedDirection, page, pageSize, cancellationToken);
+            var shaped = MarketResponseMapper.Shape(result.Markets).ToList();
 
             return Ok(new
             {
-                count = totalCount,
-                totalPages,
-                currentPage = safePage,
-                pageSize = safePageSize,
+                count = result.TotalCount,
+                totalPages = result.TotalPages,
+                currentPage = result.CurrentPage,
+                pageSize = result.PageSize,
                 sort_type = parsedSort.ToString().ToLowerInvariant(),
                 direction = parsedDirection.ToString().ToLowerInvariant(),
                 markets = shaped

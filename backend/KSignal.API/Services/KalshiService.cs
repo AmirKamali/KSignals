@@ -29,12 +29,14 @@ public class KalshiService
         }
     }
 
-    public async Task<List<MarketCache>> GetMarketsAsync(
+    public async Task<MarketPageResult> GetMarketsAsync(
         string? category = null,
         string? tag = null,
-        string? closeDateType = null,
+        string? closeDateType = "next_24_hr",
         MarketSort sortBy = MarketSort.Volume,
         SortDirection direction = SortDirection.Desc,
+        int page = 1,
+        int pageSize = 50,
         CancellationToken cancellationToken = default)
     {
         var hasCategoryOrTag = !string.IsNullOrWhiteSpace(category) || !string.IsNullOrWhiteSpace(tag);
@@ -55,7 +57,14 @@ public class KalshiService
             if (seriesIds.Count == 0)
             {
                 _logger.LogWarning("No series found for category={Category}, tag={Tag}", category, tag);
-                return new List<MarketCache>();
+                return new MarketPageResult
+                {
+                    Markets = new List<MarketCache>(),
+                    TotalCount = 0,
+                    TotalPages = 0,
+                    CurrentPage = 1,
+                    PageSize = Math.Max(1, pageSize)
+                };
             }
         }
 
@@ -76,14 +85,32 @@ public class KalshiService
             query = query.Where(p => p.CloseTime <= maxCloseTime.Value);
         }
 
-        var allMarkets = await query.ToListAsync(cancellationToken);
+        query = query
+            .GroupBy(m => m.SeriesTicker)
+            .Select(g => g.OrderByDescending(x => x.Volume24h).First());
 
-        // Group by series and take the market with highest 24h volume per series
-        var selected = allMarkets
-            .GroupBy(m => m.SeriesTicker, StringComparer.OrdinalIgnoreCase)
-            .Select(g => WithoutJsonResponse(g.OrderByDescending(x => x.Volume24h).First()));
+        var safePageSize = Math.Max(1, pageSize);
+        var totalCount = await query.Select(m => m.TickerId).CountAsync();
+        var totalPages = (int)Math.Ceiling(totalCount / (double)safePageSize);
+        var safePage = totalPages > 0 ? Math.Min(Math.Max(1, page), totalPages) : 1;
+        var skip = (safePage - 1) * safePageSize;
 
-        return ApplySorting(selected, sortBy, direction).ToList();
+        if (sortBy == MarketSort.Volume)
+        {
+            query = direction == SortDirection.Asc
+                ? query.OrderBy(m => m.Volume24h)
+                : query.OrderByDescending(m => m.Volume24h);
+        }
+
+        var markets = await query.Skip(skip).Take(safePageSize).Select(WithoutJsonResponse).ToListAsync(cancellationToken);
+        return new MarketPageResult
+            {
+                Markets = markets,
+                TotalCount = totalCount,
+                TotalPages = totalPages,
+                CurrentPage = safePage,
+                PageSize = safePageSize
+            };
     }
 
     private static DateTime? GetMaxCloseTimeFromDateType(string? closeDateType, DateTime nowUtc)

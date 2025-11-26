@@ -31,8 +31,8 @@ public async Task<IActionResult> GetCategories()
 [RedisCache(durationMinutes: 10, cacheKeyPrefix: "markets_list")]
 public async Task<IActionResult> GetMarkets([FromQuery] string? category = null)
 {
-    var markets = await _service.GetMarketsAsync(category);
-    return Ok(markets);
+    var result = await _service.GetMarketsAsync(category);
+    return Ok(result);
 }
 ```
 
