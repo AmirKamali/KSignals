@@ -76,7 +76,7 @@ public class KalshiService
             .AsNoTracking()
             .Where(p => p.CloseTime > nowUtc);
 
-        // if (seriesIds != null)
+         if (seriesIds != null)
         {
             query = query.Where(p => seriesIds.Contains(p.SeriesTicker));
         }
@@ -86,9 +86,14 @@ public class KalshiService
             query = query.Where(p => p.CloseTime <= maxCloseTime.Value);
         }
 
-        // query = query
-        //     .GroupBy(m => m.SeriesTicker)
-        //     .Select(g => g.OrderByDescending(x => x.Volume24h).First());
+        // Get one market per SeriesTicker (DistinctBy is not translatable by EF Core)
+        var distinctMarketIds = query
+            .GroupBy(p => p.SeriesTicker)
+            .Select(g => g.Max(x => x.TickerId));
+
+        query = _db.Markets
+            .AsNoTracking()
+            .Where(m => distinctMarketIds.Contains(m.TickerId));
 
         var safePageSize = Math.Max(1, pageSize);
         var totalCount = await query.Select(m => m.TickerId).CountAsync();
@@ -106,45 +111,7 @@ public class KalshiService
         var markets = await query
             .Skip(skip)
             .Take(safePageSize)
-            .Select(m => new MarketCache
-            {
-                TickerId = m.TickerId,
-                SeriesTicker = m.SeriesTicker,
-                Title = m.Title,
-                Subtitle = m.Subtitle,
-                Volume = m.Volume,
-                Volume24h = m.Volume24h,
-                CreatedTime = m.CreatedTime,
-                ExpirationTime = m.ExpirationTime,
-                CloseTime = m.CloseTime,
-                LatestExpirationTime = m.LatestExpirationTime,
-                OpenTime = m.OpenTime,
-                Status = m.Status,
-                YesBid = m.YesBid,
-                YesBidDollars = m.YesBidDollars,
-                YesAsk = m.YesAsk,
-                YesAskDollars = m.YesAskDollars,
-                NoBid = m.NoBid,
-                NoBidDollars = m.NoBidDollars,
-                NoAsk = m.NoAsk,
-                NoAskDollars = m.NoAskDollars,
-                LastPrice = m.LastPrice,
-                LastPriceDollars = m.LastPriceDollars,
-                PreviousYesBid = m.PreviousYesBid,
-                PreviousYesBidDollars = m.PreviousYesBidDollars,
-                PreviousYesAsk = m.PreviousYesAsk,
-                PreviousYesAskDollars = m.PreviousYesAskDollars,
-                PreviousPrice = m.PreviousPrice,
-                PreviousPriceDollars = m.PreviousPriceDollars,
-                Liquidity = m.Liquidity,
-                LiquidityDollars = m.LiquidityDollars,
-                SettlementValue = m.SettlementValue,
-                SettlementValueDollars = m.SettlementValueDollars,
-                NotionalValue = m.NotionalValue,
-                NotionalValueDollars = m.NotionalValueDollars,
-                JsonResponse = null,
-                LastUpdate = m.LastUpdate
-            })
+            .SelectWithoutJsonResponse()
             .ToListAsync(cancellationToken);
         return new MarketPageResult
             {
