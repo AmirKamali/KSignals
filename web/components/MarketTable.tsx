@@ -83,7 +83,7 @@ export default function MarketTable({ markets: initialMarkets, tagsByCategories 
 
     const initialCategory = searchParams.get("category") || "All";
     const initialTag = searchParams.get("tag");
-    const initialDate = (searchParams.get("date") as DateFilterOption) || "next_24_hr";
+    const initialDate = (searchParams.get("date") as DateFilterOption) || "next_30_days";
     const initialSort = (searchParams.get("sort_type") as SortOption) || "volume";
     const initialDirection = (searchParams.get("direction") as SortDirection) || "desc";
     const initialPage = Math.max(1, parseInt(searchParams.get("page") || "1", 10));
@@ -164,7 +164,7 @@ export default function MarketTable({ markets: initialMarkets, tagsByCategories 
     useEffect(() => {
         const cat = searchParams.get("category") || "All";
         const tag = searchParams.get("tag");
-        const date = (searchParams.get("date") as DateFilterOption) || "next_24_hr";
+        const date = (searchParams.get("date") as DateFilterOption) || "next_30_days";
         const sort = (searchParams.get("sort_type") as SortOption) || "volume";
         const direction = (searchParams.get("direction") as SortDirection) || "desc";
         const page = Math.max(1, parseInt(searchParams.get("page") || "1", 10));

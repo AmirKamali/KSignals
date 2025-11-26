@@ -33,13 +33,16 @@ public class KalshiService
     public async Task<MarketPageResult> GetMarketsAsync(
         string? category = null,
         string? tag = null,
-        string? closeDateType = "next_24_hr",
+        string? closeDateType = "next_30_days",
         MarketSort sortBy = MarketSort.Volume,
         SortDirection direction = SortDirection.Desc,
         int page = 1,
         int pageSize = 50,
         CancellationToken cancellationToken = default)
     {
+        // Default to 30-day window when caller does not provide a filter
+        closeDateType ??= "next_30_days";
+
         var hasCategoryOrTag = !string.IsNullOrWhiteSpace(category) || !string.IsNullOrWhiteSpace(tag);
         HashSet<string>? seriesIds = null;
 

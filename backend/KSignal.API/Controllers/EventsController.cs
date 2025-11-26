@@ -89,7 +89,7 @@ public class EventsController : ControllerBase
     public async Task<IActionResult> GetMarkets(
         [FromQuery] string? category = null,
         [FromQuery] string? tag = null,
-        [FromQuery] string? close_date_type = null,
+        [FromQuery] string? close_date_type = "next_30_days",
         [FromQuery(Name = "sort_type")] string? sortType = "volume",
         [FromQuery] string? direction = "desc",
         [FromQuery] int page = 1,

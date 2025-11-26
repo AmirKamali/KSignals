@@ -15,7 +15,8 @@
       "Bash(time curl -s http://localhost:3006/api/events/categories)",
       "Bash(time curl -s \"http://localhost:3006/api/markets?category=World&date=this_year\")",
       "Bash(pkill:*)",
-      "Bash(killall:*)"
+      "Bash(killall:*)",
+      "Bash(xargs kill -9)"
     ],
     "deny": [],
     "ask": []

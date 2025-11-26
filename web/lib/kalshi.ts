@@ -202,7 +202,9 @@ export async function getBackendMarkets(params?: {
     const url = new URL(endpoint, isServer ? baseUrl : window.location.origin);
     if (params?.category) url.searchParams.set("category", params.category);
     if (params?.tag) url.searchParams.set("tag", params.tag);
-    if (params?.close_date_type) url.searchParams.set("close_date_type", params.close_date_type);
+    // Default to next 30 days when no filter is provided; allow explicit null to mean all_time
+    const closeDateType = params?.close_date_type === undefined ? "next_30_days" : params.close_date_type;
+    if (closeDateType) url.searchParams.set("close_date_type", closeDateType);
     url.searchParams.set("sort_type", params?.sort ?? "volume");
     url.searchParams.set("direction", params?.direction ?? "desc");
     if (params?.page && params.page > 1) url.searchParams.set("page", params.page.toString());
