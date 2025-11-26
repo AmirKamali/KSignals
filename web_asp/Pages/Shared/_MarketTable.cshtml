@@ -1,0 +1,304 @@
+@using Microsoft.AspNetCore.WebUtilities
+@model web_asp.Models.MarketTableViewModel
+@{
+    var categories = new List<string> { "All" };
+    categories.AddRange(Model.TagsByCategories.Keys.OrderBy(c => c));
+
+    var subTags = Model.ActiveCategory != "All" && Model.TagsByCategories.TryGetValue(Model.ActiveCategory, out var tagList)
+        ? tagList
+        : new List<string>();
+
+    var dateOptions = new List<(string Value, string Label)>
+    {
+        ("all_time", "All time"),
+        ("next_24_hr", "Next 24 Hours"),
+        ("next_48_hr", "Next 48 Hours"),
+        ("next_7_days", "Next 7 Days"),
+        ("next_30_days", "Next 30 Days"),
+        ("next_90_days", "Next 90 Days"),
+        ("this_year", "This Year"),
+        ("next_year", "Next Year")
+    };
+
+    var basePath = "/markets";
+
+    string BuildLink(Dictionary<string, string?> overrides)
+    {
+        var query = new Dictionary<string, string?>
+        {
+            ["category"] = Model.ActiveCategory != "All" ? Model.ActiveCategory : null,
+            ["tag"] = Model.ActiveTag,
+            ["date"] = Model.ActiveDate != "all_time" ? Model.ActiveDate : null,
+            ["sort_type"] = Model.ActiveSort,
+            ["direction"] = Model.SortDirection,
+            ["page"] = Model.CurrentPage > 1 ? Model.CurrentPage.ToString() : null,
+            ["pageSize"] = Model.PageSize.ToString(),
+            ["query"] = string.IsNullOrWhiteSpace(Model.Query) ? null : Model.Query
+        };
+
+        foreach (var kvp in overrides)
+        {
+            query[kvp.Key] = kvp.Value;
+        }
+
+        var cleaned = query
+            .Where(kvp => !string.IsNullOrWhiteSpace(kvp.Value))
+            .ToDictionary(kvp => kvp.Key, kvp => kvp.Value!, StringComparer.OrdinalIgnoreCase);
+
+        var parameters = cleaned.ToDictionary(kvp => kvp.Key, kvp => (string?)kvp.Value, StringComparer.OrdinalIgnoreCase);
+        return QueryHelpers.AddQueryString(basePath, parameters);
+    }
+
+    var currentPage = Math.Max(1, Model.CurrentPage);
+    var totalCount = Model.TotalCount > 0 ? Model.TotalCount : Model.Markets.Count;
+    var totalPages = Model.TotalPages > 0 ? Model.TotalPages : Math.Max(1, (int)Math.Ceiling((double)Math.Max(1, totalCount) / Math.Max(1, Model.PageSize)));
+}
+
+<section class="section">
+    <div class="container">
+        <div class="filterContainer">
+            <div class="controls">
+                @foreach (var cat in categories)
+                {
+                    var link = BuildLink(new Dictionary<string, string?>
+                    {
+                        ["category"] = cat == "All" ? null : cat,
+                        ["tag"] = null,
+                        ["page"] = "1"
+                    });
+                    <a class="segmentBtn @(Model.ActiveCategory == cat ? "active" : string.Empty)" href="@link">@cat</a>
+                }
+            </div>
+
+            @if (subTags.Count > 0)
+            {
+                <div class="controls">
+                    @foreach (var tag in subTags)
+                    {
+                        var link = BuildLink(new Dictionary<string, string?>
+                        {
+                            ["tag"] = tag,
+                            ["page"] = "1"
+                        });
+                        <a class="segmentBtn @(Model.ActiveTag == tag ? "active" : string.Empty)" href="@link">@tag</a>
+                    }
+                </div>
+            }
+
+            <div class="dateFilterContainer">
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                </svg>
+                <select
+                    class="dateSelect"
+                    data-href-prefix="@basePath"
+                    data-category="@(Model.ActiveCategory != "All" ? Model.ActiveCategory : string.Empty)"
+                    data-tag="@(Model.ActiveTag ?? string.Empty)"
+                    data-sort="@Model.ActiveSort"
+                    data-direction="@Model.SortDirection"
+                    data-query="@Model.Query"
+                    data-pagesize="@Model.PageSize"
+                >
+                    @foreach (var option in dateOptions)
+                    {
+                        <option value="@option.Value" selected="@(option.Value == Model.ActiveDate ? "selected" : null)">@option.Label</option>
+                    }
+                </select>
+            </div>
+        </div>
+
+        @if (Model.ShowSearch)
+        {
+            <form class="searchBar" method="get" action="@basePath">
+                <input type="hidden" name="category" value="@(Model.ActiveCategory != "All" ? Model.ActiveCategory : string.Empty)" />
+                <input type="hidden" name="tag" value="@(Model.ActiveTag ?? string.Empty)" />
+                <input type="hidden" name="date" value="@Model.ActiveDate" />
+                <input type="hidden" name="sort_type" value="@Model.ActiveSort" />
+                <input type="hidden" name="direction" value="@Model.SortDirection" />
+                <input type="hidden" name="page" value="1" />
+                <input type="hidden" name="pageSize" value="@Model.PageSize" />
+                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: var(--primary);">
+                    <circle cx="11" cy="11" r="8"></circle>
+                    <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                </svg>
+                <input
+                    type="text"
+                    name="query"
+                    value="@Model.Query"
+                    placeholder="Search markets by title or ticker"
+                    class="searchInput"
+                />
+                @if (!string.IsNullOrWhiteSpace(Model.Query))
+                {
+                    var clearLink = BuildLink(new Dictionary<string, string?>
+                    {
+                        ["query"] = null,
+                        ["page"] = "1"
+                    });
+                    <a class="clearButton" href="@clearLink">Clear</a>
+                }
+                <button type="submit" class="searchButton">Search</button>
+            </form>
+        }
+
+        <div class="tableContainer">
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>Market</th>
+                        <th>
+                            @{
+                                var nextDirection = Model.ActiveSort == "volume" && Model.SortDirection == "desc" ? "asc" : "desc";
+                                var sortLink = BuildLink(new Dictionary<string, string?>
+                                {
+                                    ["sort_type"] = "volume",
+                                    ["direction"] = nextDirection,
+                                    ["page"] = "1"
+                                });
+                                var isActive = Model.ActiveSort == "volume";
+                            }
+                            <a class="sortButton @(isActive ? "sortActive" : string.Empty)" href="@sortLink" aria-label="Sort by volume">
+                                Volume
+                                <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="currentColor" style="transform: @(Model.SortDirection == "desc" ? "rotate(0deg)" : "rotate(180deg)");">
+                                    <path d="M12 16l-6-6h12z"></path>
+                                </svg>
+                            </a>
+                        </th>
+                        <th>Yes Price</th>
+                        <th>No Price</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @if (Model.Markets.Count == 0)
+                    {
+                        <tr>
+                            <td colspan="4" style="text-align: center; padding: 2rem;">No markets found</td>
+                        </tr>
+                    }
+                    else
+                    {
+                        var index = 0;
+                        foreach (var market in Model.Markets)
+                        {
+                            index++;
+                            var closeLabel = FormatCloseTime(market.CloseTime);
+                            var noPrice = market.NoPrice ?? Math.Max(0, 100 - market.YesPrice);
+                            var previousYes = market.PreviousYesPrice;
+                            var previousNo = market.PreviousNoPrice ?? (previousYes.HasValue ? 100 - previousYes.Value : (decimal?)null);
+                            var yesTrend = GetTrendInfo(market.YesPrice, previousYes);
+                            var noTrend = GetTrendInfo(noPrice, previousNo);
+                            <tr>
+                                <td class="titleCell">
+                                    <a class="titleLink" href="/markets?query=@market.Ticker">
+                                        <div class="marketTitle">@TitleFormatter.FormatTitle(market.Title)</div>
+                                        <div class="marketSubtitle">@closeLabel</div>
+                                    </a>
+                                </td>
+                                <td>@market.Volume.ToString("N0")</td>
+                                <td>
+                                    <div class="priceCell">
+                                        <span class="price">@market.YesPrice.ToString("0.#")&cent;</span>
+                                        @if (yesTrend.HasValue && yesTrend.Value.diff != 0)
+                                        {
+                                            var directionClass = yesTrend.Value.direction == "up" ? "trendUp" : "trendDown";
+                                            <span class="trend @directionClass">
+                                                <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="currentColor" style="transform:@(yesTrend.Value.direction == "down" ? "rotate(180deg)" : "none");">
+                                                    <path d="M12 16l-6-6h12z"></path>
+                                                </svg>
+                                                <span class="delta">@FormatDelta(yesTrend.Value.diff)&cent;</span>
+                                            </span>
+                                        }
+                                    </div>
+                                </td>
+                                <td>
+                                    <div class="priceCell">
+                                        <span class="noPrice">@noPrice.ToString("0.#")&cent;</span>
+                                        @if (noTrend.HasValue && noTrend.Value.diff != 0)
+                                        {
+                                            var directionClass = noTrend.Value.direction == "up" ? "trendUp" : "trendDown";
+                                            <span class="trend @directionClass">
+                                                <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="currentColor" style="transform:@(noTrend.Value.direction == "down" ? "rotate(180deg)" : "none");">
+                                                    <path d="M12 16l-6-6h12z"></path>
+                                                </svg>
+                                                <span class="delta">@FormatDelta(noTrend.Value.diff)&cent;</span>
+                                            </span>
+                                        }
+                                    </div>
+                                </td>
+                            </tr>
+                        }
+                    }
+                </tbody>
+            </table>
+        </div>
+
+        @if (totalPages > 1)
+        {
+            var prevPage = Math.Max(1, currentPage - 1);
+            var nextPage = Math.Min(totalPages, currentPage + 1);
+            var prevLink = BuildLink(new Dictionary<string, string?> { ["page"] = prevPage.ToString() });
+            var nextLink = BuildLink(new Dictionary<string, string?> { ["page"] = nextPage.ToString() });
+            <div class="pagination">
+                <a class="pageButton @(currentPage <= 1 ? "disabled" : string.Empty)" href="@(currentPage <= 1 ? "#" : prevLink)" aria-disabled="@(currentPage <= 1)">Previous</a>
+                <span class="pageIndicator">Page @currentPage of @totalPages @(totalCount > 0 ? $"• {totalCount} markets" : string.Empty)</span>
+                <a class="pageButton @(currentPage >= totalPages ? "disabled" : string.Empty)" href="@(currentPage >= totalPages ? "#" : nextLink)" aria-disabled="@(currentPage >= totalPages)">Next</a>
+            </div>
+        }
+    </div>
+</section>
+
+@functions {
+    private static string FormatCloseTime(string? closeTime)
+    {
+        if (string.IsNullOrWhiteSpace(closeTime)) return "Close time unavailable";
+        if (!DateTime.TryParse(closeTime, out var close)) return "Close time unavailable";
+
+        var now = DateTime.UtcNow;
+        var diff = close - now;
+        var absMinutes = Math.Max(1, (int)Math.Round(Math.Abs(diff.TotalMinutes)));
+        var value = absMinutes;
+        var unit = "minutes";
+
+        if (absMinutes >= 60)
+        {
+            var hours = (int)Math.Round(absMinutes / 60.0);
+            if (hours < 48)
+            {
+                value = hours;
+                unit = hours == 1 ? "hour" : "hours";
+            }
+            else
+            {
+                var days = (int)Math.Round(hours / 24.0);
+                value = days;
+                unit = days == 1 ? "day" : "days";
+            }
+        }
+        else if (absMinutes == 1)
+        {
+            unit = "minute";
+        }
+
+        return diff >= TimeSpan.Zero
+            ? $"Close time in {value} {unit}"
+            : $"Closed {value} {unit} ago";
+    }
+
+    private static (string direction, decimal diff)? GetTrendInfo(decimal current, decimal? previous)
+    {
+        if (!previous.HasValue) return null;
+        var diff = current - previous.Value;
+        if (diff == 0) return ("flat", 0);
+        return diff > 0 ? ("up", diff) : ("down", diff);
+    }
+
+    private static string FormatDelta(decimal diff)
+    {
+        var abs = Math.Abs(diff);
+        if (abs >= 1)
+        {
+            return Math.Round(abs).ToString("0");
+        }
+        return abs.ToString("0.00");
+    }
+}

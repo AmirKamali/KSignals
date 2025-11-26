@@ -1,0 +1,9 @@
+@page "/markets"
+@model web_asp.Pages.Markets.IndexModel
+@{
+    ViewData["Title"] = "Markets";
+}
+
+<main>
+    @await Html.PartialAsync("_MarketTable", Model.TableModel)
+</main>

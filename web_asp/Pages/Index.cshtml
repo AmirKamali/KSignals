@@ -1,0 +1,11 @@
+﻿@page
+@model IndexModel
+@{
+    ViewData["Title"] = "Kalshi Signals";
+}
+
+<main>
+    @await Html.PartialAsync("_HeroSection")
+    @await Html.PartialAsync("_VolumeGrid", Model.TopMarkets)
+    @await Html.PartialAsync("_MarketTable", Model.TableModel)
+</main>

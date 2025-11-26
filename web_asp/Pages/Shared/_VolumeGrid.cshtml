@@ -1,0 +1,16 @@
+@model IReadOnlyList<web_asp.Models.Market>
+<section class="section">
+    <div class="container">
+        <div class="volume-header">
+            <h2 class="heading">High Volume Trades</h2>
+            <p class="subheading">Top active markets right now</p>
+        </div>
+
+        <div class="grid">
+            @foreach (var market in Model)
+            {
+                @await Html.PartialAsync("_MarketCard", market)
+            }
+        </div>
+    </div>
+    </section>
