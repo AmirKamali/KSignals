@@ -8,7 +8,7 @@ export default function SiteHeader() {
                 <div className={styles.inner}>
                     <nav className={styles.nav} aria-label="Primary navigation">
                         <Link href="/" className={styles.navLink}>Home</Link>
-                        <Link href="/#markets" className={styles.navLink}>Markets</Link>
+                        <Link href="/markets" className={styles.navLink}>Markets</Link>
                     </nav>
                 </div>
             </div>
