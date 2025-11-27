@@ -190,7 +190,16 @@
                             <tr>
                                 <td class="titleCell">
                                     <a class="titleLink" href="/marketDetails?tickerId=@market.Ticker">
-                                        <div class="marketTitle">@TitleFormatter.FormatTitle(market.Title)</div>
+                                        <div class="marketTitle">
+                                            @if (!string.IsNullOrWhiteSpace(Model.Query) && !string.IsNullOrWhiteSpace(market.Subtitle))
+                                            {
+                                                @TitleFormatter.FormatTitle($"{market.Title} - {market.Subtitle}")
+                                            }
+                                            else
+                                            {
+                                                @TitleFormatter.FormatTitle(market.Title)
+                                            }
+                                        </div>
                                         <div class="marketSubtitle">@closeLabel</div>
                                     </a>
                                 </td>
