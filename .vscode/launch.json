@@ -74,9 +74,9 @@
         "run",
         "--no-build",
         "--project",
-        "${workspaceFolder}/web_asp/web_asp.csproj"
+        "${workspaceFolder}/web/web_asp.csproj"
       ],
-      "cwd": "${workspaceFolder}/web_asp",
+      "cwd": "${workspaceFolder}/web",
       "stopAtEntry": false,
       "justMyCode": true,
       "launchBrowser": {

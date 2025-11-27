@@ -115,7 +115,7 @@
       "type": "shell",
       "command": "dotnet build",
       "options": {
-        "cwd": "${workspaceFolder}/web_asp"
+        "cwd": "${workspaceFolder}/web"
       },
       "problemMatcher": "$msCompile",
       "group": {

@@ -2,7 +2,7 @@
 @model web_asp.Pages.Markets.DetailsModel
 @{
     var market = Model.Market;
-    ViewData["Title"] = market != null ? $"{market.Ticker} details" : "Market Details";
+    ViewData["Title"] = market != null ? $"{market.Title} details" : "Market Details";
 
     var noPrice = market?.NoPrice ?? (market != null ? Math.Max(0m, 100m - market.YesPrice) : 0m);
     var previousNo = market?.PreviousNoPrice ?? (market?.PreviousYesPrice.HasValue == true ? 100m - market.PreviousYesPrice.Value : (decimal?)null);
@@ -30,19 +30,17 @@
         {
             <header class="detailsHeader">
                 <div>
-                    <p class="eyebrow">Ticker · @market.Ticker</p>
                     <h1 class="detailsTitle">@TitleFormatter.FormatTitle(market.Title)</h1>
                     @if (!string.IsNullOrWhiteSpace(market.Subtitle))
                     {
                         <p class="detailsSubtitle">@market.Subtitle</p>
                     }
                     <div class="pillRow">
-                        <span class="statusPill">@market.Status?.ToUpperInvariant()</span>
+                        <span class="statusPill success">@market.Status?.ToUpperInvariant()</span>
                         <span class="statusPill muted">@FormatCloseTime(market.CloseTime)</span>
-                        @if (!string.IsNullOrWhiteSpace(market.EventTicker))
-                        {
-                            <span class="statusPill outline">@market.EventTicker</span>
-                        }
+                        <a class="statusPill outline" target="_blank" rel="noopener noreferrer" href="https://kalshi.com/?search=@market.Ticker">
+                            Open on Kalshi
+                        </a>
                     </div>
                 </div>
                 <div class="priceSummary">
@@ -104,17 +102,6 @@
                     </div>
                 </div>
 
-                <div class="priceCard neutralCard">
-                    <div class="cardHeader">
-                        <span class="pill outline">Market</span>
-                        <span class="pill muted">@market.Ticker</span>
-                    </div>
-                    <div class="priceValue">@((market.LastPrice ?? market.YesPrice).ToString("0.#"))&cent;</div>
-                    <div class="bookRow">
-                        <span>Liquidity @market.Liquidity.ToString("N0")</span>
-                        <span>Volume @market.Volume.ToString("N0")</span>
-                    </div>
-                </div>
             </section>
 
             <section class="detailsGrid">
