@@ -131,6 +131,51 @@ public class KalshiService
             };
     }
 
+    public async Task<MarketCache?> GetMarketDetailsAsync(string tickerId, CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(tickerId))
+        {
+            throw new ArgumentException("TickerId is required", nameof(tickerId));
+        }
+
+        await EnsureMarketsTableAsync(cancellationToken);
+
+        try
+        {
+            var response = await _kalshiClient.Markets.GetMarketAsync(tickerId, cancellationToken: cancellationToken);
+            var market = response?.Market;
+
+            if (market == null)
+            {
+                _logger.LogWarning("Market {TickerId} was not returned from Kalshi", tickerId);
+                return null;
+            }
+
+            var fetchedAtUtc = DateTime.UtcNow;
+            var seriesTicker = string.IsNullOrWhiteSpace(market.EventTicker) ? market.Ticker : market.EventTicker;
+            var mapped = MapMarket(seriesTicker ?? tickerId, market, fetchedAtUtc);
+
+            var existing = await _db.Markets.FirstOrDefaultAsync(m => m.TickerId == mapped.TickerId, cancellationToken);
+            if (existing == null)
+            {
+                await _db.Markets.AddAsync(mapped, cancellationToken);
+            }
+            else
+            {
+                CopyMarket(existing, mapped);
+            }
+
+            await _db.SaveChangesAsync(cancellationToken);
+
+            return existing ?? mapped;
+        }
+        catch (ApiException apiEx)
+        {
+            _logger.LogError(apiEx, "Kalshi API error fetching market {TickerId}", tickerId);
+            throw;
+        }
+    }
+
     private static DateTime? GetMaxCloseTimeFromDateType(string? closeDateType, DateTime nowUtc)
     {
         if (string.IsNullOrWhiteSpace(closeDateType) || closeDateType.Equals("all_time", StringComparison.OrdinalIgnoreCase))
@@ -223,6 +268,45 @@ CREATE TABLE IF NOT EXISTS Markets (
 ) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;";
 
         await _db.Database.ExecuteSqlRawAsync(createSql, cancellationToken);
+    }
+
+    private static void CopyMarket(MarketCache target, MarketCache source)
+    {
+        target.SeriesTicker = source.SeriesTicker;
+        target.Title = source.Title;
+        target.Subtitle = source.Subtitle;
+        target.Volume = source.Volume;
+        target.Volume24h = source.Volume24h;
+        target.CreatedTime = source.CreatedTime;
+        target.ExpirationTime = source.ExpirationTime;
+        target.CloseTime = source.CloseTime;
+        target.LatestExpirationTime = source.LatestExpirationTime;
+        target.OpenTime = source.OpenTime;
+        target.Status = source.Status;
+        target.YesBid = source.YesBid;
+        target.YesBidDollars = source.YesBidDollars;
+        target.YesAsk = source.YesAsk;
+        target.YesAskDollars = source.YesAskDollars;
+        target.NoBid = source.NoBid;
+        target.NoBidDollars = source.NoBidDollars;
+        target.NoAsk = source.NoAsk;
+        target.NoAskDollars = source.NoAskDollars;
+        target.LastPrice = source.LastPrice;
+        target.LastPriceDollars = source.LastPriceDollars;
+        target.PreviousYesBid = source.PreviousYesBid;
+        target.PreviousYesBidDollars = source.PreviousYesBidDollars;
+        target.PreviousYesAsk = source.PreviousYesAsk;
+        target.PreviousYesAskDollars = source.PreviousYesAskDollars;
+        target.PreviousPrice = source.PreviousPrice;
+        target.PreviousPriceDollars = source.PreviousPriceDollars;
+        target.Liquidity = source.Liquidity;
+        target.LiquidityDollars = source.LiquidityDollars;
+        target.SettlementValue = source.SettlementValue;
+        target.SettlementValueDollars = source.SettlementValueDollars;
+        target.NotionalValue = source.NotionalValue;
+        target.NotionalValueDollars = source.NotionalValueDollars;
+        target.JsonResponse = source.JsonResponse;
+        target.LastUpdate = source.LastUpdate;
     }
 
     internal static MarketCache MapMarket(string seriesTicker, Market market, DateTime lastUpdate)

@@ -5,18 +5,20 @@
       "commandName": "Project",
       "dotnetRunMessages": true,
       "launchBrowser": true,
-      "applicationUrl": "http://localhost:0",
+      "applicationUrl": "http://localhost:3011",
       "environmentVariables": {
-        "ASPNETCORE_ENVIRONMENT": "Development"
+        "ASPNETCORE_ENVIRONMENT": "Development",
+        "BACKEND_API_BASE_URL": "http://localhost:5271"
       }
     },
     "https": {
       "commandName": "Project",
       "dotnetRunMessages": true,
       "launchBrowser": true,
-      "applicationUrl": "https://localhost:0;http://localhost:0",
+      "applicationUrl": "https://localhost:7011;http://localhost:3011",
       "environmentVariables": {
-        "ASPNETCORE_ENVIRONMENT": "Development"
+        "ASPNETCORE_ENVIRONMENT": "Development",
+        "BACKEND_API_BASE_URL": "http://localhost:5271"
       }
     }
   }

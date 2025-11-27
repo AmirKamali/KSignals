@@ -56,12 +56,6 @@ public class RefreshService
         SortDirection direction = SortDirection.Desc,
         CancellationToken cancellationToken = default)
     {
-        // Clear Redis cache if available
-        if (await _redisCacheService.IsAvailableAsync())
-        {
-            _logger.LogInformation("Clearing Redis cache for markets");
-            await _redisCacheService.DeleteByPatternAsync("markets*", cancellationToken);
-        }
 
         var nowUtc = DateTime.UtcNow;
         var safeDays = Math.Max(1, days);
@@ -125,6 +119,13 @@ public class RefreshService
             {
                 _logger.LogError(ex, "Failed to upsert {Count} today markets for next {Days} day(s)", results.Count, safeDays);
             }
+        }
+
+        // Clear Redis cache if available
+        if (await _redisCacheService.IsAvailableAsync())
+        {
+            _logger.LogInformation("Clearing Redis cache for markets");
+            await _redisCacheService.DeleteByPatternAsync("markets*", cancellationToken);
         }
     }
     
@@ -756,13 +757,6 @@ public class RefreshService
 
     private async Task CacheMarketDataInternalAsync(string? category = null, string? tag = null)
     {
-        // Clear Redis cache if available
-        if (await _redisCacheService.IsAvailableAsync())
-        {
-            _logger.LogInformation("Clearing Redis cache for markets");
-            await _redisCacheService.DeleteByPatternAsync("markets*", CancellationToken.None);
-        }
-
         using var scope = _scopeFactory.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<KalshiDbContext>();
 
@@ -839,6 +833,14 @@ public class RefreshService
                 }
             }
         });
+
+        // Clear Redis cache if available
+        if (await _redisCacheService.IsAvailableAsync())
+        {
+            _logger.LogInformation("Clearing Redis cache for markets");
+            await _redisCacheService.DeleteByPatternAsync("markets*", CancellationToken.None);
+        }
+
 
         _logger.LogInformation("Successfully cached {TotalCount} markets across {SeriesCount} series",
             totalCached, seriesIds.Count);

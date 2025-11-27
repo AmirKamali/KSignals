@@ -109,7 +109,19 @@
         "kind": "build",
         "isDefault": false
       }
+    },
+    {
+      "label": "build-web-asp",
+      "type": "shell",
+      "command": "dotnet build",
+      "options": {
+        "cwd": "${workspaceFolder}/web_asp"
+      },
+      "problemMatcher": "$msCompile",
+      "group": {
+        "kind": "build",
+        "isDefault": false
+      }
     }
   ]
 }
-

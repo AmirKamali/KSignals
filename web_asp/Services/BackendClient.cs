@@ -61,6 +61,44 @@ public class BackendClient
         return DefaultTags();
     }
 
+    public async Task<MarketDetails?> GetMarketDetailsAsync(string tickerId)
+    {
+        if (string.IsNullOrWhiteSpace(tickerId))
+        {
+            throw new ArgumentException("tickerId is required", nameof(tickerId));
+        }
+
+        try
+        {
+            var url = QueryHelpers.AddQueryString(
+                $"{_options.BaseUrl.TrimEnd('/')}/api/marketDetails",
+                new Dictionary<string, string?> { ["tickerId"] = tickerId });
+
+            using var response = await _httpClient.GetAsync(url);
+            if (!response.IsSuccessStatusCode)
+            {
+                throw new HttpRequestException($"Market details request failed with status {response.StatusCode}");
+            }
+
+            await using var stream = await response.Content.ReadAsStreamAsync();
+            using var doc = await JsonDocument.ParseAsync(stream);
+            var root = doc.RootElement;
+
+            if (root.TryGetProperty("market", out var marketNode))
+            {
+                return NormalizeMarketDetails(marketNode);
+            }
+
+            _logger.LogWarning("Market details response missing 'market' payload for ticker {TickerId}", tickerId);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to fetch market details for ticker {TickerId}", tickerId);
+        }
+
+        return null;
+    }
+
     public async Task<BackendMarketsResponse> GetBackendMarketsAsync(MarketQuery query)
     {
         try
@@ -199,6 +237,38 @@ public class BackendClient
             Status = GetString(raw, "status") ?? string.Empty,
             Category = GetString(raw, "category") ?? seriesTicker,
             CloseTime = closeTime
+        };
+    }
+
+    private static MarketDetails NormalizeMarketDetails(JsonElement raw)
+    {
+        var market = NormalizeMarket(raw);
+
+        return new MarketDetails
+        {
+            Ticker = market.Ticker,
+            EventTicker = market.EventTicker,
+            Title = market.Title,
+            Subtitle = market.Subtitle,
+            YesPrice = market.YesPrice,
+            NoPrice = market.NoPrice,
+            PreviousYesPrice = market.PreviousYesPrice,
+            PreviousNoPrice = market.PreviousNoPrice,
+            Volume = market.Volume,
+            OpenInterest = market.OpenInterest,
+            Liquidity = market.Liquidity,
+            Status = market.Status,
+            Category = market.Category,
+            CloseTime = market.CloseTime,
+            YesBid = GetDecimal(raw, "yesBid", "yes_bid", "yesPrice"),
+            YesAsk = GetDecimal(raw, "yesAsk", "yes_ask"),
+            NoBid = GetDecimal(raw, "noBid", "no_bid", "noPrice"),
+            NoAsk = GetDecimal(raw, "noAsk", "no_ask"),
+            LastPrice = GetDecimal(raw, "lastPrice", "last_price"),
+            Volume24h = GetDecimal(raw, "volume24h", "volume_24h", "24h_volume"),
+            OpenTime = GetString(raw, "openTime", "open_time"),
+            ExpirationTime = GetString(raw, "expirationTime", "expiration_time"),
+            LatestExpirationTime = GetString(raw, "latestExpirationTime", "latest_expiration_time")
         };
     }
 

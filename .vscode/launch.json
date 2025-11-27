@@ -63,6 +63,35 @@
       "sourceFileMap": {
         "/Views": "${workspaceFolder}/Views"
       }
+    },
+    {
+      "name": "Frontend .NET",
+      "type": "coreclr",
+      "request": "launch",
+      "preLaunchTask": "build-web-asp",
+      "program": "dotnet",
+      "args": [
+        "run",
+        "--no-build",
+        "--project",
+        "${workspaceFolder}/web_asp/web_asp.csproj"
+      ],
+      "cwd": "${workspaceFolder}/web_asp",
+      "stopAtEntry": false,
+      "justMyCode": true,
+      "launchBrowser": {
+        "enabled": true,
+        "args": "${auto-detect-url}"
+      },
+      "serverReadyAction": {
+        "action": "openExternally",
+        "pattern": "\\bNow listening on:\\s+(https?://[^\\s]+)",
+        "uriFormat": "%s"
+      },
+      "env": {
+        "ASPNETCORE_ENVIRONMENT": "Development",
+        "ASPNETCORE_URLS": "http://127.0.0.1:3011;https://127.0.0.1:7011"
+      }
     }
   ],
   "compounds": [
@@ -76,4 +105,3 @@
     }
   ]
 }
-

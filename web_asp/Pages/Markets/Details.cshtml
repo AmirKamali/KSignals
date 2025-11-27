@@ -1,0 +1,254 @@
+@page "/marketDetails"
+@model web_asp.Pages.Markets.DetailsModel
+@{
+    var market = Model.Market;
+    ViewData["Title"] = market != null ? $"{market.Ticker} details" : "Market Details";
+
+    var noPrice = market?.NoPrice ?? (market != null ? Math.Max(0m, 100m - market.YesPrice) : 0m);
+    var previousNo = market?.PreviousNoPrice ?? (market?.PreviousYesPrice.HasValue == true ? 100m - market.PreviousYesPrice.Value : (decimal?)null);
+    var yesTrend = market != null ? GetTrendInfo(market.YesPrice, market.PreviousYesPrice) : null;
+    var noTrend = market != null ? GetTrendInfo(noPrice, previousNo) : null;
+}
+
+<main class="detailsPage">
+    <div class="container">
+        <a class="backLink" href="/markets">
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="15 18 9 12 15 6"></polyline>
+            </svg>
+            Back to markets
+        </a>
+
+        @if (market == null)
+        {
+            <div class="emptyState">
+                <h1>Market not found</h1>
+                <p>Try selecting a different market from the list.</p>
+            </div>
+        }
+        else
+        {
+            <header class="detailsHeader">
+                <div>
+                    <p class="eyebrow">Ticker · @market.Ticker</p>
+                    <h1 class="detailsTitle">@TitleFormatter.FormatTitle(market.Title)</h1>
+                    @if (!string.IsNullOrWhiteSpace(market.Subtitle))
+                    {
+                        <p class="detailsSubtitle">@market.Subtitle</p>
+                    }
+                    <div class="pillRow">
+                        <span class="statusPill">@market.Status?.ToUpperInvariant()</span>
+                        <span class="statusPill muted">@FormatCloseTime(market.CloseTime)</span>
+                        @if (!string.IsNullOrWhiteSpace(market.EventTicker))
+                        {
+                            <span class="statusPill outline">@market.EventTicker</span>
+                        }
+                    </div>
+                </div>
+                <div class="priceSummary">
+                    <div class="summaryLine">
+                        <span class="label">Last trade</span>
+                        <span class="value">@((market.LastPrice ?? market.YesPrice).ToString("0.#"))&cent;</span>
+                    </div>
+                    <div class="summaryLine">
+                        <span class="label">Open interest</span>
+                        <span class="value">@market.OpenInterest.ToString("N0")</span>
+                    </div>
+                    <div class="summaryLine">
+                        <span class="label">24h volume</span>
+                        <span class="value">@((market.Volume24h ?? market.Volume).ToString("N0"))</span>
+                    </div>
+                </div>
+            </header>
+
+            <section class="priceGrid">
+                <div class="priceCard yesCard">
+                    <div class="cardHeader">
+                        <span class="pill success">Yes</span>
+                        @if (yesTrend.HasValue && yesTrend.Value.diff != 0)
+                        {
+                            var directionClass = yesTrend.Value.direction == "up" ? "trendUp" : "trendDown";
+                            <span class="deltaBadge @directionClass">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="currentColor" style="transform:@(yesTrend.Value.direction == "down" ? "rotate(180deg)" : "none");">
+                                    <path d="M12 16l-6-6h12z"></path>
+                                </svg>
+                                @FormatDelta(yesTrend.Value.diff)&cent;
+                            </span>
+                        }
+                    </div>
+                    <div class="priceValue">@market.YesPrice.ToString("0.#")&cent;</div>
+                    <div class="bookRow">
+                        <span>Bid @market.YesBid?.ToString("0.#")&cent;</span>
+                        <span>Ask @market.YesAsk?.ToString("0.#")&cent;</span>
+                    </div>
+                </div>
+
+                <div class="priceCard noCard">
+                    <div class="cardHeader">
+                        <span class="pill danger">No</span>
+                        @if (noTrend.HasValue && noTrend.Value.diff != 0)
+                        {
+                            var directionClass = noTrend.Value.direction == "up" ? "trendUp" : "trendDown";
+                            <span class="deltaBadge @directionClass">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="currentColor" style="transform:@(noTrend.Value.direction == "down" ? "rotate(180deg)" : "none");">
+                                    <path d="M12 16l-6-6h12z"></path>
+                                </svg>
+                                @FormatDelta(noTrend.Value.diff)&cent;
+                            </span>
+                        }
+                    </div>
+                    <div class="priceValue">@noPrice.ToString("0.#")&cent;</div>
+                    <div class="bookRow">
+                        <span>Bid @market.NoBid?.ToString("0.#")&cent;</span>
+                        <span>Ask @market.NoAsk?.ToString("0.#")&cent;</span>
+                    </div>
+                </div>
+
+                <div class="priceCard neutralCard">
+                    <div class="cardHeader">
+                        <span class="pill outline">Market</span>
+                        <span class="pill muted">@market.Ticker</span>
+                    </div>
+                    <div class="priceValue">@((market.LastPrice ?? market.YesPrice).ToString("0.#"))&cent;</div>
+                    <div class="bookRow">
+                        <span>Liquidity @market.Liquidity.ToString("N0")</span>
+                        <span>Volume @market.Volume.ToString("N0")</span>
+                    </div>
+                </div>
+            </section>
+
+            <section class="detailsGrid">
+                <div class="statCard">
+                    <h3>Liquidity</h3>
+                    <p class="statValue">@market.Liquidity.ToString("N0")</p>
+                    <p class="statSub">Open interest @market.OpenInterest.ToString("N0")</p>
+                </div>
+                <div class="statCard">
+                    <h3>24h Volume</h3>
+                    <p class="statValue">@((market.Volume24h ?? market.Volume).ToString("N0"))</p>
+                    <p class="statSub">Total volume @market.Volume.ToString("N0")</p>
+                </div>
+                <div class="statCard">
+                    <h3>Status</h3>
+                    <p class="statValue">@market.Status</p>
+                    <p class="statSub">@FormatCloseTime(market.CloseTime)</p>
+                </div>
+            </section>
+
+            <section class="detailPanels">
+                <div class="panel timelineCard">
+                    <h3>Timeline</h3>
+                    <dl>
+                        <div>
+                            <dt>Opens</dt>
+                            <dd>@FormatDate(market.OpenTime)</dd>
+                        </div>
+                        <div>
+                            <dt>Closes</dt>
+                            <dd>@FormatDate(market.CloseTime)</dd>
+                        </div>
+                        <div>
+                            <dt>Expiration</dt>
+                            <dd>@FormatDate(market.ExpirationTime)</dd>
+                        </div>
+                        <div>
+                            <dt>Latest expiration</dt>
+                            <dd>@FormatDate(market.LatestExpirationTime)</dd>
+                        </div>
+                    </dl>
+                </div>
+
+                <div class="panel orderbookCard">
+                    <h3>Orderbook</h3>
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Side</th>
+                                <th>Bid</th>
+                                <th>Ask</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td>Yes</td>
+                                <td>@(market.YesBid.HasValue ? $"{market.YesBid.Value:0.#}¢" : "—")</td>
+                                <td>@(market.YesAsk.HasValue ? $"{market.YesAsk.Value:0.#}¢" : "—")</td>
+                            </tr>
+                            <tr>
+                                <td>No</td>
+                                <td>@(market.NoBid.HasValue ? $"{market.NoBid.Value:0.#}¢" : "—")</td>
+                                <td>@(market.NoAsk.HasValue ? $"{market.NoAsk.Value:0.#}¢" : "—")</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+        }
+    </div>
+</main>
+
+@functions {
+    private static string FormatCloseTime(string? closeTime)
+    {
+        if (string.IsNullOrWhiteSpace(closeTime)) return "Close time unavailable";
+        if (!DateTime.TryParse(closeTime, out var close)) return "Close time unavailable";
+
+        var now = DateTime.UtcNow;
+        var diff = close - now;
+        var absMinutes = Math.Max(1, (int)Math.Round(Math.Abs(diff.TotalMinutes)));
+        var value = absMinutes;
+        var unit = "minutes";
+
+        if (absMinutes >= 60)
+        {
+            var hours = (int)Math.Round(absMinutes / 60.0);
+            if (hours < 48)
+            {
+                value = hours;
+                unit = hours == 1 ? "hour" : "hours";
+            }
+            else
+            {
+                var days = (int)Math.Round(hours / 24.0);
+                value = days;
+                unit = days == 1 ? "day" : "days";
+            }
+        }
+        else if (absMinutes == 1)
+        {
+            unit = "minute";
+        }
+
+        return diff >= TimeSpan.Zero
+            ? $"Closes in {value} {unit}"
+            : $"Closed {value} {unit} ago";
+    }
+
+    private static (string direction, decimal diff)? GetTrendInfo(decimal current, decimal? previous)
+    {
+        if (!previous.HasValue) return null;
+        var diff = current - previous.Value;
+        if (diff == 0) return ("flat", 0);
+        return diff > 0 ? ("up", diff) : ("down", diff);
+    }
+
+    private static string FormatDelta(decimal diff)
+    {
+        var abs = Math.Abs(diff);
+        if (abs >= 1)
+        {
+            return Math.Round(abs).ToString("0");
+        }
+        return abs.ToString("0.00");
+    }
+
+    private static string FormatDate(string? raw)
+    {
+        if (string.IsNullOrWhiteSpace(raw)) return "—";
+        if (DateTime.TryParse(raw, out var parsed))
+        {
+            return parsed.ToUniversalTime().ToString("MMM d, yyyy h:mm tt 'UTC'");
+        }
+        return "—";
+    }
+}
