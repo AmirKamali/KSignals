@@ -38,12 +38,29 @@
                     <div class="pillRow">
                         <span class="statusPill success">@market.Status?.ToUpperInvariant()</span>
                         <span class="statusPill muted">@FormatCloseTime(market.CloseTime)</span>
+                        @if (!string.IsNullOrWhiteSpace(market.Category))
+                        {
+                            <span class="statusPill outline">@market.Category</span>
+                        }
+                        @if (market.Tags?.Count > 0)
+                        {
+                            foreach (var tag in market.Tags)
+                            {
+                                <span class="statusPill outline">@tag</span>
+                            }
+                        }
                         <a class="statusPill outline" target="_blank" rel="noopener noreferrer" href="https://kalshi.com/?search=@market.Ticker">
                             Open on Kalshi
                         </a>
                     </div>
                 </div>
                 <div class="priceSummary">
+                    <div class="summaryLine">
+                        <span class="label">Kalshi</span>
+                        <a class="statusPill outline" target="_blank" rel="noopener noreferrer" href="https://kalshi.com/?search=@market.Ticker">
+                            Open on Kalshi
+                        </a>
+                    </div>
                     <div class="summaryLine">
                         <span class="label">Last trade</span>
                         <span class="value">@((market.LastPrice ?? market.YesPrice).ToString("0.#"))&cent;</span>

@@ -17,7 +17,7 @@ internal static class MarketResponseMapper
         }
     }
 
-    public static object ToResponse(MarketCache market, bool detailed = false)
+    public static object ToResponse(MarketCache market, bool detailed = false, string? category = null, IEnumerable<string>? tags = null)
     {
         return new
         {
@@ -55,7 +55,9 @@ internal static class MarketResponseMapper
             market.SettlementValueDollars,
             market.NotionalValue,
             market.NotionalValueDollars,
-            market.LastUpdate
+            market.LastUpdate,
+            Category = category,
+            Tags = tags?.ToArray()
         };
     }
 }

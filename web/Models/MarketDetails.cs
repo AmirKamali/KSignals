@@ -11,6 +11,7 @@ public class MarketDetails : Market
     public string? OpenTime { get; set; }
     public string? ExpirationTime { get; set; }
     public string? LatestExpirationTime { get; set; }
+    public List<string> Tags { get; set; } = new();
 }
 
 public class KalshiOptions

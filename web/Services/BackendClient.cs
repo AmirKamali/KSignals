@@ -244,6 +244,15 @@ public class BackendClient
     {
         var market = NormalizeMarket(raw);
 
+        var tags = new List<string>();
+        if (raw.TryGetProperty("tags", out var tagsNode) && tagsNode.ValueKind == JsonValueKind.Array)
+        {
+            tags.AddRange(tagsNode.EnumerateArray()
+                .Where(t => t.ValueKind == JsonValueKind.String)
+                .Select(t => t.GetString() ?? string.Empty)
+                .Where(t => !string.IsNullOrWhiteSpace(t)));
+        }
+
         return new MarketDetails
         {
             Ticker = market.Ticker,
@@ -258,7 +267,6 @@ public class BackendClient
             OpenInterest = market.OpenInterest,
             Liquidity = market.Liquidity,
             Status = market.Status,
-            Category = market.Category,
             CloseTime = market.CloseTime,
             YesBid = GetDecimal(raw, "yesBid", "yes_bid", "yesPrice"),
             YesAsk = GetDecimal(raw, "yesAsk", "yes_ask"),
@@ -268,7 +276,9 @@ public class BackendClient
             Volume24h = GetDecimal(raw, "volume24h", "volume_24h", "24h_volume"),
             OpenTime = GetString(raw, "openTime", "open_time"),
             ExpirationTime = GetString(raw, "expirationTime", "expiration_time"),
-            LatestExpirationTime = GetString(raw, "latestExpirationTime", "latest_expiration_time")
+            LatestExpirationTime = GetString(raw, "latestExpirationTime", "latest_expiration_time"),
+            Category = GetString(raw, "category", "Category"),
+            Tags = tags
         };
     }
 

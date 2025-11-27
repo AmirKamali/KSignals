@@ -35,6 +35,7 @@ public class KalshiService
         string? tag = null,
         string? query = null,
         string? closeDateType = "next_30_days",
+        string? status = "Active",  
         MarketSort sortBy = MarketSort.Volume,
         SortDirection direction = SortDirection.Desc,
         int page = 1,
@@ -79,7 +80,7 @@ public class KalshiService
 
         var marketsQuery = _db.Markets
             .AsNoTracking()
-            .Where(p => p.CloseTime > nowUtc);
+            .Where(p => p.CloseTime > nowUtc && p.Status == status);
 
          if (seriesIds != null)
         {
@@ -174,6 +175,38 @@ public class KalshiService
             _logger.LogError(apiEx, "Kalshi API error fetching market {TickerId}", tickerId);
             throw;
         }
+    }
+
+    public async Task<(MarketCache? Market, MarketCategory? Category)> GetMarketDetailsWithCategoryAsync(string tickerId, CancellationToken cancellationToken = default)
+    {
+        var market = await GetMarketDetailsAsync(tickerId, cancellationToken);
+        if (market == null)
+        {
+            return (null, null);
+        }
+
+        // Derive series id from tickerId by taking the first component before '-'
+        var seriesId = string.Empty;
+        if (!string.IsNullOrWhiteSpace(market.TickerId))
+        {
+            var parts = market.TickerId.Split('-', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+            seriesId = parts.Length > 0 ? parts[0] : market.TickerId;
+        }
+
+        MarketCategory? category = null;
+
+        try
+        {
+            category = await _db.MarketCategories
+                .AsNoTracking()
+                .FirstOrDefaultAsync(mc => mc.SeriesId == seriesId, cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to load market category for series {SeriesId}", seriesId);
+        }
+
+        return (market, category);
     }
 
     private static DateTime? GetMaxCloseTimeFromDateType(string? closeDateType, DateTime nowUtc)
