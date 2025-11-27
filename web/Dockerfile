@@ -14,7 +14,7 @@ WORKDIR /app
 
 ENV ASPNETCORE_URLS=http://+:3000
 # Backend base URL can be overridden at runtime (e.g., -e BACKEND_API_BASE_URL=http://host.docker.internal:5271)
-ENV BACKEND_API_BASE_URL=http://localhost:5271
+ENV BACKEND_API_BASE_URL=http://localhost:3006
 
 EXPOSE 3000
 
