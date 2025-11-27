@@ -40,7 +40,6 @@ jobs:
               - 'backend/**'
             frontend:
               - 'web/**'
-              - 'web_asp/**'
 
       - name: Set manual selection
         id: manual
@@ -122,8 +121,8 @@ jobs:
       - name: Build frontend container image
         uses: docker/build-push-action@v5
         with:
-          context: ./web_asp
-          file: ./web_asp/Dockerfile
+          context: ./web
+          file: ./web/Dockerfile
           platforms: linux/amd64,linux/arm64
           push: true
           tags: |
