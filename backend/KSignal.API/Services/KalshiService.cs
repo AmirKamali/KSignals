@@ -101,18 +101,6 @@ public class KalshiService
                 (p.TickerId != null && EF.Functions.Like(p.TickerId, likePattern)));
         }
 
-        // Get the TickerId with the highest Volume24h for each SeriesTicker to avoid duplicates
-        var maxVolumePerSeries = marketsQuery
-            .GroupBy(m => m.SeriesTicker)
-            .Select(g => new { SeriesTicker = g.Key, MaxVolume = g.Max(m => m.Volume24h) });
-
-        // Join back to get full records - only markets with max volume per series
-        marketsQuery = marketsQuery.Join(
-            maxVolumePerSeries,
-            m => new { m.SeriesTicker, Volume = m.Volume24h },
-            mv => new { mv.SeriesTicker, Volume = mv.MaxVolume },
-            (m, mv) => m);
-
         if (sortBy == MarketSort.Volume)
         {
             marketsQuery = direction == SortDirection.Asc

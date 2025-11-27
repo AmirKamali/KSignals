@@ -51,7 +51,7 @@ public class RefreshService
 
     public async Task GetTodayMarketsAsync(
         int days = 1,
-        int maxPages = 5,
+        int maxPages = -1,
         MarketSort sortBy = MarketSort.Volume,
         SortDirection direction = SortDirection.Desc,
         CancellationToken cancellationToken = default)
@@ -65,7 +65,7 @@ public class RefreshService
 
         var nowUtc = DateTime.UtcNow;
         var safeDays = Math.Max(1, days);
-        var safeMaxPages = Math.Max(1, maxPages);
+        int? pageLimit = maxPages == -1 ? null : Math.Max(1, maxPages);
         var maxCloseTs = DateTimeOffset.UtcNow.AddDays(safeDays).ToUnixTimeSeconds();
         var fetchedAtUtc = nowUtc;
         var results = new List<MarketCache>();
@@ -111,7 +111,7 @@ public class RefreshService
 
             cursor = data?.Cursor;
             pageCounter++;
-        } while (!string.IsNullOrWhiteSpace(cursor) && pageCounter < safeMaxPages);
+        } while (!string.IsNullOrWhiteSpace(cursor) && (!pageLimit.HasValue || pageCounter < pageLimit.Value));
 
         var ordered = results.OrderBy(m => m.CloseTime).ToList();
 

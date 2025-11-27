@@ -136,7 +136,7 @@ public class BackendPrivateController : ControllerBase
     [HttpPost("refresh-today-market")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status500InternalServerError)]
-    public async Task<IActionResult> RefreshTodayMarkets([FromQuery] int days = 1, [FromQuery] int max_pages = 5)
+    public async Task<IActionResult> RefreshTodayMarkets([FromQuery] int days = 1, [FromQuery] int max_pages = -1)
     {
         try
         {
