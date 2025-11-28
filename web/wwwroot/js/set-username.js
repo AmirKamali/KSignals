@@ -1,5 +1,5 @@
 document.addEventListener('DOMContentLoaded', async () => {
-    console.log("SetUsername.js - DOM loaded");
+    console.log("Username.js - DOM loaded");
 
     const firebaseIdInput = document.getElementById("firebase-id-input");
 

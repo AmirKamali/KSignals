@@ -1,0 +1,611 @@
+dotnet watch 🔥 Hot reload enabled. For a list of supported edits, see https://aka.ms/dotnet/hot-reload.
+dotnet watch ⌚ Building /Users/amir/Documents/dev/kalshi-signals/web/web_asp.csproj ...
+dotnet watch 🔨 Build succeeded: /Users/amir/Documents/dev/kalshi-signals/web/web_asp.csproj
+Using launch settings from /Users/amir/Documents/dev/kalshi-signals/web/Properties/launchSettings.json...
+info: Microsoft.Hosting.Lifetime[14]
+      Now listening on: http://localhost:3011
+info: Microsoft.Hosting.Lifetime[0]
+      Application started. Press Ctrl+C to shut down.
+info: Microsoft.Hosting.Lifetime[0]
+      Hosting environment: Development
+info: Microsoft.Hosting.Lifetime[0]
+      Content root path: /Users/amir/Documents/dev/kalshi-signals/web
+warn: Microsoft.AspNetCore.HttpsPolicy.HttpsRedirectionMiddleware[3]
+      Failed to determine the https port for redirect.
+info: System.Net.Http.HttpClient.BackendClient.LogicalHandler[100]
+      Start processing HTTP request GET http://localhost:5271/api/markets?*
+info: System.Net.Http.HttpClient.BackendClient.ClientHandler[100]
+      Sending HTTP request GET http://localhost:5271/api/markets?*
+dotnet watch ⚠ msbuild: [Warning] Found project reference without a matching metadata reference: /Users/amir/Documents/dev/kalshi-signals/shared/KSignals.DTO/KSignals.DTO.csproj
+info: System.Net.Http.HttpClient.BackendClient.ClientHandler[101]
+      Received HTTP response headers after 4388.1053ms - 200
+info: System.Net.Http.HttpClient.BackendClient.LogicalHandler[101]
+      End processing HTTP request after 4396.0779ms - 200
+info: System.Net.Http.HttpClient.BackendClient.LogicalHandler[100]
+      Start processing HTTP request GET http://localhost:5271/api/events/categories
+info: System.Net.Http.HttpClient.BackendClient.ClientHandler[100]
+      Sending HTTP request GET http://localhost:5271/api/events/categories
+info: System.Net.Http.HttpClient.BackendClient.ClientHandler[101]
+      Received HTTP response headers after 440.0889ms - 200
+info: System.Net.Http.HttpClient.BackendClient.LogicalHandler[101]
+      End processing HTTP request after 440.1782ms - 200
+info: System.Net.Http.HttpClient.BackendClient.LogicalHandler[100]
+      Start processing HTTP request GET http://localhost:5271/api/markets?*
+info: System.Net.Http.HttpClient.BackendClient.ClientHandler[100]
+      Sending HTTP request GET http://localhost:5271/api/markets?*
+info: System.Net.Http.HttpClient.BackendClient.ClientHandler[101]
+      Received HTTP response headers after 3663.8754ms - 200
+info: System.Net.Http.HttpClient.BackendClient.LogicalHandler[101]
+      End processing HTTP request after 3664.0402ms - 200
+info: System.Net.Http.HttpClient.BackendClient.LogicalHandler[100]
+      Start processing HTTP request GET http://localhost:5271/api/events/categories
+info: System.Net.Http.HttpClient.BackendClient.ClientHandler[100]
+      Sending HTTP request GET http://localhost:5271/api/events/categories
+info: System.Net.Http.HttpClient.BackendClient.ClientHandler[101]
+      Received HTTP response headers after 182.9458ms - 200
+info: System.Net.Http.HttpClient.BackendClient.LogicalHandler[101]
+      End processing HTTP request after 183.034ms - 200
+info: System.Net.Http.HttpClient.BackendClient.LogicalHandler[100]
+      Start processing HTTP request GET http://localhost:5271/api/markets?*
+info: System.Net.Http.HttpClient.BackendClient.ClientHandler[100]
+      Sending HTTP request GET http://localhost:5271/api/markets?*
+info: System.Net.Http.HttpClient.BackendClient.ClientHandler[101]
+      Received HTTP response headers after 3363.7072ms - 200
+info: System.Net.Http.HttpClient.BackendClient.LogicalHandler[101]
+      End processing HTTP request after 3363.8155ms - 200
+info: System.Net.Http.HttpClient.BackendClient.LogicalHandler[100]
+      Start processing HTTP request GET http://localhost:5271/api/events/categories
+info: System.Net.Http.HttpClient.BackendClient.ClientHandler[100]
+      Sending HTTP request GET http://localhost:5271/api/events/categories
+info: System.Net.Http.HttpClient.BackendClient.ClientHandler[101]
+      Received HTTP response headers after 294.4666ms - 200
+info: System.Net.Http.HttpClient.BackendClient.LogicalHandler[101]
+      End processing HTTP request after 294.5765ms - 200
+dotnet watch ⌚ File added: ./.development-notes.md
+dotnet watch ⌚ File updated: ./.development-notes.md.tmp.90506.1764334897507
+info: System.Net.Http.HttpClient.BackendClient.LogicalHandler[100]
+      Start processing HTTP request GET http://localhost:5271/api/markets?*
+info: System.Net.Http.HttpClient.BackendClient.ClientHandler[100]
+      Sending HTTP request GET http://localhost:5271/api/markets?*
+dotnet watch ⚠ msbuild: [Warning] Found project reference without a matching metadata reference: /Users/amir/Documents/dev/kalshi-signals/shared/KSignals.DTO/KSignals.DTO.csproj
+dotnet watch ⌚ No C# changes to apply.
+info: System.Net.Http.HttpClient.BackendClient.LogicalHandler[100]
+      Start processing HTTP request GET http://localhost:5271/api/markets?*
+info: System.Net.Http.HttpClient.BackendClient.ClientHandler[100]
+      Sending HTTP request GET http://localhost:5271/api/markets?*
+info: System.Net.Http.HttpClient.BackendClient.ClientHandler[101]
+      Received HTTP response headers after 2988.2689ms - 200
+info: System.Net.Http.HttpClient.BackendClient.LogicalHandler[101]
+      End processing HTTP request after 2988.3817ms - 200
+info: System.Net.Http.HttpClient.BackendClient.LogicalHandler[100]
+      Start processing HTTP request GET http://localhost:5271/api/events/categories
+info: System.Net.Http.HttpClient.BackendClient.ClientHandler[100]
+      Sending HTTP request GET http://localhost:5271/api/events/categories
+info: System.Net.Http.HttpClient.BackendClient.ClientHandler[101]
+      Received HTTP response headers after 176.8386ms - 200
+info: System.Net.Http.HttpClient.BackendClient.LogicalHandler[101]
+      End processing HTTP request after 176.9219ms - 200
+info: System.Net.Http.HttpClient.BackendClient.ClientHandler[101]
+      Received HTTP response headers after 3402.5329ms - 200
+info: System.Net.Http.HttpClient.BackendClient.LogicalHandler[101]
+      End processing HTTP request after 3402.6265ms - 200
+info: System.Net.Http.HttpClient.BackendClient.LogicalHandler[100]
+      Start processing HTTP request GET http://localhost:5271/api/events/categories
+info: System.Net.Http.HttpClient.BackendClient.ClientHandler[100]
+      Sending HTTP request GET http://localhost:5271/api/events/categories
+info: System.Net.Http.HttpClient.BackendClient.ClientHandler[101]
+      Received HTTP response headers after 170.1489ms - 200
+info: System.Net.Http.HttpClient.BackendClient.LogicalHandler[101]
+      End processing HTTP request after 170.2094ms - 200
+dotnet watch ⌚ File updated: ./.development-notes.md
+dotnet watch ⌚ No C# changes to apply.
+info: System.Net.Http.HttpClient.BackendClient.LogicalHandler[100]
+      Start processing HTTP request GET http://localhost:5271/api/markets?*
+info: System.Net.Http.HttpClient.BackendClient.ClientHandler[100]
+      Sending HTTP request GET http://localhost:5271/api/markets?*
+info: System.Net.Http.HttpClient.BackendClient.ClientHandler[101]
+      Received HTTP response headers after 3444.0281ms - 200
+info: System.Net.Http.HttpClient.BackendClient.LogicalHandler[101]
+      End processing HTTP request after 3444.1096ms - 200
+info: System.Net.Http.HttpClient.BackendClient.LogicalHandler[100]
+      Start processing HTTP request GET http://localhost:5271/api/events/categories
+info: System.Net.Http.HttpClient.BackendClient.ClientHandler[100]
+      Sending HTTP request GET http://localhost:5271/api/events/categories
+info: System.Net.Http.HttpClient.BackendClient.ClientHandler[101]
+      Received HTTP response headers after 190.9652ms - 200
+info: System.Net.Http.HttpClient.BackendClient.LogicalHandler[101]
+      End processing HTTP request after 191.0315ms - 200
+info: System.Net.Http.HttpClient.BackendClient.LogicalHandler[100]
+      Start processing HTTP request GET http://localhost:5271/api/markets?*
+info: System.Net.Http.HttpClient.BackendClient.ClientHandler[100]
+      Sending HTTP request GET http://localhost:5271/api/markets?*
+info: System.Net.Http.HttpClient.BackendClient.ClientHandler[101]
+      Received HTTP response headers after 3318.8607ms - 200
+info: System.Net.Http.HttpClient.BackendClient.LogicalHandler[101]
+      End processing HTTP request after 3318.926ms - 200
+info: System.Net.Http.HttpClient.BackendClient.LogicalHandler[100]
+      Start processing HTTP request GET http://localhost:5271/api/events/categories
+info: System.Net.Http.HttpClient.BackendClient.ClientHandler[100]
+      Sending HTTP request GET http://localhost:5271/api/events/categories
+info: System.Net.Http.HttpClient.BackendClient.ClientHandler[101]
+      Received HTTP response headers after 263.0009ms - 200
+info: System.Net.Http.HttpClient.BackendClient.LogicalHandler[101]
+      End processing HTTP request after 263.0572ms - 200
+info: System.Net.Http.HttpClient.BackendClient.LogicalHandler[100]
+      Start processing HTTP request GET http://localhost:5271/api/markets?*
+info: System.Net.Http.HttpClient.BackendClient.ClientHandler[100]
+      Sending HTTP request GET http://localhost:5271/api/markets?*
+info: System.Net.Http.HttpClient.BackendClient.ClientHandler[101]
+      Received HTTP response headers after 3664.1547ms - 200
+info: System.Net.Http.HttpClient.BackendClient.LogicalHandler[101]
+      End processing HTTP request after 3664.2712ms - 200
+info: System.Net.Http.HttpClient.BackendClient.LogicalHandler[100]
+      Start processing HTTP request GET http://localhost:5271/api/events/categories
+info: System.Net.Http.HttpClient.BackendClient.ClientHandler[100]
+      Sending HTTP request GET http://localhost:5271/api/events/categories
+info: System.Net.Http.HttpClient.BackendClient.ClientHandler[101]
+      Received HTTP response headers after 200.4435ms - 200
+info: System.Net.Http.HttpClient.BackendClient.LogicalHandler[101]
+      End processing HTTP request after 200.5346ms - 200
+dotnet watch ⌚ Files updated: ./wwwroot/js/login.js.tmp.90506.1764335060212, ./wwwroot/js/login.js
+dotnet watch 🔥 Hot reload of static files succeeded.
+dotnet watch ⌚ No C# changes to apply.
+info: System.Net.Http.HttpClient.BackendClient.LogicalHandler[100]
+      Start processing HTTP request GET http://localhost:5271/api/markets?*
+info: System.Net.Http.HttpClient.BackendClient.ClientHandler[100]
+      Sending HTTP request GET http://localhost:5271/api/markets?*
+info: System.Net.Http.HttpClient.BackendClient.ClientHandler[101]
+      Received HTTP response headers after 3185.2221ms - 200
+info: System.Net.Http.HttpClient.BackendClient.LogicalHandler[101]
+      End processing HTTP request after 3185.3305ms - 200
+info: System.Net.Http.HttpClient.BackendClient.LogicalHandler[100]
+      Start processing HTTP request GET http://localhost:5271/api/events/categories
+info: System.Net.Http.HttpClient.BackendClient.ClientHandler[100]
+      Sending HTTP request GET http://localhost:5271/api/events/categories
+info: System.Net.Http.HttpClient.BackendClient.ClientHandler[101]
+      Received HTTP response headers after 265.3599ms - 200
+info: System.Net.Http.HttpClient.BackendClient.LogicalHandler[101]
+      End processing HTTP request after 265.4049ms - 200
+dotnet watch ⌚ Files updated: ./Pages/User/Username.cshtml.cs.tmp.90506.1764335073157, ./Pages/User/Username.cshtml.cs
+info: System.Net.Http.HttpClient.BackendClient.LogicalHandler[100]
+      Start processing HTTP request GET http://localhost:5271/api/markets?*
+info: System.Net.Http.HttpClient.BackendClient.ClientHandler[100]
+      Sending HTTP request GET http://localhost:5271/api/markets?*
+dotnet watch 🔥 [web_asp (net10.0)] Hot reload succeeded.
+info: System.Net.Http.HttpClient.BackendClient.LogicalHandler[100]
+      Start processing HTTP request GET http://localhost:5271/api/markets?*
+info: System.Net.Http.HttpClient.BackendClient.ClientHandler[100]
+      Sending HTTP request GET http://localhost:5271/api/markets?*
+info: System.Net.Http.HttpClient.BackendClient.ClientHandler[101]
+      Received HTTP response headers after 19325.117ms - 200
+info: System.Net.Http.HttpClient.BackendClient.LogicalHandler[101]
+      End processing HTTP request after 19325.1748ms - 200
+info: System.Net.Http.HttpClient.BackendClient.ClientHandler[101]
+      Received HTTP response headers after 19225.8053ms - 200
+info: System.Net.Http.HttpClient.BackendClient.LogicalHandler[101]
+      End processing HTTP request after 19225.8867ms - 200
+info: System.Net.Http.HttpClient.BackendClient.LogicalHandler[100]
+      Start processing HTTP request GET http://localhost:5271/api/events/categories
+info: System.Net.Http.HttpClient.BackendClient.ClientHandler[100]
+      Sending HTTP request GET http://localhost:5271/api/events/categories
+info: System.Net.Http.HttpClient.BackendClient.LogicalHandler[100]
+      Start processing HTTP request GET http://localhost:5271/api/events/categories
+info: System.Net.Http.HttpClient.BackendClient.ClientHandler[100]
+      Sending HTTP request GET http://localhost:5271/api/events/categories
+info: System.Net.Http.HttpClient.BackendClient.ClientHandler[101]
+      Received HTTP response headers after 185.9345ms - 200
+info: System.Net.Http.HttpClient.BackendClient.LogicalHandler[101]
+      End processing HTTP request after 186.0007ms - 200
+info: System.Net.Http.HttpClient.BackendClient.ClientHandler[101]
+      Received HTTP response headers after 191.8343ms - 200
+info: System.Net.Http.HttpClient.BackendClient.LogicalHandler[101]
+      End processing HTTP request after 191.9128ms - 200
+info: System.Net.Http.HttpClient.BackendClient.LogicalHandler[100]
+      Start processing HTTP request GET http://localhost:5271/api/markets?*
+info: System.Net.Http.HttpClient.BackendClient.ClientHandler[100]
+      Sending HTTP request GET http://localhost:5271/api/markets?*
+info: System.Net.Http.HttpClient.BackendClient.ClientHandler[101]
+      Received HTTP response headers after 3797.6265ms - 200
+info: System.Net.Http.HttpClient.BackendClient.LogicalHandler[101]
+      End processing HTTP request after 3797.7092ms - 200
+info: System.Net.Http.HttpClient.BackendClient.LogicalHandler[100]
+      Start processing HTTP request GET http://localhost:5271/api/events/categories
+info: System.Net.Http.HttpClient.BackendClient.ClientHandler[100]
+      Sending HTTP request GET http://localhost:5271/api/events/categories
+info: System.Net.Http.HttpClient.BackendClient.ClientHandler[101]
+      Received HTTP response headers after 343.7532ms - 200
+info: System.Net.Http.HttpClient.BackendClient.LogicalHandler[101]
+      End processing HTTP request after 343.8242ms - 200
+info: System.Net.Http.HttpClient.BackendClient.LogicalHandler[100]
+      Start processing HTTP request GET http://localhost:5271/api/markets?*
+info: System.Net.Http.HttpClient.BackendClient.ClientHandler[100]
+      Sending HTTP request GET http://localhost:5271/api/markets?*
+info: System.Net.Http.HttpClient.BackendClient.ClientHandler[101]
+      Received HTTP response headers after 3328.8827ms - 200
+info: System.Net.Http.HttpClient.BackendClient.LogicalHandler[101]
+      End processing HTTP request after 3328.9575ms - 200
+info: System.Net.Http.HttpClient.BackendClient.LogicalHandler[100]
+      Start processing HTTP request GET http://localhost:5271/api/events/categories
+info: System.Net.Http.HttpClient.BackendClient.ClientHandler[100]
+      Sending HTTP request GET http://localhost:5271/api/events/categories
+info: System.Net.Http.HttpClient.BackendClient.ClientHandler[101]
+      Received HTTP response headers after 189.4482ms - 200
+info: System.Net.Http.HttpClient.BackendClient.LogicalHandler[101]
+      End processing HTTP request after 189.5143ms - 200
+info: System.Net.Http.HttpClient.BackendClient.LogicalHandler[100]
+      Start processing HTTP request GET http://localhost:5271/api/markets?*
+info: System.Net.Http.HttpClient.BackendClient.ClientHandler[100]
+      Sending HTTP request GET http://localhost:5271/api/markets?*
+info: System.Net.Http.HttpClient.BackendClient.ClientHandler[101]
+      Received HTTP response headers after 3409.3201ms - 200
+info: System.Net.Http.HttpClient.BackendClient.LogicalHandler[101]
+      End processing HTTP request after 3409.4094ms - 200
+info: System.Net.Http.HttpClient.BackendClient.LogicalHandler[100]
+      Start processing HTTP request GET http://localhost:5271/api/events/categories
+info: System.Net.Http.HttpClient.BackendClient.ClientHandler[100]
+      Sending HTTP request GET http://localhost:5271/api/events/categories
+info: System.Net.Http.HttpClient.BackendClient.ClientHandler[101]
+      Received HTTP response headers after 296.9697ms - 200
+info: System.Net.Http.HttpClient.BackendClient.LogicalHandler[101]
+      End processing HTTP request after 297.0353ms - 200
+info: System.Net.Http.HttpClient.BackendClient.LogicalHandler[100]
+      Start processing HTTP request GET http://localhost:5271/api/markets?*
+info: System.Net.Http.HttpClient.BackendClient.ClientHandler[100]
+      Sending HTTP request GET http://localhost:5271/api/markets?*
+info: System.Net.Http.HttpClient.BackendClient.ClientHandler[101]
+      Received HTTP response headers after 3320.2722ms - 200
+info: System.Net.Http.HttpClient.BackendClient.LogicalHandler[101]
+      End processing HTTP request after 3320.358ms - 200
+info: System.Net.Http.HttpClient.BackendClient.LogicalHandler[100]
+      Start processing HTTP request GET http://localhost:5271/api/events/categories
+info: System.Net.Http.HttpClient.BackendClient.ClientHandler[100]
+      Sending HTTP request GET http://localhost:5271/api/events/categories
+info: System.Net.Http.HttpClient.BackendClient.ClientHandler[101]
+      Received HTTP response headers after 349.3019ms - 200
+info: System.Net.Http.HttpClient.BackendClient.LogicalHandler[101]
+      End processing HTTP request after 349.3571ms - 200
+dotnet watch ⌚ File updated: ./wwwroot/js/site.js
+dotnet watch 🔥 Hot reload of static files succeeded.
+dotnet watch ⌚ No C# changes to apply.
+info: System.Net.Http.HttpClient.BackendClient.LogicalHandler[100]
+      Start processing HTTP request GET http://localhost:5271/api/markets?*
+info: System.Net.Http.HttpClient.BackendClient.ClientHandler[100]
+      Sending HTTP request GET http://localhost:5271/api/markets?*
+info: System.Net.Http.HttpClient.BackendClient.LogicalHandler[100]
+      Start processing HTTP request GET http://localhost:5271/api/markets?*
+info: System.Net.Http.HttpClient.BackendClient.ClientHandler[100]
+      Sending HTTP request GET http://localhost:5271/api/markets?*
+info: System.Net.Http.HttpClient.BackendClient.LogicalHandler[100]
+      Start processing HTTP request GET http://localhost:5271/api/markets?*
+info: System.Net.Http.HttpClient.BackendClient.ClientHandler[100]
+      Sending HTTP request GET http://localhost:5271/api/markets?*
+info: System.Net.Http.HttpClient.BackendClient.ClientHandler[101]
+      Received HTTP response headers after 3161.0047ms - 200
+info: System.Net.Http.HttpClient.BackendClient.LogicalHandler[101]
+      End processing HTTP request after 3161.1568ms - 200
+info: System.Net.Http.HttpClient.BackendClient.LogicalHandler[100]
+      Start processing HTTP request GET http://localhost:5271/api/events/categories
+info: System.Net.Http.HttpClient.BackendClient.ClientHandler[100]
+      Sending HTTP request GET http://localhost:5271/api/events/categories
+info: System.Net.Http.HttpClient.BackendClient.ClientHandler[101]
+      Received HTTP response headers after 3157.7478ms - 200
+info: System.Net.Http.HttpClient.BackendClient.LogicalHandler[101]
+      End processing HTTP request after 3157.795ms - 200
+info: System.Net.Http.HttpClient.BackendClient.ClientHandler[101]
+      Received HTTP response headers after 3174.625ms - 200
+info: System.Net.Http.HttpClient.BackendClient.LogicalHandler[101]
+      End processing HTTP request after 3174.7208ms - 200
+info: System.Net.Http.HttpClient.BackendClient.LogicalHandler[100]
+      Start processing HTTP request GET http://localhost:5271/api/events/categories
+info: System.Net.Http.HttpClient.BackendClient.ClientHandler[100]
+      Sending HTTP request GET http://localhost:5271/api/events/categories
+info: System.Net.Http.HttpClient.BackendClient.LogicalHandler[100]
+      Start processing HTTP request GET http://localhost:5271/api/events/categories
+info: System.Net.Http.HttpClient.BackendClient.ClientHandler[100]
+      Sending HTTP request GET http://localhost:5271/api/events/categories
+info: System.Net.Http.HttpClient.BackendClient.ClientHandler[101]
+      Received HTTP response headers after 267.7757ms - 200
+info: System.Net.Http.HttpClient.BackendClient.LogicalHandler[101]
+      End processing HTTP request after 267.8103ms - 200
+info: System.Net.Http.HttpClient.BackendClient.ClientHandler[101]
+      Received HTTP response headers after 282.9412ms - 200
+info: System.Net.Http.HttpClient.BackendClient.LogicalHandler[101]
+      End processing HTTP request after 282.9873ms - 200
+info: System.Net.Http.HttpClient.BackendClient.ClientHandler[101]
+      Received HTTP response headers after 284.1377ms - 200
+info: System.Net.Http.HttpClient.BackendClient.LogicalHandler[101]
+      End processing HTTP request after 284.179ms - 200
+dotnet watch ⌚ File updated: ./wwwroot/js/login.js
+dotnet watch 🔥 Hot reload of static files succeeded.
+dotnet watch ⌚ No C# changes to apply.
+info: System.Net.Http.HttpClient.BackendClient.LogicalHandler[100]
+      Start processing HTTP request GET http://localhost:5271/api/markets?*
+info: System.Net.Http.HttpClient.BackendClient.ClientHandler[100]
+      Sending HTTP request GET http://localhost:5271/api/markets?*
+info: System.Net.Http.HttpClient.BackendClient.LogicalHandler[100]
+      Start processing HTTP request GET http://localhost:5271/api/markets?*
+info: System.Net.Http.HttpClient.BackendClient.ClientHandler[100]
+      Sending HTTP request GET http://localhost:5271/api/markets?*
+info: System.Net.Http.HttpClient.BackendClient.LogicalHandler[100]
+      Start processing HTTP request GET http://localhost:5271/api/markets?*
+info: System.Net.Http.HttpClient.BackendClient.ClientHandler[100]
+      Sending HTTP request GET http://localhost:5271/api/markets?*
+info: System.Net.Http.HttpClient.BackendClient.ClientHandler[101]
+      Received HTTP response headers after 2745.7525ms - 200
+info: System.Net.Http.HttpClient.BackendClient.ClientHandler[101]
+      Received HTTP response headers after 2741.7436ms - 200
+info: System.Net.Http.HttpClient.BackendClient.LogicalHandler[101]
+      End processing HTTP request after 2745.8294ms - 200
+info: System.Net.Http.HttpClient.BackendClient.LogicalHandler[101]
+      End processing HTTP request after 2741.7774ms - 200
+info: System.Net.Http.HttpClient.BackendClient.LogicalHandler[100]
+      Start processing HTTP request GET http://localhost:5271/api/events/categories
+info: System.Net.Http.HttpClient.BackendClient.ClientHandler[100]
+      Sending HTTP request GET http://localhost:5271/api/events/categories
+info: System.Net.Http.HttpClient.BackendClient.LogicalHandler[100]
+      Start processing HTTP request GET http://localhost:5271/api/events/categories
+info: System.Net.Http.HttpClient.BackendClient.ClientHandler[100]
+      Sending HTTP request GET http://localhost:5271/api/events/categories
+info: System.Net.Http.HttpClient.BackendClient.ClientHandler[101]
+      Received HTTP response headers after 2749.0962ms - 200
+info: System.Net.Http.HttpClient.BackendClient.LogicalHandler[101]
+      End processing HTTP request after 2749.1281ms - 200
+info: System.Net.Http.HttpClient.BackendClient.LogicalHandler[100]
+      Start processing HTTP request GET http://localhost:5271/api/events/categories
+info: System.Net.Http.HttpClient.BackendClient.ClientHandler[100]
+      Sending HTTP request GET http://localhost:5271/api/events/categories
+info: System.Net.Http.HttpClient.BackendClient.ClientHandler[101]
+      Received HTTP response headers after 314.8066ms - 200
+info: System.Net.Http.HttpClient.BackendClient.LogicalHandler[101]
+      End processing HTTP request after 314.8403ms - 200
+info: System.Net.Http.HttpClient.BackendClient.ClientHandler[101]
+      Received HTTP response headers after 310.5959ms - 200
+info: System.Net.Http.HttpClient.BackendClient.LogicalHandler[101]
+      End processing HTTP request after 310.6267ms - 200
+info: System.Net.Http.HttpClient.BackendClient.ClientHandler[101]
+      Received HTTP response headers after 315.1539ms - 200
+info: System.Net.Http.HttpClient.BackendClient.LogicalHandler[101]
+      End processing HTTP request after 315.1888ms - 200
+info: System.Net.Http.HttpClient.BackendClient.LogicalHandler[100]
+      Start processing HTTP request GET http://localhost:5271/api/markets?*
+info: System.Net.Http.HttpClient.BackendClient.ClientHandler[100]
+      Sending HTTP request GET http://localhost:5271/api/markets?*
+info: System.Net.Http.HttpClient.BackendClient.ClientHandler[101]
+      Received HTTP response headers after 3710.9185ms - 200
+info: System.Net.Http.HttpClient.BackendClient.LogicalHandler[101]
+      End processing HTTP request after 3710.9631ms - 200
+info: System.Net.Http.HttpClient.BackendClient.LogicalHandler[100]
+      Start processing HTTP request GET http://localhost:5271/api/events/categories
+info: System.Net.Http.HttpClient.BackendClient.ClientHandler[100]
+      Sending HTTP request GET http://localhost:5271/api/events/categories
+info: System.Net.Http.HttpClient.BackendClient.ClientHandler[101]
+      Received HTTP response headers after 199.3694ms - 200
+info: System.Net.Http.HttpClient.BackendClient.LogicalHandler[101]
+      End processing HTTP request after 199.4031ms - 200
+dotnet watch ⌚ File updated: ./wwwroot/js/site.js
+dotnet watch 🔥 Hot reload of static files succeeded.
+dotnet watch ⌚ No C# changes to apply.
+info: System.Net.Http.HttpClient.BackendClient.LogicalHandler[100]
+      Start processing HTTP request GET http://localhost:5271/api/markets?*
+info: System.Net.Http.HttpClient.BackendClient.ClientHandler[100]
+      Sending HTTP request GET http://localhost:5271/api/markets?*
+info: System.Net.Http.HttpClient.BackendClient.LogicalHandler[100]
+      Start processing HTTP request GET http://localhost:5271/api/markets?*
+info: System.Net.Http.HttpClient.BackendClient.ClientHandler[100]
+      Sending HTTP request GET http://localhost:5271/api/markets?*
+info: System.Net.Http.HttpClient.BackendClient.ClientHandler[101]
+      Received HTTP response headers after 3780.663ms - 200
+info: System.Net.Http.HttpClient.BackendClient.LogicalHandler[101]
+      End processing HTTP request after 3780.7119ms - 200
+info: System.Net.Http.HttpClient.BackendClient.LogicalHandler[100]
+      Start processing HTTP request GET http://localhost:5271/api/events/categories
+info: System.Net.Http.HttpClient.BackendClient.ClientHandler[100]
+      Sending HTTP request GET http://localhost:5271/api/events/categories
+info: System.Net.Http.HttpClient.BackendClient.ClientHandler[101]
+      Received HTTP response headers after 3864.2347ms - 200
+info: System.Net.Http.HttpClient.BackendClient.LogicalHandler[101]
+      End processing HTTP request after 3864.274ms - 200
+info: System.Net.Http.HttpClient.BackendClient.LogicalHandler[100]
+      Start processing HTTP request GET http://localhost:5271/api/events/categories
+info: System.Net.Http.HttpClient.BackendClient.ClientHandler[100]
+      Sending HTTP request GET http://localhost:5271/api/events/categories
+info: System.Net.Http.HttpClient.BackendClient.ClientHandler[101]
+      Received HTTP response headers after 211.2156ms - 200
+info: System.Net.Http.HttpClient.BackendClient.LogicalHandler[101]
+      End processing HTTP request after 211.2597ms - 200
+info: System.Net.Http.HttpClient.BackendClient.ClientHandler[101]
+      Received HTTP response headers after 249.4323ms - 200
+info: System.Net.Http.HttpClient.BackendClient.LogicalHandler[101]
+      End processing HTTP request after 249.4713ms - 200
+dotnet watch ⌚ File updated: ./wwwroot/js/login.js
+dotnet watch 🔥 Hot reload of static files succeeded.
+dotnet watch ⌚ No C# changes to apply.
+info: System.Net.Http.HttpClient.BackendClient.LogicalHandler[100]
+      Start processing HTTP request GET http://localhost:5271/api/markets?*
+info: System.Net.Http.HttpClient.BackendClient.ClientHandler[100]
+      Sending HTTP request GET http://localhost:5271/api/markets?*
+info: System.Net.Http.HttpClient.BackendClient.LogicalHandler[100]
+      Start processing HTTP request GET http://localhost:5271/api/markets?*
+info: System.Net.Http.HttpClient.BackendClient.ClientHandler[100]
+      Sending HTTP request GET http://localhost:5271/api/markets?*
+info: System.Net.Http.HttpClient.BackendClient.ClientHandler[101]
+      Received HTTP response headers after 2851.8805ms - 200
+info: System.Net.Http.HttpClient.BackendClient.LogicalHandler[101]
+      End processing HTTP request after 2851.9368ms - 200
+info: System.Net.Http.HttpClient.BackendClient.ClientHandler[101]
+      Received HTTP response headers after 2852.267ms - 200
+info: System.Net.Http.HttpClient.BackendClient.LogicalHandler[101]
+      End processing HTTP request after 2852.3585ms - 200
+info: System.Net.Http.HttpClient.BackendClient.LogicalHandler[100]
+      Start processing HTTP request GET http://localhost:5271/api/events/categories
+info: System.Net.Http.HttpClient.BackendClient.ClientHandler[100]
+      Sending HTTP request GET http://localhost:5271/api/events/categories
+info: System.Net.Http.HttpClient.BackendClient.LogicalHandler[100]
+      Start processing HTTP request GET http://localhost:5271/api/events/categories
+info: System.Net.Http.HttpClient.BackendClient.ClientHandler[100]
+      Sending HTTP request GET http://localhost:5271/api/events/categories
+info: System.Net.Http.HttpClient.BackendClient.ClientHandler[101]
+      Received HTTP response headers after 168.6729ms - 200
+info: System.Net.Http.HttpClient.BackendClient.LogicalHandler[101]
+      End processing HTTP request after 168.7147ms - 200
+info: System.Net.Http.HttpClient.BackendClient.ClientHandler[101]
+      Received HTTP response headers after 187.6266ms - 200
+info: System.Net.Http.HttpClient.BackendClient.LogicalHandler[101]
+      End processing HTTP request after 187.6646ms - 200
+dotnet watch ⌚ File updated: ./wwwroot/js/firebase-init.js
+dotnet watch 🔥 Hot reload of static files succeeded.
+dotnet watch ⌚ No C# changes to apply.
+info: System.Net.Http.HttpClient.BackendClient.LogicalHandler[100]
+      Start processing HTTP request GET http://localhost:5271/api/markets?*
+info: System.Net.Http.HttpClient.BackendClient.ClientHandler[100]
+      Sending HTTP request GET http://localhost:5271/api/markets?*
+info: System.Net.Http.HttpClient.BackendClient.LogicalHandler[100]
+      Start processing HTTP request GET http://localhost:5271/api/markets?*
+info: System.Net.Http.HttpClient.BackendClient.ClientHandler[100]
+      Sending HTTP request GET http://localhost:5271/api/markets?*
+info: System.Net.Http.HttpClient.BackendClient.ClientHandler[101]
+      Received HTTP response headers after 2914.3378ms - 200
+info: System.Net.Http.HttpClient.BackendClient.LogicalHandler[101]
+      End processing HTTP request after 2914.3966ms - 200
+info: System.Net.Http.HttpClient.BackendClient.LogicalHandler[100]
+      Start processing HTTP request GET http://localhost:5271/api/events/categories
+info: System.Net.Http.HttpClient.BackendClient.ClientHandler[100]
+      Sending HTTP request GET http://localhost:5271/api/events/categories
+info: System.Net.Http.HttpClient.BackendClient.ClientHandler[101]
+      Received HTTP response headers after 2919.8583ms - 200
+info: System.Net.Http.HttpClient.BackendClient.LogicalHandler[101]
+      End processing HTTP request after 2919.899ms - 200
+info: System.Net.Http.HttpClient.BackendClient.LogicalHandler[100]
+      Start processing HTTP request GET http://localhost:5271/api/events/categories
+info: System.Net.Http.HttpClient.BackendClient.ClientHandler[100]
+      Sending HTTP request GET http://localhost:5271/api/events/categories
+info: System.Net.Http.HttpClient.BackendClient.ClientHandler[101]
+      Received HTTP response headers after 291.4154ms - 200
+info: System.Net.Http.HttpClient.BackendClient.LogicalHandler[101]
+      End processing HTTP request after 291.4472ms - 200
+info: System.Net.Http.HttpClient.BackendClient.ClientHandler[101]
+      Received HTTP response headers after 303.9212ms - 200
+info: System.Net.Http.HttpClient.BackendClient.LogicalHandler[101]
+      End processing HTTP request after 303.9697ms - 200
+dotnet watch ⌚ File updated: ./wwwroot/js/firebase-init-v2.js
+dotnet watch 🔥 Hot reload of static files succeeded.
+dotnet watch ⌚ No C# changes to apply.
+info: System.Net.Http.HttpClient.BackendClient.LogicalHandler[100]
+      Start processing HTTP request GET http://localhost:5271/api/markets?*
+info: System.Net.Http.HttpClient.BackendClient.ClientHandler[100]
+      Sending HTTP request GET http://localhost:5271/api/markets?*
+info: System.Net.Http.HttpClient.BackendClient.LogicalHandler[100]
+      Start processing HTTP request GET http://localhost:5271/api/markets?*
+info: System.Net.Http.HttpClient.BackendClient.ClientHandler[100]
+      Sending HTTP request GET http://localhost:5271/api/markets?*
+info: System.Net.Http.HttpClient.BackendClient.ClientHandler[101]
+      Received HTTP response headers after 2972.5637ms - 200
+info: System.Net.Http.HttpClient.BackendClient.LogicalHandler[101]
+      End processing HTTP request after 2972.7436ms - 200
+info: System.Net.Http.HttpClient.BackendClient.LogicalHandler[100]
+      Start processing HTTP request GET http://localhost:5271/api/events/categories
+info: System.Net.Http.HttpClient.BackendClient.ClientHandler[100]
+      Sending HTTP request GET http://localhost:5271/api/events/categories
+info: System.Net.Http.HttpClient.BackendClient.ClientHandler[101]
+      Received HTTP response headers after 2982.244ms - 200
+info: System.Net.Http.HttpClient.BackendClient.LogicalHandler[101]
+      End processing HTTP request after 2982.2836ms - 200
+info: System.Net.Http.HttpClient.BackendClient.LogicalHandler[100]
+      Start processing HTTP request GET http://localhost:5271/api/events/categories
+info: System.Net.Http.HttpClient.BackendClient.ClientHandler[100]
+      Sending HTTP request GET http://localhost:5271/api/events/categories
+info: System.Net.Http.HttpClient.BackendClient.ClientHandler[101]
+      Received HTTP response headers after 185.0267ms - 200
+info: System.Net.Http.HttpClient.BackendClient.LogicalHandler[101]
+      End processing HTTP request after 185.0778ms - 200
+info: System.Net.Http.HttpClient.BackendClient.ClientHandler[101]
+      Received HTTP response headers after 179.0814ms - 200
+info: System.Net.Http.HttpClient.BackendClient.LogicalHandler[101]
+      End processing HTTP request after 179.1062ms - 200
+dotnet watch ⌚ File updated: ./wwwroot/js/login.js
+dotnet watch 🔥 Hot reload of static files succeeded.
+dotnet watch ⌚ No C# changes to apply.
+info: System.Net.Http.HttpClient.BackendClient.LogicalHandler[100]
+      Start processing HTTP request GET http://localhost:5271/api/markets?*
+info: System.Net.Http.HttpClient.BackendClient.ClientHandler[100]
+      Sending HTTP request GET http://localhost:5271/api/markets?*
+info: System.Net.Http.HttpClient.BackendClient.LogicalHandler[100]
+      Start processing HTTP request GET http://localhost:5271/api/markets?*
+info: System.Net.Http.HttpClient.BackendClient.ClientHandler[100]
+      Sending HTTP request GET http://localhost:5271/api/markets?*
+info: System.Net.Http.HttpClient.BackendClient.ClientHandler[101]
+      Received HTTP response headers after 3050.5852ms - 200
+info: System.Net.Http.HttpClient.BackendClient.LogicalHandler[101]
+      End processing HTTP request after 3050.65ms - 200
+info: System.Net.Http.HttpClient.BackendClient.ClientHandler[101]
+      Received HTTP response headers after 3049.876ms - 200
+info: System.Net.Http.HttpClient.BackendClient.LogicalHandler[101]
+      End processing HTTP request after 3049.9131ms - 200
+info: System.Net.Http.HttpClient.BackendClient.LogicalHandler[100]
+      Start processing HTTP request GET http://localhost:5271/api/events/categories
+info: System.Net.Http.HttpClient.BackendClient.ClientHandler[100]
+      Sending HTTP request GET http://localhost:5271/api/events/categories
+info: System.Net.Http.HttpClient.BackendClient.LogicalHandler[100]
+      Start processing HTTP request GET http://localhost:5271/api/events/categories
+info: System.Net.Http.HttpClient.BackendClient.ClientHandler[100]
+      Sending HTTP request GET http://localhost:5271/api/events/categories
+info: System.Net.Http.HttpClient.BackendClient.ClientHandler[101]
+      Received HTTP response headers after 165.8671ms - 200
+info: System.Net.Http.HttpClient.BackendClient.LogicalHandler[101]
+      End processing HTTP request after 165.9346ms - 200
+info: System.Net.Http.HttpClient.BackendClient.ClientHandler[101]
+      Received HTTP response headers after 188.5408ms - 200
+info: System.Net.Http.HttpClient.BackendClient.LogicalHandler[101]
+      End processing HTTP request after 188.5897ms - 200
+info: System.Net.Http.HttpClient.BackendClient.LogicalHandler[100]
+      Start processing HTTP request GET http://localhost:5271/api/markets?*
+info: System.Net.Http.HttpClient.BackendClient.ClientHandler[100]
+      Sending HTTP request GET http://localhost:5271/api/markets?*
+info: System.Net.Http.HttpClient.BackendClient.ClientHandler[101]
+      Received HTTP response headers after 3388.7785ms - 200
+info: System.Net.Http.HttpClient.BackendClient.LogicalHandler[101]
+      End processing HTTP request after 3388.8292ms - 200
+info: System.Net.Http.HttpClient.BackendClient.LogicalHandler[100]
+      Start processing HTTP request GET http://localhost:5271/api/events/categories
+info: System.Net.Http.HttpClient.BackendClient.ClientHandler[100]
+      Sending HTTP request GET http://localhost:5271/api/events/categories
+info: System.Net.Http.HttpClient.BackendClient.ClientHandler[101]
+      Received HTTP response headers after 262.2664ms - 200
+info: System.Net.Http.HttpClient.BackendClient.LogicalHandler[101]
+      End processing HTTP request after 262.3187ms - 200
+dotnet watch ⌚ File deleted: /Users/amir/Documents/dev/kalshi-signals/shared/KSignals.DTO/bin
+dotnet watch ⌚ No C# changes to apply.
+info: System.Net.Http.HttpClient.BackendClient.LogicalHandler[100]
+      Start processing HTTP request GET http://localhost:5271/api/markets?*
+info: System.Net.Http.HttpClient.BackendClient.ClientHandler[100]
+      Sending HTTP request GET http://localhost:5271/api/markets?*
+dotnet watch ⌚ File deleted: /Users/amir/Documents/dev/kalshi-signals/shared/KSignals.DTO/obj
+dotnet watch ⌚ No C# changes to apply.
+info: System.Net.Http.HttpClient.BackendClient.LogicalHandler[100]
+      Start processing HTTP request GET http://localhost:5271/api/markets?*
+info: System.Net.Http.HttpClient.BackendClient.ClientHandler[100]
+      Sending HTTP request GET http://localhost:5271/api/markets?*
+info: System.Net.Http.HttpClient.BackendClient.ClientHandler[101]
+      Received HTTP response headers after 3716.2725ms - 200
+info: System.Net.Http.HttpClient.BackendClient.LogicalHandler[101]
+      End processing HTTP request after 3716.3077ms - 200
+info: System.Net.Http.HttpClient.BackendClient.LogicalHandler[100]
+      Start processing HTTP request GET http://localhost:5271/api/events/categories
+info: System.Net.Http.HttpClient.BackendClient.ClientHandler[100]
+      Sending HTTP request GET http://localhost:5271/api/events/categories
+info: System.Net.Http.HttpClient.BackendClient.ClientHandler[101]
+      Received HTTP response headers after 248.6969ms - 200
+info: System.Net.Http.HttpClient.BackendClient.LogicalHandler[101]
+      End processing HTTP request after 248.7434ms - 200
+info: System.Net.Http.HttpClient.BackendClient.ClientHandler[101]
+      Received HTTP response headers after 3513.9624ms - 200
+info: System.Net.Http.HttpClient.BackendClient.LogicalHandler[101]
+      End processing HTTP request after 3514.026ms - 200
+info: System.Net.Http.HttpClient.BackendClient.LogicalHandler[100]
+      Start processing HTTP request GET http://localhost:5271/api/events/categories
+info: System.Net.Http.HttpClient.BackendClient.ClientHandler[100]
+      Sending HTTP request GET http://localhost:5271/api/events/categories
+info: System.Net.Http.HttpClient.BackendClient.ClientHandler[101]
+      Received HTTP response headers after 247.6844ms - 200
+info: System.Net.Http.HttpClient.BackendClient.LogicalHandler[101]
+      End processing HTTP request after 247.7207ms - 200

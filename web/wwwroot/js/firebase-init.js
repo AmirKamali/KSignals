@@ -74,9 +74,6 @@
             if (!res.ok) return;
             const json = await res.json();
             if (json?.token) {
-                localStorage.setItem("ksignals_jwt", json.token);
-                localStorage.setItem("ksignals_username", json.username || "");
-                localStorage.setItem("ksignals_name", json.name || "");
                 updateUi(json.name || json.username || user.email || "Logged in");
             }
         } catch (err) {

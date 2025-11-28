@@ -1,13 +1,12 @@
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.AspNetCore.Mvc.RazorPages;
 using web_asp.Services;
 
-namespace web_asp.Pages;
+namespace web_asp.Pages.User;
 
-public class SetUsernameModel : PageModel
+public class UsernameModel : AuthenticatedPageModel
 {
     private readonly BackendClient _backendClient;
-    private readonly ILogger<SetUsernameModel> _logger;
+    private readonly ILogger<UsernameModel> _logger;
 
     [BindProperty]
     public string Username { get; set; } = string.Empty;
@@ -17,7 +16,7 @@ public class SetUsernameModel : PageModel
 
     public string? ErrorMessage { get; set; }
 
-    public SetUsernameModel(BackendClient backendClient, ILogger<SetUsernameModel> logger)
+    public UsernameModel(BackendClient backendClient, ILogger<UsernameModel> logger)
     {
         _backendClient = backendClient;
         _logger = logger;
@@ -25,6 +24,8 @@ public class SetUsernameModel : PageModel
 
     public void OnGet()
     {
+        // Get Firebase ID from parent class method if needed
+        FirebaseId = GetFirebaseIdFromCookies() ?? string.Empty;
     }
 
     public async Task<IActionResult> OnPostAsync()
@@ -73,42 +74,55 @@ public class SetUsernameModel : PageModel
 
         if (response != null)
         {
+            // Only use Secure flag in production (HTTPS)
+            var isSecure = Request.IsHttps;
+            var expires = DateTimeOffset.UtcNow.AddDays(7);
+
             // Store the token in a cookie
             Response.Cookies.Append("ksignals_jwt", response.Token, new CookieOptions
             {
                 HttpOnly = true,
-                Secure = true,
+                Secure = isSecure,
                 SameSite = SameSiteMode.Strict,
-                Expires = DateTimeOffset.UtcNow.AddDays(7)
+                Expires = expires
+            });
+
+            // Store Firebase ID for authentication check
+            Response.Cookies.Append("ksignals_firebase_id", FirebaseId, new CookieOptions
+            {
+                HttpOnly = true,
+                Secure = isSecure,
+                SameSite = SameSiteMode.Strict,
+                Expires = expires
             });
 
             // Store user info in cookies for client-side access
             Response.Cookies.Append("ksignals_username", response.Username, new CookieOptions
             {
                 HttpOnly = false,
-                Secure = true,
+                Secure = isSecure,
                 SameSite = SameSiteMode.Strict,
-                Expires = DateTimeOffset.UtcNow.AddDays(7)
+                Expires = expires
             });
 
             Response.Cookies.Append("ksignals_name", response.Name, new CookieOptions
             {
                 HttpOnly = false,
-                Secure = true,
+                Secure = isSecure,
                 SameSite = SameSiteMode.Strict,
-                Expires = DateTimeOffset.UtcNow.AddDays(7)
+                Expires = expires
             });
 
             Response.Cookies.Append("ksignals_email", response.Email, new CookieOptions
             {
                 HttpOnly = false,
-                Secure = true,
+                Secure = isSecure,
                 SameSite = SameSiteMode.Strict,
-                Expires = DateTimeOffset.UtcNow.AddDays(7)
+                Expires = expires
             });
         }
 
         // Redirect to home page on success
-        return RedirectToPage("/Index");
+        return Redirect("/");
     }
 }

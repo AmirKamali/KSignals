@@ -9,6 +9,11 @@ const firebaseConfig = {
     measurementId: "G-393TTYJYMY"
 };
 
+const getCookie = (name) => {
+    const cookie = document.cookie.split(';').find(c => c.trim().startsWith(name + '='));
+    return cookie ? decodeURIComponent(cookie.split('=')[1]) : null;
+};
+
 if (window.firebase) {
     console.log("Login.js: Initializing Firebase...");
     try {
@@ -111,10 +116,24 @@ document.addEventListener('DOMContentLoaded', () => {
 
             const json = await res.json();
             if (json?.token) {
-                localStorage.setItem("ksignals_jwt", json.token);
-                localStorage.setItem("ksignals_username", json.username || "");
-                localStorage.setItem("ksignals_name", json.name || "");
-                localStorage.setItem("ksignals_email", json.email || "");
+                const expires = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toUTCString();
+                // Only use Secure flag in production (HTTPS)
+                const isSecure = window.location.protocol === 'https:';
+                const secureFlag = isSecure ? '; Secure' : '';
+
+                document.cookie = `ksignals_jwt=${json.token}; expires=${expires}; path=/; SameSite=Strict${secureFlag}`;
+                document.cookie = `ksignals_firebase_id=${user.uid}; expires=${expires}; path=/; SameSite=Strict${secureFlag}`;
+                document.cookie = `ksignals_username=${json.username || ""}; expires=${expires}; path=/; SameSite=Strict${secureFlag}`;
+                document.cookie = `ksignals_name=${json.name || ""}; expires=${expires}; path=/; SameSite=Strict${secureFlag}`;
+                document.cookie = `ksignals_email=${json.email || ""}; expires=${expires}; path=/; SameSite=Strict${secureFlag}`;
+
+                console.log("Cookies set successfully:", {
+                    jwt: !!json.token,
+                    firebaseId: !!user.uid,
+                    username: json.username,
+                    isSecure
+                });
+
                 return true;
             }
             return false;
@@ -155,7 +174,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         showStatus("Login successful! Redirecting...");
 
                         // Check if user needs to set a username
-                        const username = localStorage.getItem("ksignals_username");
+                        const username = getCookie("ksignals_username");
                         console.log("Checking username:", username);
 
                         // User needs username if: no username, username is email, username is 'null' string, or username is uid
@@ -165,9 +184,9 @@ document.addEventListener('DOMContentLoaded', () => {
                                              username === result.user.uid;
 
                         if (needsUsername) {
-                            console.log("User needs to set username, redirecting to SetUsername");
+                            console.log("User needs to set username, redirecting to Username page");
                             setTimeout(() => {
-                                window.location.href = "/SetUsername";
+                                window.location.href = "/user/username";
                             }, 500);
                         } else {
                             const redirectUrl = window.returnUrl || "/";
@@ -199,10 +218,15 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Check if user is already logged in
     auth.onAuthStateChanged(user => {
-        if (user && localStorage.getItem("ksignals_jwt")) {
-            // User is already logged in, redirect back
-            console.log("User already logged in, redirecting...");
-            window.location.href = window.returnUrl || "/";
+        if (user) {
+            const hasTokenCookie = !!getCookie("ksignals_jwt");
+            const hasUsername = !!getCookie("ksignals_username");
+
+            if (hasTokenCookie || hasUsername) {
+                // User is already logged in, redirect back
+                console.log("User already logged in, redirecting...");
+                window.location.href = window.returnUrl || "/";
+            }
         }
     });
 });

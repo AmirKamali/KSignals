@@ -29,18 +29,20 @@
 
     function updateAccountUI() {
         console.log("Updating account UI...");
+        // JWT may be httpOnly now; rely on readable cookies or username
         const token = getCookie("ksignals_jwt");
         const username = getCookie("ksignals_username");
 
-        console.log("Token:", !!token, "Username:", username);
+        console.log("Token readable:", !!token, "Username:", username);
 
         const loginBtn = document.getElementById("ksignals-login-btn");
         const accountDropdown = document.getElementById("ksignals-account-dropdown");
 
         // Check if user has a valid username (not email, not null)
         const hasValidUsername = username && !username.includes('@') && username !== 'null';
+        const isAuthenticated = !!token || hasValidUsername;
 
-        if (token && hasValidUsername) {
+        if (isAuthenticated && hasValidUsername) {
             // User is logged in - show account dropdown
             console.log("Showing account dropdown");
             if (loginBtn) loginBtn.style.display = "none";
@@ -82,9 +84,11 @@
             logoutBtn.addEventListener("click", () => {
                 // Clear cookies
                 document.cookie = "ksignals_jwt=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
+                document.cookie = "ksignals_firebase_id=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
                 document.cookie = "ksignals_username=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
                 document.cookie = "ksignals_name=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
                 document.cookie = "ksignals_email=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
+
 
                 // Sign out from Firebase if available
                 if (window.firebase && window.firebase.auth) {
