@@ -102,10 +102,13 @@ kalshi-signals/
 If you get a "port already in use" error:
 
 ```bash
+# Use the kill_backend script to kill processes on port 5271
+./kill_backend.sh
+
 # Kill all dotnet processes
 killall -9 dotnet
 
-# Or kill specific ports
+# Or kill specific ports manually
 lsof -ti :3011 | xargs kill -9
 lsof -ti :5271 | xargs kill -9
 ```
@@ -132,6 +135,7 @@ rm -rf web/bin web/obj backend/KSignal.API/bin backend/KSignal.API/obj
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `BACKEND_API_BASE_URL` | `http://localhost:5271` | Backend API base URL |
+| `JWT_SECRET` | `dev-secret-key-...` | Secret key for JWT token signing (min 32 chars) |
 | `ASPNETCORE_ENVIRONMENT` | `Development` | ASP.NET environment |
 
 ## Database

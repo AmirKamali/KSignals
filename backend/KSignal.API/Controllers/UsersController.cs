@@ -69,6 +69,60 @@ public class UsersController : ControllerBase
         return Ok(new { ok = true });
     }
 
+    [HttpPost("setUsername")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    public async Task<IActionResult> SetUsername([FromBody] SetUsernameRequest request, CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(request.FirebaseId))
+        {
+            return BadRequest(new { error = "firebaseId is required" });
+        }
+
+        if (string.IsNullOrWhiteSpace(request.Username))
+        {
+            return BadRequest(new { error = "username is required" });
+        }
+
+        // Validate username format (alphanumeric and underscores only, 3-30 chars)
+        if (!System.Text.RegularExpressions.Regex.IsMatch(request.Username, @"^[a-zA-Z0-9_]{3,30}$"))
+        {
+            return BadRequest(new { error = "Username must be 3-30 characters and contain only letters, numbers, and underscores" });
+        }
+
+        await _db.Database.EnsureCreatedAsync(cancellationToken);
+
+        // Check if username is already taken by another user
+        var existingUser = await _db.Users.FirstOrDefaultAsync(u => u.Username == request.Username, cancellationToken);
+        if (existingUser != null && existingUser.FirebaseId != request.FirebaseId)
+        {
+            return BadRequest(new { error = "Username is already taken" });
+        }
+
+        // Find user by FirebaseId
+        var user = await _db.Users.FirstOrDefaultAsync(u => u.FirebaseId == request.FirebaseId, cancellationToken);
+        if (user == null)
+        {
+            return BadRequest(new { error = "User not found" });
+        }
+
+        user.Username = request.Username;
+        user.UpdatedAt = DateTime.UtcNow;
+        await _db.SaveChangesAsync(cancellationToken);
+
+        // Generate new JWT with updated username
+        var token = CreateJwt(user);
+        var response = new SignInResponse
+        {
+            Token = token,
+            Username = user.Username,
+            Name = $"{user.FirstName} {user.LastName}".Trim(),
+            Email = user.Email ?? string.Empty
+        };
+
+        return Ok(response);
+    }
+
     [HttpPost("login")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
@@ -115,7 +169,8 @@ public class UsersController : ControllerBase
         {
             Token = token,
             Username = user.Username ?? user.Email ?? user.FirebaseId,
-            Name = $"{user.FirstName} {user.LastName}".Trim()
+            Name = $"{user.FirstName} {user.LastName}".Trim(),
+            Email = user.Email ?? string.Empty
         };
 
         return Ok(response);

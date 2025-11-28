@@ -47,8 +47,9 @@ check_port 3011 || exit 1
 echo -e "${GREEN}✓ Ports available${NC}"
 echo ""
 
-# Set environment variable for backend URL
+# Set environment variables
 export BACKEND_API_BASE_URL="http://localhost:5271"
+export JWT_SECRET="vS2d7BbiCp5AKQBaKnKzhuDTamgh1g+Sw0vFkbQ/qKxRnEqUlenrYH4ZCDk5tUoW"
 
 # Create logs directory if it doesn't exist
 mkdir -p logs

@@ -20,8 +20,30 @@
                     <a asp-area="" asp-page="/Markets/Index" class="nav-link">Markets</a>
                 </nav>
                 <div class="nav-actions">
-                    <span id="ksignals-user-display" class="nav-user"></span>
                     <a asp-area="" asp-page="/Login" asp-route-returnUrl="@Context.Request.Path" class="btn btn-primary" id="ksignals-login-btn">Login</a>
+                    <div class="account-dropdown" id="ksignals-account-dropdown" style="display: none;">
+                        <button class="btn btn-primary account-btn" id="ksignals-account-btn">
+                            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                <path d="M8 8a3 3 0 100-6 3 3 0 000 6zM8 9.5c-3.5 0-6.5 1.8-6.5 4v1h13v-1c0-2.2-3-4-6.5-4z" fill="currentColor"/>
+                            </svg>
+                            Account
+                        </button>
+                        <div class="account-menu" id="ksignals-account-menu">
+                            <div class="account-menu-item account-username-item" id="ksignals-account-username"></div>
+                            <a href="/Account" class="account-menu-item">
+                                <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                    <path d="M8 8a3 3 0 100-6 3 3 0 000 6zM8 9.5c-3.5 0-6.5 1.8-6.5 4v1h13v-1c0-2.2-3-4-6.5-4z" fill="currentColor"/>
+                                </svg>
+                                My Account
+                            </a>
+                            <button class="account-menu-item account-logout-btn" id="ksignals-logout-btn">
+                                <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                    <path d="M6 14H3a1 1 0 01-1-1V3a1 1 0 011-1h3M11 11l3-3-3-3M14 8H6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+                                </svg>
+                                Logout
+                            </button>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>

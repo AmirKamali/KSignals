@@ -19,6 +19,45 @@ public class BackendClient
         _options = options.Value;
     }
 
+    public async Task<(bool Success, string? ErrorMessage, KSignals.DTO.SignInResponse? Response)> SetUsernameAsync(string firebaseId, string username)
+    {
+        try
+        {
+            var request = new KSignals.DTO.SetUsernameRequest
+            {
+                FirebaseId = firebaseId,
+                Username = username
+            };
+
+            var url = $"{_options.BaseUrl.TrimEnd('/')}/api/users/setUsername";
+            var content = new StringContent(
+                JsonSerializer.Serialize(request),
+                System.Text.Encoding.UTF8,
+                "application/json");
+
+            using var response = await _httpClient.PostAsync(url, content);
+            var responseBody = await response.Content.ReadAsStringAsync();
+
+            if (!response.IsSuccessStatusCode)
+            {
+                using var doc = JsonDocument.Parse(responseBody);
+                if (doc.RootElement.TryGetProperty("error", out var errorElement))
+                {
+                    return (false, errorElement.GetString() ?? "Failed to set username", null);
+                }
+                return (false, "Failed to set username", null);
+            }
+
+            var signInResponse = JsonSerializer.Deserialize<KSignals.DTO.SignInResponse>(responseBody, _jsonOptions);
+            return (true, null, signInResponse);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to call setUsername API");
+            return (false, "An error occurred. Please try again.", null);
+        }
+    }
+
     public async Task<IReadOnlyList<Market>> GetHighVolumeMarketsAsync(int limit = 100)
     {
         var response = await GetBackendMarketsAsync(new MarketQuery { PageSize = limit });

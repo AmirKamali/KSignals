@@ -1,0 +1,45 @@
+@page
+@model SetUsernameModel
+@{
+    ViewData["Title"] = "Set Username";
+}
+
+<div class="login-container">
+    <div class="login-card">
+        <h1 class="login-title">Choose Your Username</h1>
+        <p class="login-subtitle">Pick a unique username for your account</p>
+
+        <form method="post" class="username-form">
+            <input type="hidden" asp-for="FirebaseId" id="firebase-id-input" />
+
+            <div class="form-group">
+                <label for="Username" class="form-label">Username</label>
+                <div class="username-input-wrapper">
+                    <span class="username-prefix">@@</span>
+                    <input
+                        asp-for="Username"
+                        type="text"
+                        class="form-input"
+                        placeholder="username"
+                        autocomplete="off"
+                        maxlength="30"
+                        required
+                    />
+                </div>
+                @if (!string.IsNullOrEmpty(Model.ErrorMessage))
+                {
+                    <div class="form-error" style="display: block;">@Model.ErrorMessage</div>
+                }
+                <div class="form-hint">3-30 characters. Letters, numbers, and underscores only.</div>
+            </div>
+
+            <button type="submit" class="btn btn-primary btn-full">
+                Continue
+            </button>
+        </form>
+    </div>
+</div>
+
+@section Scripts {
+    <script src="~/js/set-username.js" asp-append-version="true"></script>
+}

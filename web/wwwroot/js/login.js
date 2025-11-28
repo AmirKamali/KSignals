@@ -98,7 +98,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 },
                 body: JSON.stringify({
                     firebaseId: user.uid,
-                    username: user.displayName || user.email || user.uid,
+                    username: null,  // Don't set username during login - user will set it later
                     firstName,
                     lastName,
                     email: user.email
@@ -114,6 +114,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 localStorage.setItem("ksignals_jwt", json.token);
                 localStorage.setItem("ksignals_username", json.username || "");
                 localStorage.setItem("ksignals_name", json.name || "");
+                localStorage.setItem("ksignals_email", json.email || "");
                 return true;
             }
             return false;
@@ -152,11 +153,29 @@ document.addEventListener('DOMContentLoaded', () => {
 
                     if (loginSuccess) {
                         showStatus("Login successful! Redirecting...");
-                        const redirectUrl = window.returnUrl || "/";
-                        console.log("Redirecting to:", redirectUrl);
-                        setTimeout(() => {
-                            window.location.href = redirectUrl;
-                        }, 500);
+
+                        // Check if user needs to set a username
+                        const username = localStorage.getItem("ksignals_username");
+                        console.log("Checking username:", username);
+
+                        // User needs username if: no username, username is email, username is 'null' string, or username is uid
+                        const needsUsername = !username ||
+                                             username === 'null' ||
+                                             username.includes('@') ||
+                                             username === result.user.uid;
+
+                        if (needsUsername) {
+                            console.log("User needs to set username, redirecting to SetUsername");
+                            setTimeout(() => {
+                                window.location.href = "/SetUsername";
+                            }, 500);
+                        } else {
+                            const redirectUrl = window.returnUrl || "/";
+                            console.log("Redirecting to:", redirectUrl);
+                            setTimeout(() => {
+                                window.location.href = redirectUrl;
+                            }, 500);
+                        }
                     } else {
                         throw new Error("Backend authentication failed");
                     }

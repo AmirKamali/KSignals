@@ -20,7 +20,9 @@
       "Bash(export BACKEND_API_BASE_URL=\"http://localhost:5271\")",
       "Bash(chmod:*)",
       "Bash(./run_dev.sh)",
-      "Bash(cat:*)"
+      "Bash(cat:*)",
+      "Bash(./kill_backend.sh)",
+      "Bash(echo:*)"
     ],
     "deny": [],
     "ask": []
