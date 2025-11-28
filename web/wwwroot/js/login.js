@@ -1,12 +1,60 @@
-(() => {
-    if (!window.firebase || !window.backendBaseUrl) {
-        console.error("Firebase or backend URL not initialized");
+// Inline Firebase Initialization
+const firebaseConfig = {
+    apiKey: "AIzaSyB1hIE0843ovq2tDJM6hc_z9BX2uE4uX5M",
+    authDomain: "ksignals-5caa3.firebaseapp.com",
+    projectId: "ksignals-5caa3",
+    storageBucket: "ksignals-5caa3.firebasestorage.app",
+    messagingSenderId: "561592439844",
+    appId: "1:561592439844:web:b5d4330a7cf04d2ab274b1",
+    measurementId: "G-393TTYJYMY"
+};
+
+if (window.firebase) {
+    console.log("Login.js: Initializing Firebase...");
+    try {
+        firebase.initializeApp(firebaseConfig);
+        console.log("Login.js: Firebase initialized successfully");
+    } catch (e) {
+        if (e.code === 'app/duplicate-app') {
+            console.log("Login.js: Firebase already initialized");
+        } else {
+            console.error("Login.js: Firebase initialization failed", e);
+        }
+    }
+} else {
+    console.error("Login.js: window.firebase not found!");
+}
+
+if (!window.backendBaseUrl) {
+    console.warn("Login.js: backendBaseUrl not found, some features may not work.");
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    console.log("Login.js - DOM loaded");
+    console.log("Firebase available:", !!window.firebase);
+    console.log("Backend URL:", window.backendBaseUrl);
+
+    if (!window.firebase) {
+        console.error("Firebase not initialized - waiting...");
         return;
     }
 
-    const auth = firebase.auth();
+
+    // Initialize Firebase auth
+    let auth;
+    try {
+        auth = firebase.auth();
+        console.log("Firebase auth initialized:", !!auth);
+    } catch (err) {
+        console.error("Failed to initialize Firebase auth:", err);
+        return;
+    }
+
     const loginBtn = document.getElementById("google-login-btn");
     const loginStatus = document.getElementById("login-status");
+
+    console.log("Login button found:", !!loginBtn);
+    console.log("Login status found:", !!loginStatus);
 
     async function syncUser(user) {
         try {
@@ -83,14 +131,19 @@
     }
 
     if (loginBtn) {
+        console.log("Attaching click event to login button");
         loginBtn.addEventListener("click", async () => {
+            console.log("Login button clicked!");
             try {
                 loginBtn.disabled = true;
                 loginBtn.textContent = "Signing in...";
                 showStatus("Opening Google sign-in...");
 
+                console.log("Creating Google auth provider...");
                 const provider = new firebase.auth.GoogleAuthProvider();
+                console.log("Opening sign-in popup...");
                 const result = await auth.signInWithPopup(provider);
+                console.log("Sign-in successful:", !!result.user);
 
                 if (result.user) {
                     showStatus("Authenticating with backend...");
@@ -99,8 +152,10 @@
 
                     if (loginSuccess) {
                         showStatus("Login successful! Redirecting...");
+                        const redirectUrl = window.returnUrl || "/";
+                        console.log("Redirecting to:", redirectUrl);
                         setTimeout(() => {
-                            window.location.href = returnUrl || "/";
+                            window.location.href = redirectUrl;
                         }, 500);
                     } else {
                         throw new Error("Backend authentication failed");
@@ -127,7 +182,8 @@
     auth.onAuthStateChanged(user => {
         if (user && localStorage.getItem("ksignals_jwt")) {
             // User is already logged in, redirect back
-            window.location.href = returnUrl || "/";
+            console.log("User already logged in, redirecting...");
+            window.location.href = window.returnUrl || "/";
         }
     });
-})();
+});

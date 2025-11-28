@@ -16,7 +16,11 @@
       "Bash(time curl -s \"http://localhost:3006/api/markets?category=World&date=this_year\")",
       "Bash(pkill:*)",
       "Bash(killall:*)",
-      "Bash(xargs kill -9)"
+      "Bash(xargs kill -9)",
+      "Bash(export BACKEND_API_BASE_URL=\"http://localhost:5271\")",
+      "Bash(chmod:*)",
+      "Bash(./run_dev.sh)",
+      "Bash(cat:*)"
     ],
     "deny": [],
     "ask": []

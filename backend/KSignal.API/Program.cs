@@ -7,6 +7,16 @@ using KSignal.API.Services;
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy("AllowAll",
+        builder =>
+        {
+            builder.AllowAnyOrigin()
+                   .AllowAnyMethod()
+                   .AllowAnyHeader();
+        });
+});
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(c =>
@@ -115,6 +125,8 @@ if (app.Environment.IsDevelopment())
     app.UseSwaggerUI();
     // Don't force HTTPS redirect in development
 }
+
+app.UseCors("AllowAll");
 
 app.UseAuthorization();
 app.MapControllers();

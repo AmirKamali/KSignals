@@ -12,3 +12,4 @@ public class CategoryRefreshStatus
     public string? Tag { get; set; }
 }
 
+
