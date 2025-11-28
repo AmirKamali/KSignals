@@ -1,4 +1,6 @@
-﻿<!DOCTYPE html>
+﻿@using Microsoft.Extensions.Configuration
+@inject IConfiguration Configuration
+<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="utf-8" />
@@ -17,12 +19,22 @@
                     <a asp-area="" asp-page="/Index" class="nav-link">Home</a>
                     <a asp-area="" asp-page="/Markets/Index" class="nav-link">Markets</a>
                 </nav>
+                <div class="nav-actions">
+                    <span id="ksignals-user-display" class="nav-user"></span>
+                    <a asp-area="" asp-page="/Login" asp-route-returnUrl="@Context.Request.Path" class="btn btn-primary" id="ksignals-login-btn">Login</a>
+                </div>
             </div>
         </div>
     </header>
 
     @RenderBody()
 
+    <script>
+        window.backendBaseUrl = '@(Environment.GetEnvironmentVariable("BACKEND_API_BASE_URL") ?? Configuration.GetSection("Backend")["BaseUrl"] ?? "http://localhost:3006")';
+    </script>
+    <script src="https://www.gstatic.com/firebasejs/11.0.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/11.0.1/firebase-auth-compat.js"></script>
+    <script src="~/js/firebase-init.js" asp-append-version="true"></script>
     <script src="~/js/site.js" asp-append-version="true"></script>
     @await RenderSectionAsync("Scripts", required: false)
 </body>

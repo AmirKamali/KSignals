@@ -11,10 +11,12 @@
     <PackageReference Include="StackExchange.Redis" Version="2.10.1" />
     <PackageReference Include="Swashbuckle.AspNetCore" Version="6.6.2" />
     <PackageReference Include="Pomelo.EntityFrameworkCore.MySql" Version="8.0.2" />
+    <PackageReference Include="System.IdentityModel.Tokens.Jwt" Version="7.6.2" />
   </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\Kalshi.Api\Kalshi.Api.csproj" />
+    <ProjectReference Include="..\..\shared\KSignals.DTO\KSignals.DTO.csproj" />
   </ItemGroup>
 
 </Project>

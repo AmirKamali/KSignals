@@ -3,14 +3,15 @@ using Microsoft.EntityFrameworkCore;
 
 namespace KSignal.API.Data;
 
-public class KalshiDbContext : DbContext
-{
-    public KalshiDbContext(DbContextOptions<KalshiDbContext> options) : base(options)
+    public class KalshiDbContext : DbContext
     {
-    }
+        public KalshiDbContext(DbContextOptions<KalshiDbContext> options) : base(options)
+        {
+        }
 
-    public DbSet<MarketCategory> MarketCategories => Set<MarketCategory>();
-    public DbSet<MarketCache> Markets => Set<MarketCache>();
+        public DbSet<MarketCategory> MarketCategories => Set<MarketCategory>();
+        public DbSet<MarketCache> Markets => Set<MarketCache>();
+        public DbSet<User> Users => Set<User>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -70,5 +71,18 @@ public class KalshiDbContext : DbContext
         market.Property(e => e.NotionalValueDollars);
         market.Property(e => e.JsonResponse);
         market.Property(e => e.LastUpdate).IsRequired();
+
+        var user = modelBuilder.Entity<User>();
+        user.ToTable("Users");
+        user.HasKey(e => e.Id);
+        user.HasIndex(e => e.FirebaseId).IsUnique();
+        user.Property(e => e.FirebaseId).HasMaxLength(255).IsRequired();
+        user.Property(e => e.Username).HasMaxLength(255);
+        user.Property(e => e.FirstName).HasMaxLength(255);
+        user.Property(e => e.LastName).HasMaxLength(255);
+        user.Property(e => e.Email).HasMaxLength(255);
+        user.Property(e => e.IsComnEmailOn).HasDefaultValue(false);
+        user.Property(e => e.CreatedAt).IsRequired();
+        user.Property(e => e.UpdatedAt).IsRequired();
     }
 }
