@@ -1,6 +1,7 @@
 using KSignal.API.Data;
 using KSignal.API.Models;
 using KSignals.DTO;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
@@ -22,6 +23,82 @@ public class UsersController : ControllerBase
     {
         _db = db ?? throw new ArgumentNullException(nameof(db));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+    }
+
+    [Authorize]
+    [HttpGet("me")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> GetUserProfile(CancellationToken cancellationToken)
+    {
+        var firebaseId = User.FindFirstValue(JwtRegisteredClaimNames.Sub);
+        if (string.IsNullOrWhiteSpace(firebaseId))
+        {
+            return Unauthorized(new { error = "Invalid token" });
+        }
+
+        await _db.Database.EnsureCreatedAsync(cancellationToken);
+        var user = await _db.Users.AsNoTracking().FirstOrDefaultAsync(u => u.FirebaseId == firebaseId, cancellationToken);
+        if (user == null)
+        {
+            return NotFound(new { error = "User not found" });
+        }
+
+        var response = new UserProfileResponse
+        {
+            Username = user.Username ?? string.Empty,
+            FirstName = user.FirstName ?? string.Empty,
+            LastName = user.LastName ?? string.Empty,
+            Email = user.Email ?? string.Empty,
+            CreatedAt = user.CreatedAt,
+            UpdatedAt = user.UpdatedAt
+        };
+
+        return Ok(response);
+    }
+
+    [Authorize]
+    [HttpPut("profile")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    public async Task<IActionResult> UpdateProfile([FromBody] UpdateProfileRequest request, CancellationToken cancellationToken)
+    {
+        var firebaseId = User.FindFirstValue(JwtRegisteredClaimNames.Sub);
+        if (string.IsNullOrWhiteSpace(firebaseId))
+        {
+            return Unauthorized(new { error = "Invalid token" });
+        }
+
+        if (string.IsNullOrWhiteSpace(request.FirstName) && string.IsNullOrWhiteSpace(request.LastName))
+        {
+            return BadRequest(new { error = "Please provide at least a first or last name" });
+        }
+
+        await _db.Database.EnsureCreatedAsync(cancellationToken);
+        var user = await _db.Users.FirstOrDefaultAsync(u => u.FirebaseId == firebaseId, cancellationToken);
+        if (user == null)
+        {
+            return NotFound(new { error = "User not found" });
+        }
+
+        user.FirstName = request.FirstName ?? user.FirstName;
+        user.LastName = request.LastName ?? user.LastName;
+        user.UpdatedAt = DateTime.UtcNow;
+
+        await _db.SaveChangesAsync(cancellationToken);
+
+        var token = CreateJwt(user);
+        var response = new SignInResponse
+        {
+            Token = token,
+            Username = user.Username ?? user.Email ?? user.FirebaseId,
+            Name = $"{user.FirstName} {user.LastName}".Trim(),
+            Email = user.Email ?? string.Empty
+        };
+
+        return Ok(response);
     }
 
     [HttpPost("register")]

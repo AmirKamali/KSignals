@@ -3,6 +3,9 @@ using Kalshi.Api.Configuration;
 using KSignal.API.Data;
 using Microsoft.EntityFrameworkCore;
 using KSignal.API.Services;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.IdentityModel.Tokens;
+using System.Text;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -18,6 +21,7 @@ builder.Services.AddCors(options =>
         });
 });
 builder.Services.AddControllers();
+builder.Services.AddAuthorization();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(c =>
 {
@@ -116,6 +120,30 @@ builder.Services.AddSingleton<RefreshService>();
 // Register Redis cache service as singleton (connection pooling)
 builder.Services.AddSingleton<IRedisCacheService, RedisCacheService>();
 
+// JWT authentication
+var jwtSecret = Environment.GetEnvironmentVariable("JWT_SECRET") ?? "development-placeholder-secret";
+if (jwtSecret == "development-placeholder-secret")
+{
+    Console.WriteLine("Warning: JWT_SECRET is not set. Using development placeholder key.");
+}
+
+var signingKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtSecret));
+builder.Services.AddAuthentication(options =>
+{
+    options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
+    options.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
+}).AddJwtBearer(options =>
+{
+    options.TokenValidationParameters = new TokenValidationParameters
+    {
+        ValidateIssuer = false,
+        ValidateAudience = false,
+        ValidateLifetime = true,
+        ValidateIssuerSigningKey = true,
+        IssuerSigningKey = signingKey
+    };
+});
+
 var app = builder.Build();
 
 // Configure the HTTP request pipeline.
@@ -128,6 +156,7 @@ if (app.Environment.IsDevelopment())
 
 app.UseCors("AllowAll");
 
+app.UseAuthentication();
 app.UseAuthorization();
 app.MapControllers();
 

@@ -1,0 +1,83 @@
+@page "/user/account"
+@model web_asp.Pages.User.AccountModel
+@{
+    ViewData["Title"] = "My Account";
+}
+
+<div class="page-section">
+    <div class="section-header">
+        <div>
+            <h1 class="login-title" style="margin-bottom: 6px;">My Account</h1>
+            <p class="login-subtitle">Profile overview and name settings.</p>
+        </div>
+    </div>
+
+    <div class="account-grid">
+        <div class="account-card">
+            <div class="account-card-header">
+                <div>
+                    <div class="eyebrow">Profile</div>
+                    <h2>Account details</h2>
+                </div>
+            </div>
+
+            <div class="account-detail-row">
+                <span class="label">Username</span>
+                <span class="value">@Model.Username</span>
+            </div>
+            <div class="account-detail-row">
+                <span class="label">Email</span>
+                <span class="value">@Model.Email</span>
+            </div>
+            <div class="account-detail-row">
+                <span class="label">Created</span>
+                <span class="value">@Model.CreatedAt?.ToString("yyyy-MM-dd")</span>
+            </div>
+            <div class="account-detail-row">
+                <span class="label">Last updated</span>
+                <span class="value">@Model.UpdatedAt?.ToString("yyyy-MM-dd")</span>
+            </div>
+        </div>
+
+        <div class="account-card">
+            <div class="account-card-header">
+                <div>
+                    <div class="eyebrow">Settings</div>
+                    <h2>Update your name</h2>
+                </div>
+                @if (!string.IsNullOrWhiteSpace(Model.StatusMessage))
+                {
+                    <span class="badge badge-success">@Model.StatusMessage</span>
+                }
+                @if (!string.IsNullOrWhiteSpace(Model.ErrorMessage))
+                {
+                    <span class="badge badge-error">@Model.ErrorMessage</span>
+                }
+            </div>
+
+            <form method="post" class="account-form">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label asp-for="FirstName" class="form-label">First name</label>
+                        <input asp-for="FirstName" class="form-input" placeholder="Add your first name" />
+                        <span asp-validation-for="FirstName" class="text-danger"></span>
+                    </div>
+
+                    <div class="form-group">
+                        <label asp-for="LastName" class="form-label">Last name</label>
+                        <input asp-for="LastName" class="form-input" placeholder="Add your last name" />
+                        <span asp-validation-for="LastName" class="text-danger"></span>
+                    </div>
+                </div>
+
+                <button type="submit" class="btn btn-primary" style="width: 100%; margin-top: 16px;">
+                    Save changes
+                </button>
+            </form>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+}

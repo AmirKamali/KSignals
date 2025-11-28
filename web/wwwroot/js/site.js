@@ -81,14 +81,20 @@
         }
 
         if (logoutBtn) {
-            logoutBtn.addEventListener("click", () => {
-                // Clear cookies
+            logoutBtn.addEventListener("click", async () => {
+                // Ask server to clear HttpOnly cookies
+                try {
+                    await fetch("/logout", { method: "POST", credentials: "include" });
+                } catch (err) {
+                    console.warn("Logout request failed", err);
+                }
+
+                // Clear readable cookies
                 document.cookie = "ksignals_jwt=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
                 document.cookie = "ksignals_firebase_id=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
                 document.cookie = "ksignals_username=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
                 document.cookie = "ksignals_name=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
                 document.cookie = "ksignals_email=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
-
 
                 // Sign out from Firebase if available
                 if (window.firebase && window.firebase.auth) {

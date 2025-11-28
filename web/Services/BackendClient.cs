@@ -1,7 +1,9 @@
+using System.Net.Http.Headers;
 using System.Text.Json;
 using Microsoft.AspNetCore.WebUtilities;
 using Microsoft.Extensions.Options;
 using web_asp.Models;
+using KSignals.DTO;
 
 namespace web_asp.Services;
 
@@ -54,6 +56,165 @@ public class BackendClient
         catch (Exception ex)
         {
             _logger.LogError(ex, "Failed to call setUsername API");
+            return (false, "An error occurred. Please try again.", null);
+        }
+    }
+
+    public async Task<(bool Success, string? ErrorMessage, KSignals.DTO.SignInResponse? Response)> LoginAsync(
+        string firebaseId,
+        string? username,
+        string? firstName,
+        string? lastName,
+        string? email)
+    {
+        try
+        {
+            var request = new KSignals.DTO.SignInRequest
+            {
+                FirebaseId = firebaseId,
+                Username = username,
+                FirstName = firstName,
+                LastName = lastName,
+                Email = email,
+                IsComnEmailOn = true
+            };
+
+            var url = $"{_options.BaseUrl.TrimEnd('/')}/api/users/login";
+            var content = new StringContent(
+                JsonSerializer.Serialize(request),
+                System.Text.Encoding.UTF8,
+                "application/json");
+
+            using var response = await _httpClient.PostAsync(url, content);
+            var responseBody = await response.Content.ReadAsStringAsync();
+
+            if (!response.IsSuccessStatusCode)
+            {
+                try
+                {
+                    using var doc = JsonDocument.Parse(responseBody);
+                    if (doc.RootElement.TryGetProperty("error", out var errorElement))
+                    {
+                        return (false, errorElement.GetString() ?? "Failed to refresh session", null);
+                    }
+                }
+                catch
+                {
+                    // Non-JSON error body
+                }
+
+                return (false, "Failed to refresh session", null);
+            }
+
+            var signInResponse = JsonSerializer.Deserialize<KSignals.DTO.SignInResponse>(responseBody, _jsonOptions);
+            return (true, null, signInResponse);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to call login API");
+            return (false, "Unable to refresh your session. Please sign in again.", null);
+        }
+    }
+
+    public async Task<(bool Success, string? ErrorMessage, KSignals.DTO.SignInResponse? Response)> UpdateNameAsync(
+        string jwt,
+        string firstName,
+        string lastName)
+    {
+        try
+        {
+            var request = new UpdateProfileRequest
+            {
+                FirstName = firstName,
+                LastName = lastName
+            };
+
+            var url = $"{_options.BaseUrl.TrimEnd('/')}/api/users/profile";
+            using var message = new HttpRequestMessage(HttpMethod.Put, url)
+            {
+                Content = new StringContent(
+                    JsonSerializer.Serialize(request),
+                    System.Text.Encoding.UTF8,
+                    "application/json")
+            };
+            message.Headers.Authorization = new AuthenticationHeaderValue("Bearer", jwt);
+
+            using var response = await _httpClient.SendAsync(message);
+            var responseBody = await response.Content.ReadAsStringAsync();
+
+            if (!response.IsSuccessStatusCode)
+            {
+                if (response.StatusCode == System.Net.HttpStatusCode.Unauthorized)
+                {
+                    return (false, "Authentication expired. Please sign in again.", null);
+                }
+
+                try
+                {
+                    using var doc = JsonDocument.Parse(responseBody);
+                    if (doc.RootElement.TryGetProperty("error", out var errorElement))
+                    {
+                        return (false, errorElement.GetString() ?? "Failed to update name", null);
+                    }
+                }
+                catch
+                {
+                    // Non-JSON error body
+                }
+
+                return (false, "Failed to update name", null);
+            }
+
+            var signInResponse = JsonSerializer.Deserialize<KSignals.DTO.SignInResponse>(responseBody, _jsonOptions);
+            return (true, null, signInResponse);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to call update name API");
+            return (false, "An error occurred. Please try again.", null);
+        }
+    }
+
+    public async Task<(bool Success, string? ErrorMessage, UserProfileResponse? Response)> GetUserProfileAsync(string jwt)
+    {
+        try
+        {
+            var url = $"{_options.BaseUrl.TrimEnd('/')}/api/users/me";
+            using var message = new HttpRequestMessage(HttpMethod.Get, url);
+            message.Headers.Authorization = new AuthenticationHeaderValue("Bearer", jwt);
+
+            using var response = await _httpClient.SendAsync(message);
+            var responseBody = await response.Content.ReadAsStringAsync();
+
+            if (!response.IsSuccessStatusCode)
+            {
+                if (response.StatusCode == System.Net.HttpStatusCode.Unauthorized)
+                {
+                    return (false, "Authentication expired. Please sign in again.", null);
+                }
+
+                try
+                {
+                    using var doc = JsonDocument.Parse(responseBody);
+                    if (doc.RootElement.TryGetProperty("error", out var errorElement))
+                    {
+                        return (false, errorElement.GetString() ?? "Failed to fetch profile", null);
+                    }
+                }
+                catch
+                {
+                    // Non-JSON error body
+                }
+
+                return (false, "Failed to fetch profile", null);
+            }
+
+            var profile = JsonSerializer.Deserialize<UserProfileResponse>(responseBody, _jsonOptions);
+            return (true, null, profile);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to fetch user profile");
             return (false, "An error occurred. Please try again.", null);
         }
     }
