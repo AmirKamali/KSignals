@@ -19,6 +19,11 @@ builder.Services.Configure<BackendOptions>(options =>
         builder.Configuration["BACKEND_API_PUBLIC_URL"]
         ?? builder.Configuration.GetSection("Backend")["PublicBaseUrl"]
         ?? baseUrl;
+
+    Console.WriteLine($"[Config] BaseUrl: {options.BaseUrl}");
+    Console.WriteLine($"[Config] PublicBaseUrl: {options.PublicBaseUrl}");
+    Console.WriteLine($"[Config] Env BACKEND_API_PUBLIC_URL: {builder.Configuration["BACKEND_API_PUBLIC_URL"]}");
+    Console.WriteLine($"[Config] Config Backend:PublicBaseUrl: {builder.Configuration.GetSection("Backend")["PublicBaseUrl"]}");
 });
 
 builder.Services.AddHttpClient<BackendClient>();
