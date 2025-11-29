@@ -79,7 +79,7 @@ jobs:
       - name: Build backend container image
         uses: docker/build-push-action@v5
         with:
-          context: ./backend
+          context: .
           file: ./backend/KSignal.API/Dockerfile
           platforms: linux/amd64,linux/arm64
           push: true
@@ -121,7 +121,7 @@ jobs:
       - name: Build frontend container image
         uses: docker/build-push-action@v5
         with:
-          context: ./web
+          context: .
           file: ./web/Dockerfile
           platforms: linux/amd64,linux/arm64
           push: true
