@@ -46,6 +46,8 @@ services:
       - ASPNETCORE_ENVIRONMENT=Production
       - BACKEND_API_BASE_URL=http://backend:3006
       - BACKEND_API_PUBLIC_URL=https://api.kalshisignals.com
+      # Supplied via .env file in the compose directory or host env
+      - FIREBASE_CREDENTIALS_BASE64
     depends_on:
       - backend
     networks:
