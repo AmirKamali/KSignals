@@ -1,4 +1,6 @@
 # Build stage
+# NOTE: Build with the repo root as context so the shared DTO project is available:
+#   docker build -f web/Dockerfile .
 FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build
 WORKDIR /src
 
