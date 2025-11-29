@@ -111,7 +111,13 @@ document.addEventListener('DOMContentLoaded', () => {
             });
 
             if (!res.ok) {
-                throw new Error("Backend login failed");
+                const errorText = await res.text();
+                console.error("Backend login failed:", {
+                    status: res.status,
+                    statusText: res.statusText,
+                    body: errorText
+                });
+                throw new Error(`Backend login failed: ${res.status} ${res.statusText}`);
             }
 
             const json = await res.json();
@@ -121,22 +127,54 @@ document.addEventListener('DOMContentLoaded', () => {
                 const isSecure = window.location.protocol === 'https:';
                 const secureFlag = isSecure ? '; Secure' : '';
 
-                document.cookie = `ksignals_jwt=${json.token}; expires=${expires}; path=/; SameSite=Strict${secureFlag}`;
-                document.cookie = `ksignals_firebase_id=${user.uid}; expires=${expires}; path=/; SameSite=Strict${secureFlag}`;
-                document.cookie = `ksignals_username=${json.username || ""}; expires=${expires}; path=/; SameSite=Strict${secureFlag}`;
-                document.cookie = `ksignals_name=${json.name || ""}; expires=${expires}; path=/; SameSite=Strict${secureFlag}`;
-                document.cookie = `ksignals_email=${json.email || ""}; expires=${expires}; path=/; SameSite=Strict${secureFlag}`;
+                // Helper function to set cookie with proper encoding and error handling
+                function setCookie(name, value, expires, secureFlag) {
+                    try {
+                        // Encode the value to handle special characters
+                        const encodedValue = encodeURIComponent(value || '');
+                        const cookieString = `${name}=${encodedValue}; expires=${expires}; path=/; SameSite=Strict${secureFlag}`;
+                        document.cookie = cookieString;
+                        
+                        // Verify cookie was set by reading it back
+                        const verifyCookie = getCookie(name);
+                        if (verifyCookie !== value) {
+                            console.error(`Failed to set cookie ${name}. Expected: ${value ? 'present' : 'empty'}, Got: ${verifyCookie ? 'present' : 'empty'}`);
+                            return false;
+                        }
+                        return true;
+                    } catch (err) {
+                        console.error(`Error setting cookie ${name}:`, err);
+                        return false;
+                    }
+                }
 
-                console.log("Cookies set successfully:", {
-                    jwt: !!json.token,
-                    firebaseId: !!user.uid,
-                    username: json.username,
-                    isSecure
-                });
+                // Set all cookies and track success
+                const cookiesSet = {
+                    jwt: setCookie('ksignals_jwt', json.token, expires, secureFlag),
+                    firebaseId: setCookie('ksignals_firebase_id', user.uid, expires, secureFlag),
+                    username: setCookie('ksignals_username', json.username || '', expires, secureFlag),
+                    name: setCookie('ksignals_name', json.name || '', expires, secureFlag),
+                    email: setCookie('ksignals_email', json.email || '', expires, secureFlag)
+                };
 
-                return true;
+                const allCookiesSet = Object.values(cookiesSet).every(v => v === true);
+
+                if (allCookiesSet) {
+                    console.log("Cookies set successfully:", {
+                        jwt: !!json.token,
+                        firebaseId: !!user.uid,
+                        username: json.username,
+                        isSecure
+                    });
+                    return true;
+                } else {
+                    console.error("Failed to set some cookies:", cookiesSet);
+                    return false;
+                }
+            } else {
+                console.error("Backend login response missing token:", json);
+                return false;
             }
-            return false;
         } catch (err) {
             console.warn("Failed to login to backend", err);
             return false;

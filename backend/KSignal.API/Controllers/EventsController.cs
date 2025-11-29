@@ -1,7 +1,6 @@
 using Kalshi.Api;
 using Kalshi.Api.Client;
 using Kalshi.Api.Model;
-using KSignal.API.Attributes;
 using KSignal.API.Models;
 using KSignal.API.Services;
 using Microsoft.AspNetCore.Mvc;
@@ -18,7 +17,6 @@ public class EventsController : ControllerBase
 {
     private readonly KalshiClient _kalshiClient;
     private readonly ILogger<EventsController> _logger;
-    private readonly KalshiService _kalshiService;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="EventsController"/> class.
@@ -33,6 +31,8 @@ public class EventsController : ControllerBase
         _kalshiService = kalshiService ?? throw new ArgumentNullException(nameof(kalshiService));
     }
 
+    private readonly KalshiService _kalshiService;
+
     /// <summary>
     /// Get tags organized by series categories
     /// </summary>
@@ -45,7 +45,6 @@ public class EventsController : ControllerBase
     /// <response code="200">Tags retrieved successfully</response>
     /// <response code="500">Internal server error</response>
     [HttpGet("categories")]
-    [RedisCache(durationMinutes: 5, cacheKeyPrefix: "markets_tags_categories")]
     [ProducesResponseType(typeof(GetTagsForSeriesCategoriesResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status500InternalServerError)]
     public async Task<ActionResult<GetTagsForSeriesCategoriesResponse>> GetTagsByCategories()
@@ -83,39 +82,18 @@ public class EventsController : ControllerBase
     }
 
     [HttpGet("/api/markets")]
-    [RedisCache(durationMinutes: 5, cacheKeyPrefix: "markets")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status500InternalServerError)]
-    public async Task<IActionResult> GetMarkets(
-        [FromQuery] string? category = null,
-        [FromQuery] string? tag = null,
-        [FromQuery] string? query = null,
-        [FromQuery] string? close_date_type = "next_30_days",
-        [FromQuery(Name = "status")] string? status = "Active",
-        [FromQuery(Name = "sort_type")] string? sortType = "volume",
-        [FromQuery] string? direction = "desc",
-        [FromQuery] int page = 1,
-        [FromQuery] int pageSize = 50,
-        CancellationToken cancellationToken = default)
+    public async Task<IActionResult> GetMarkets([FromQuery] string? category = null, [FromQuery] string? tag = null, [FromQuery] bool detailed = false, CancellationToken cancellationToken = default)
     {
         try
         {
-            var parsedSort = Enum.TryParse<MarketSort>(sortType, true, out var sortEnum) ? sortEnum : MarketSort.Volume;
-            var parsedDirection = Enum.TryParse<SortDirection>(direction, true, out var dirEnum) ? dirEnum : SortDirection.Desc;
-
-            var result = await _kalshiService.GetMarketsAsync(category, tag, query, close_date_type,status, parsedSort, parsedDirection, page, pageSize, cancellationToken);
-            var shaped = MarketResponseMapper.Shape(result.Markets).ToList();
-
-            return Ok(new
-            {
-                count = result.TotalCount,
-                totalPages = result.TotalPages,
-                currentPage = result.CurrentPage,
-                pageSize = result.PageSize,
-                sort_type = parsedSort.ToString().ToLowerInvariant(),
-                direction = parsedDirection.ToString().ToLowerInvariant(),
-                markets = shaped
-            });
+            var marketsResult = await _kalshiService.GetMarketsAsync(
+                category: category,
+                tag: tag,
+                cancellationToken: cancellationToken);
+            var shaped = MarketResponseMapper.Shape(marketsResult.Markets, detailed).ToList();
+            return Ok(new { count = shaped.Count, markets = shaped });
         }
         catch (ApiException apiEx)
         {

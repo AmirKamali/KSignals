@@ -32,7 +32,7 @@ public class UsersController : ControllerBase
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> GetUserProfile(CancellationToken cancellationToken)
     {
-        var firebaseId = User.FindFirstValue(JwtRegisteredClaimNames.Sub);
+        var firebaseId = GetFirebaseIdFromClaims();
         if (string.IsNullOrWhiteSpace(firebaseId))
         {
             return Unauthorized(new { error = "Invalid token" });
@@ -65,7 +65,7 @@ public class UsersController : ControllerBase
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     public async Task<IActionResult> UpdateProfile([FromBody] UpdateProfileRequest request, CancellationToken cancellationToken)
     {
-        var firebaseId = User.FindFirstValue(JwtRegisteredClaimNames.Sub);
+        var firebaseId = GetFirebaseIdFromClaims();
         if (string.IsNullOrWhiteSpace(firebaseId))
         {
             return Unauthorized(new { error = "Invalid token" });
@@ -99,6 +99,13 @@ public class UsersController : ControllerBase
         };
 
         return Ok(response);
+    }
+
+    private string? GetFirebaseIdFromClaims()
+    {
+        // Handle default JWT claim type mapping where "sub" becomes NameIdentifier
+        return User.FindFirstValue(ClaimTypes.NameIdentifier)
+            ?? User.FindFirstValue(JwtRegisteredClaimNames.Sub);
     }
 
     [HttpPost("register")]

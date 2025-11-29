@@ -6,6 +6,7 @@ using KSignal.API.Services;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
 using System.Text;
+using Microsoft.Extensions.Logging;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -125,6 +126,7 @@ var jwtSecret = Environment.GetEnvironmentVariable("JWT_SECRET") ?? "development
 if (jwtSecret == "development-placeholder-secret")
 {
     Console.WriteLine("Warning: JWT_SECRET is not set. Using development placeholder key.");
+    Console.WriteLine("Warning: JWT tokens created with this key will not be valid in production.");
 }
 
 var signingKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtSecret));
@@ -142,9 +144,53 @@ builder.Services.AddAuthentication(options =>
         ValidateIssuerSigningKey = true,
         IssuerSigningKey = signingKey
     };
+
+    // Add event handlers to log JWT validation errors
+    options.Events = new JwtBearerEvents
+    {
+        OnAuthenticationFailed = context =>
+        {
+            var logger = context.HttpContext.RequestServices.GetRequiredService<ILogger<Program>>();
+            logger.LogError(context.Exception, 
+                "JWT authentication failed. Error: {Error}, Path: {Path}", 
+                context.Exception?.Message, 
+                context.Request.Path);
+            return Task.CompletedTask;
+        },
+        OnChallenge = context =>
+        {
+            var logger = context.HttpContext.RequestServices.GetRequiredService<ILogger<Program>>();
+            logger.LogWarning(
+                "JWT challenge triggered. Error: {Error}, ErrorDescription: {ErrorDescription}, Path: {Path}",
+                context.Error,
+                context.ErrorDescription,
+                context.Request.Path);
+            return Task.CompletedTask;
+        },
+        OnTokenValidated = context =>
+        {
+            var logger = context.HttpContext.RequestServices.GetRequiredService<ILogger<Program>>();
+            var firebaseId = context.Principal?.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value
+                          ?? context.Principal?.FindFirst("sub")?.Value;
+            logger.LogDebug("JWT token validated successfully for FirebaseId: {FirebaseId}", firebaseId);
+            return Task.CompletedTask;
+        }
+    };
 });
 
 var app = builder.Build();
+
+// Validate JWT_SECRET configuration at startup
+var jwtSecretCheck = Environment.GetEnvironmentVariable("JWT_SECRET");
+if (string.IsNullOrWhiteSpace(jwtSecretCheck) || jwtSecretCheck == "development-placeholder-secret")
+{
+    var logger = app.Services.GetRequiredService<ILogger<Program>>();
+    logger.LogWarning("JWT_SECRET is not configured or using placeholder. JWT authentication may fail.");
+    if (app.Environment.IsProduction())
+    {
+        logger.LogError("JWT_SECRET must be set in production environment!");
+    }
+}
 
 // Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())

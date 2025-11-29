@@ -69,6 +69,12 @@ public class BackendClient
     {
         try
         {
+            if (string.IsNullOrWhiteSpace(firebaseId))
+            {
+                _logger.LogWarning("LoginAsync called with empty FirebaseId");
+                return (false, "Firebase ID is required.", null);
+            }
+
             var request = new KSignals.DTO.SignInRequest
             {
                 FirebaseId = firebaseId,
@@ -80,6 +86,8 @@ public class BackendClient
             };
 
             var url = $"{_options.BaseUrl.TrimEnd('/')}/api/users/login";
+            _logger.LogDebug("LoginAsync: Calling {Url} for FirebaseId: {FirebaseId}", url, firebaseId);
+            
             var content = new StringContent(
                 JsonSerializer.Serialize(request),
                 System.Text.Encoding.UTF8,
@@ -88,30 +96,60 @@ public class BackendClient
             using var response = await _httpClient.PostAsync(url, content);
             var responseBody = await response.Content.ReadAsStringAsync();
 
+            _logger.LogDebug(
+                "LoginAsync: Response status {StatusCode}, Body length: {BodyLength}",
+                response.StatusCode, responseBody.Length);
+
             if (!response.IsSuccessStatusCode)
             {
+                string? errorMessage = null;
                 try
                 {
                     using var doc = JsonDocument.Parse(responseBody);
                     if (doc.RootElement.TryGetProperty("error", out var errorElement))
                     {
-                        return (false, errorElement.GetString() ?? "Failed to refresh session", null);
+                        errorMessage = errorElement.GetString();
                     }
                 }
-                catch
+                catch (Exception parseEx)
                 {
-                    // Non-JSON error body
+                    _logger.LogWarning(parseEx, "LoginAsync: Failed to parse error response as JSON. Body: {Body}", responseBody);
                 }
 
-                return (false, "Failed to refresh session", null);
+                _logger.LogError(
+                    "LoginAsync: Failed with status {StatusCode}. Error: {ErrorMessage}, Response body: {Body}",
+                    response.StatusCode, errorMessage, responseBody);
+
+                return (false, errorMessage ?? $"Failed to refresh session (Status: {response.StatusCode})", null);
             }
 
-            var signInResponse = JsonSerializer.Deserialize<KSignals.DTO.SignInResponse>(responseBody, _jsonOptions);
-            return (true, null, signInResponse);
+            try
+            {
+                var signInResponse = JsonSerializer.Deserialize<KSignals.DTO.SignInResponse>(responseBody, _jsonOptions);
+                if (signInResponse == null || string.IsNullOrWhiteSpace(signInResponse.Token))
+                {
+                    _logger.LogWarning("LoginAsync: Response missing token. Response body: {Body}", responseBody);
+                    return (false, "Invalid response from server.", null);
+                }
+
+                _logger.LogDebug("LoginAsync: Successfully logged in. Username: {Username}, Token length: {TokenLength}", 
+                    signInResponse.Username, signInResponse.Token.Length);
+                return (true, null, signInResponse);
+            }
+            catch (Exception deserializeEx)
+            {
+                _logger.LogError(deserializeEx, "LoginAsync: Failed to deserialize response. Body: {Body}", responseBody);
+                return (false, "Invalid response format from server.", null);
+            }
+        }
+        catch (HttpRequestException httpEx)
+        {
+            _logger.LogError(httpEx, "LoginAsync: HTTP request failed. URL: {Url}", $"{_options.BaseUrl.TrimEnd('/')}/api/users/login");
+            return (false, "Unable to connect to the server. Please check your connection.", null);
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Failed to call login API");
+            _logger.LogError(ex, "LoginAsync: Unexpected error occurred");
             return (false, "Unable to refresh your session. Please sign in again.", null);
         }
     }
@@ -123,6 +161,12 @@ public class BackendClient
     {
         try
         {
+            if (string.IsNullOrWhiteSpace(jwt))
+            {
+                _logger.LogWarning("UpdateNameAsync called with empty JWT token");
+                return (false, "Authentication token is missing.", null);
+            }
+
             var request = new UpdateProfileRequest
             {
                 FirstName = firstName,
@@ -130,6 +174,9 @@ public class BackendClient
             };
 
             var url = $"{_options.BaseUrl.TrimEnd('/')}/api/users/profile";
+            _logger.LogDebug("UpdateNameAsync: Calling {Url} with FirstName: {FirstName}, LastName: {LastName}", 
+                url, firstName, lastName);
+            
             using var message = new HttpRequestMessage(HttpMethod.Put, url)
             {
                 Content = new StringContent(
@@ -142,35 +189,68 @@ public class BackendClient
             using var response = await _httpClient.SendAsync(message);
             var responseBody = await response.Content.ReadAsStringAsync();
 
+            _logger.LogDebug(
+                "UpdateNameAsync: Response status {StatusCode}, Body length: {BodyLength}",
+                response.StatusCode, responseBody.Length);
+
             if (!response.IsSuccessStatusCode)
             {
                 if (response.StatusCode == System.Net.HttpStatusCode.Unauthorized)
                 {
+                    _logger.LogWarning(
+                        "UpdateNameAsync: Unauthorized response. Status: {StatusCode}, Body: {Body}",
+                        response.StatusCode, responseBody);
                     return (false, "Authentication expired. Please sign in again.", null);
                 }
 
+                string? errorMessage = null;
                 try
                 {
                     using var doc = JsonDocument.Parse(responseBody);
                     if (doc.RootElement.TryGetProperty("error", out var errorElement))
                     {
-                        return (false, errorElement.GetString() ?? "Failed to update name", null);
+                        errorMessage = errorElement.GetString();
                     }
                 }
-                catch
+                catch (Exception parseEx)
                 {
-                    // Non-JSON error body
+                    _logger.LogWarning(parseEx, "UpdateNameAsync: Failed to parse error response as JSON. Body: {Body}", responseBody);
                 }
 
-                return (false, "Failed to update name", null);
+                _logger.LogError(
+                    "UpdateNameAsync: Failed with status {StatusCode}. Error: {ErrorMessage}, Response body: {Body}",
+                    response.StatusCode, errorMessage, responseBody);
+
+                return (false, errorMessage ?? $"Failed to update name (Status: {response.StatusCode})", null);
             }
 
-            var signInResponse = JsonSerializer.Deserialize<KSignals.DTO.SignInResponse>(responseBody, _jsonOptions);
-            return (true, null, signInResponse);
+            try
+            {
+                var signInResponse = JsonSerializer.Deserialize<KSignals.DTO.SignInResponse>(responseBody, _jsonOptions);
+                if (signInResponse == null)
+                {
+                    _logger.LogWarning("UpdateNameAsync: Deserialized response is null. Response body: {Body}", responseBody);
+                    return (false, "Invalid response from server.", null);
+                }
+
+                _logger.LogDebug("UpdateNameAsync: Successfully updated name. Username: {Username}", signInResponse.Username);
+                return (true, null, signInResponse);
+            }
+            catch (Exception deserializeEx)
+            {
+                _logger.LogError(deserializeEx, 
+                    "UpdateNameAsync: Failed to deserialize response. Body: {Body}", responseBody);
+                return (false, "Invalid response format from server.", null);
+            }
+        }
+        catch (HttpRequestException httpEx)
+        {
+            _logger.LogError(httpEx, "UpdateNameAsync: HTTP request failed. URL: {Url}", $"{_options.BaseUrl.TrimEnd('/')}/api/users/profile");
+            return (false, "Unable to connect to the server. Please check your connection.", null);
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Failed to call update name API");
+            _logger.LogError(ex, "UpdateNameAsync: Unexpected error occurred");
             return (false, "An error occurred. Please try again.", null);
         }
     }
@@ -179,42 +259,83 @@ public class BackendClient
     {
         try
         {
+            if (string.IsNullOrWhiteSpace(jwt))
+            {
+                _logger.LogWarning("GetUserProfileAsync called with empty JWT token");
+                return (false, "Authentication token is missing.", null);
+            }
+
             var url = $"{_options.BaseUrl.TrimEnd('/')}/api/users/me";
+            _logger.LogDebug("GetUserProfileAsync: Calling {Url} with JWT token (length: {JwtLength})", url, jwt.Length);
+            
             using var message = new HttpRequestMessage(HttpMethod.Get, url);
             message.Headers.Authorization = new AuthenticationHeaderValue("Bearer", jwt);
 
             using var response = await _httpClient.SendAsync(message);
             var responseBody = await response.Content.ReadAsStringAsync();
 
+            _logger.LogDebug(
+                "GetUserProfileAsync: Response status {StatusCode}, Body length: {BodyLength}",
+                response.StatusCode, responseBody.Length);
+
             if (!response.IsSuccessStatusCode)
             {
                 if (response.StatusCode == System.Net.HttpStatusCode.Unauthorized)
                 {
+                    _logger.LogWarning(
+                        "GetUserProfileAsync: Unauthorized response. Status: {StatusCode}, Body: {Body}",
+                        response.StatusCode, responseBody);
                     return (false, "Authentication expired. Please sign in again.", null);
                 }
 
+                string? errorMessage = null;
                 try
                 {
                     using var doc = JsonDocument.Parse(responseBody);
                     if (doc.RootElement.TryGetProperty("error", out var errorElement))
                     {
-                        return (false, errorElement.GetString() ?? "Failed to fetch profile", null);
+                        errorMessage = errorElement.GetString();
                     }
                 }
-                catch
+                catch (Exception parseEx)
                 {
-                    // Non-JSON error body
+                    _logger.LogWarning(parseEx, "GetUserProfileAsync: Failed to parse error response as JSON. Body: {Body}", responseBody);
                 }
 
-                return (false, "Failed to fetch profile", null);
+                _logger.LogError(
+                    "GetUserProfileAsync: Failed with status {StatusCode}. Error: {ErrorMessage}, Response body: {Body}",
+                    response.StatusCode, errorMessage, responseBody);
+
+                return (false, errorMessage ?? $"Failed to fetch profile (Status: {response.StatusCode})", null);
             }
 
-            var profile = JsonSerializer.Deserialize<UserProfileResponse>(responseBody, _jsonOptions);
-            return (true, null, profile);
+            try
+            {
+                var profile = JsonSerializer.Deserialize<UserProfileResponse>(responseBody, _jsonOptions);
+                if (profile == null)
+                {
+                    _logger.LogWarning("GetUserProfileAsync: Deserialized profile is null. Response body: {Body}", responseBody);
+                    return (false, "Invalid response from server.", null);
+                }
+                
+                _logger.LogDebug("GetUserProfileAsync: Successfully retrieved profile for user: {Username}", profile.Username);
+                return (true, null, profile);
+            }
+            catch (Exception deserializeEx)
+            {
+                _logger.LogError(deserializeEx, 
+                    "GetUserProfileAsync: Failed to deserialize response. Body: {Body}", responseBody);
+                return (false, "Invalid response format from server.", null);
+            }
+        }
+        catch (HttpRequestException httpEx)
+        {
+            _logger.LogError(httpEx, "GetUserProfileAsync: HTTP request failed. URL: {Url}", $"{_options.BaseUrl.TrimEnd('/')}/api/users/me");
+            return (false, "Unable to connect to the server. Please check your connection.", null);
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Failed to fetch user profile");
+            _logger.LogError(ex, "GetUserProfileAsync: Unexpected error occurred");
             return (false, "An error occurred. Please try again.", null);
         }
     }

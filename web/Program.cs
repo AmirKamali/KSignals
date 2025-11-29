@@ -35,33 +35,6 @@ app.UseRouting();
 app.UseAuthorization();
 
 app.MapStaticAssets();
-app.MapPost("/logout", (HttpContext context) =>
-{
-    var secure = context.Request.IsHttps;
-    var expired = DateTimeOffset.UnixEpoch;
-    var cookieNames = new[]
-    {
-        "ksignals_jwt",
-        "ksignals_firebase_id",
-        "ksignals_username",
-        "ksignals_name",
-        "ksignals_email"
-    };
-
-    foreach (var name in cookieNames)
-    {
-        context.Response.Cookies.Append(name, string.Empty, new CookieOptions
-        {
-            Expires = expired,
-            Path = "/",
-            HttpOnly = name is "ksignals_jwt" or "ksignals_firebase_id",
-            Secure = secure,
-            SameSite = SameSiteMode.Strict
-        });
-    }
-
-    return Results.Ok();
-});
 app.MapRazorPages()
    .WithStaticAssets();
 

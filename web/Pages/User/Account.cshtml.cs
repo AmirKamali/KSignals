@@ -38,36 +38,77 @@ public class AccountModel : AuthenticatedPageModel
 
     public async Task OnGetAsync()
     {
+        // Log cookie reading for debugging
         var jwt = GetCookie("ksignals_jwt");
-        var profileResult = string.IsNullOrWhiteSpace(jwt)
-            ? (Success: false, ErrorMessage: "Authentication required. Please log in again.", Response: (UserProfileResponse?)null)
-            : await _backendClient.GetUserProfileAsync(jwt);
+        var firebaseId = GetCookie("ksignals_firebase_id");
+        var hasJwt = !string.IsNullOrWhiteSpace(jwt);
+        var hasFirebaseId = !string.IsNullOrWhiteSpace(firebaseId);
+        
+        _logger.LogInformation(
+            "Account page OnGet - JWT present: {HasJwt}, FirebaseId present: {HasFirebaseId}, JWT length: {JwtLength}",
+            hasJwt, hasFirebaseId, hasJwt ? jwt.Length : 0);
+
+        if (!hasJwt)
+        {
+            _logger.LogWarning("JWT cookie is missing. User may need to sign in again.");
+            ErrorMessage = "Authentication required. Please log in again.";
+            return;
+        }
+
+        // Log JWT token presence (without exposing the actual token)
+        _logger.LogDebug("Attempting to fetch user profile with JWT token (length: {JwtLength})", jwt.Length);
+        
+        var profileResult = await _backendClient.GetUserProfileAsync(jwt);
+        
+        _logger.LogInformation(
+            "GetUserProfileAsync result - Success: {Success}, ErrorMessage: {ErrorMessage}, HasResponse: {HasResponse}",
+            profileResult.Success, profileResult.ErrorMessage, profileResult.Response != null);
 
         if (!profileResult.Success && IsAuthExpired(profileResult.ErrorMessage))
         {
+            _logger.LogInformation("JWT appears expired, attempting to refresh session");
             var refreshResult = await RefreshSessionAsync();
             if (refreshResult.Success && !string.IsNullOrWhiteSpace(refreshResult.Jwt))
             {
+                _logger.LogInformation("Session refresh successful, retrying profile fetch");
                 jwt = refreshResult.Jwt;
                 profileResult = await _backendClient.GetUserProfileAsync(jwt);
+                
+                _logger.LogInformation(
+                    "GetUserProfileAsync after refresh - Success: {Success}, ErrorMessage: {ErrorMessage}, HasResponse: {HasResponse}",
+                    profileResult.Success, profileResult.ErrorMessage, profileResult.Response != null);
             }
             else
             {
-                ErrorMessage = refreshResult.ErrorMessage ?? profileResult.ErrorMessage;
+                _logger.LogWarning("Session refresh failed: {ErrorMessage}", refreshResult.ErrorMessage);
+                ErrorMessage = refreshResult.ErrorMessage ?? profileResult.ErrorMessage ?? "Authentication required. Please log in again.";
                 return;
             }
         }
 
         if (!profileResult.Success || profileResult.Response == null)
         {
-            ErrorMessage = profileResult.ErrorMessage ?? "Unable to load your profile.";
+            // Distinguish between different error scenarios
             if (IsAuthExpired(profileResult.ErrorMessage))
             {
+                _logger.LogWarning("JWT token expired or invalid. Deleting cookie.");
+                ErrorMessage = "Your session has expired. Please log in again.";
                 Response.Cookies.Delete("ksignals_jwt");
+            }
+            else if (profileResult.ErrorMessage?.Contains("Unauthorized", StringComparison.OrdinalIgnoreCase) == true)
+            {
+                _logger.LogWarning("Backend returned Unauthorized. Token may be invalid.");
+                ErrorMessage = "Authentication failed. Please log in again.";
+            }
+            else
+            {
+                _logger.LogError("Failed to load user profile: {ErrorMessage}", profileResult.ErrorMessage);
+                ErrorMessage = profileResult.ErrorMessage ?? "Unable to load your profile. Please try again.";
             }
             return;
         }
 
+        _logger.LogInformation("User profile loaded successfully for user: {Username}", profileResult.Response.Username);
         MapProfile(profileResult.Response);
     }
 
@@ -158,8 +199,11 @@ public class AccountModel : AuthenticatedPageModel
         var firebaseId = GetCookie("ksignals_firebase_id");
         if (string.IsNullOrWhiteSpace(firebaseId))
         {
+            _logger.LogWarning("RefreshSessionAsync: FirebaseId cookie is missing");
             return (false, null, "Authentication required. Please log in again.");
         }
+
+        _logger.LogInformation("RefreshSessionAsync: Attempting to refresh session for FirebaseId: {FirebaseId}", firebaseId);
 
         var username = GetCookie("ksignals_username");
         var email = GetCookie("ksignals_email");
@@ -172,6 +216,9 @@ public class AccountModel : AuthenticatedPageModel
         var firstName = nameParts.Length > 0 ? nameParts[0] : FirstName;
         var lastName = nameParts.Length > 1 ? nameParts[1] : LastName;
 
+        _logger.LogDebug("RefreshSessionAsync: Calling LoginAsync with FirebaseId: {FirebaseId}, Username: {Username}", 
+            firebaseId, username);
+
         var (success, errorMessage, signIn) = await _backendClient.LoginAsync(
             firebaseId,
             username,
@@ -179,11 +226,17 @@ public class AccountModel : AuthenticatedPageModel
             lastName,
             email);
 
+        _logger.LogInformation(
+            "RefreshSessionAsync: LoginAsync result - Success: {Success}, ErrorMessage: {ErrorMessage}, HasToken: {HasToken}",
+            success, errorMessage, signIn?.Token != null);
+
         if (!success || signIn == null || string.IsNullOrWhiteSpace(signIn.Token))
         {
+            _logger.LogWarning("RefreshSessionAsync: Failed to refresh session. Error: {ErrorMessage}", errorMessage);
             return (false, errorMessage ?? "Authentication required. Please log in again.", null);
         }
 
+        _logger.LogInformation("RefreshSessionAsync: Session refreshed successfully, setting cookies");
         SetAuthCookies(signIn, firebaseId);
 
         Username = signIn.Username ?? username ?? Username;
