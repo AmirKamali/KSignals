@@ -29,6 +29,13 @@ if (!app.Environment.IsDevelopment())
 
 app.UseHttpsRedirection();
 
+// Allow authentication popups (e.g., Google/Firebase) to close themselves.
+app.Use(async (context, next) =>
+{
+    context.Response.Headers["Cross-Origin-Opener-Policy"] = "same-origin-allow-popups";
+    await next();
+});
+
 app.UseStaticFiles();
 app.UseRouting();
 
