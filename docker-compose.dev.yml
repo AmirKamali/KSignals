@@ -21,8 +21,8 @@ services:
 
   backend:
     build:
-      context: ./backend
-      dockerfile: KSignal.API/Dockerfile
+      context: .
+      dockerfile: backend/KSignal.API/Dockerfile
     image: ksignals-backend:dev
     platform: ${DOCKER_PLATFORM:-linux/amd64}
     ports:
@@ -50,8 +50,8 @@ services:
 
   web:
     build:
-      context: ./web
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: web/Dockerfile
     image: ksignals-frontend:dev
     platform: ${DOCKER_PLATFORM:-linux/amd64}
     ports:

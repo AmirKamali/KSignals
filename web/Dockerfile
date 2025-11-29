@@ -1,15 +1,22 @@
 # Build stage
-FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
-WORKDIR /src/web_asp
+FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build
+WORKDIR /src
 
-COPY web_asp.csproj .
-RUN dotnet restore web_asp.csproj
+# Copy csproj files and restore dependencies (include shared DTO project)
+COPY web/web_asp.csproj web/
+COPY shared/KSignals.DTO/KSignals.DTO.csproj shared/KSignals.DTO/
+RUN dotnet restore web/web_asp.csproj
 
-COPY . .
+# Copy source
+COPY web/. web/
+COPY shared/. shared/
+
+# Publish
+WORKDIR /src/web
 RUN dotnet publish -c Release -o /app/publish --no-restore
 
 # Runtime stage
-FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS final
+FROM mcr.microsoft.com/dotnet/aspnet:8.0 AS final
 WORKDIR /app
 
 ENV ASPNETCORE_URLS=http://+:3000
