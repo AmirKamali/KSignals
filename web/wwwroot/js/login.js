@@ -1,7 +1,7 @@
 // Inline Firebase Initialization
 const firebaseConfig = {
     apiKey: "AIzaSyB1hIE0843ovq2tDJM6hc_z9BX2uE4uX5M",
-    authDomain: "ksignals-5caa3.firebaseapp.com",
+    authDomain: "KalshiSignals.com",
     projectId: "ksignals-5caa3",
     storageBucket: "ksignals-5caa3.firebasestorage.app",
     messagingSenderId: "561592439844",
