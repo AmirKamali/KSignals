@@ -20,6 +20,7 @@ services:
       - KALSHI_API_KEY=${KALSHI_API_KEY:?Set KALSHI_API_KEY}
       - KALSHI_PRIVATE_KEY_PATH=${KALSHI_PRIVATE_KEY_PATH:?Set KALSHI_PRIVATE_KEY_PATH}
       - KALSHI_BASE_URL=${KALSHI_BASE_URL:?Set KALSHI_BASE_URL}
+      - JWT_SECRET=${JWT_SECRET:?Set JWT_SECRET}
     networks:
       - kalshi-network
       - web
