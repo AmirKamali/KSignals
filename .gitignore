@@ -4,3 +4,5 @@ backend/KSignal.API/bin
 backend/KSignal.API/obj
 web/bin
 web/obj
+shared/KSignals.DTO/bin
+shared/KSignals.DTO/obj
