@@ -22,7 +22,8 @@
       "Bash(./run_dev.sh)",
       "Bash(cat:*)",
       "Bash(./kill_backend.sh)",
-      "Bash(echo:*)"
+      "Bash(echo:*)",
+      "Bash(docker build:*)"
     ],
     "deny": [],
     "ask": []
