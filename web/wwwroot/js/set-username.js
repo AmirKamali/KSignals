@@ -1,41 +1,40 @@
-document.addEventListener('DOMContentLoaded', async () => {
+document.addEventListener("DOMContentLoaded", async () => {
     console.log("Username.js - DOM loaded");
 
     const firebaseIdInput = document.getElementById("firebase-id-input");
 
-    // Check if user is authenticated with Firebase
-    if (!window.firebase || !window.firebase.auth) {
-        console.error("Firebase not available");
-        window.location.href = "/Login";
+    const getCookie = (name) => {
+        const cookie = document.cookie.split(";").find(c => c.trim().startsWith(name + "="));
+        return cookie ? decodeURIComponent(cookie.split("=")[1]) : null;
+    };
+
+    const firebaseIdFromCookie = getCookie("ksignals_firebase_id");
+    if (firebaseIdInput && firebaseIdFromCookie) {
+        firebaseIdInput.value = firebaseIdFromCookie;
+        console.log("Firebase ID populated from cookie");
+    }
+
+    if (firebaseIdInput?.value) {
         return;
     }
 
-    const auth = firebase.auth();
-
-    // Wait for auth state to be ready
-    auth.onAuthStateChanged((user) => {
-        if (!user) {
-            console.log("No user logged in, redirecting to login");
-            window.location.href = "/Login";
-            return;
-        }
-
-        // Populate the hidden FirebaseId field for server-side processing
-        if (firebaseIdInput) {
-            firebaseIdInput.value = user.uid;
-            console.log("Firebase ID set:", user.uid);
-        }
-
-        // Check if user already has a username in cookies
-        const cookies = document.cookie.split(';');
-        const usernameCookie = cookies.find(c => c.trim().startsWith('ksignals_username='));
-        if (usernameCookie) {
-            const username = usernameCookie.split('=')[1];
-            if (username && username !== user.email && username !== user.uid) {
-                console.log("User already has username, redirecting home");
-                window.location.href = "/";
+    // Fallback to Firebase auth if available
+    if (window.firebase?.auth) {
+        const auth = firebase.auth();
+        auth.onAuthStateChanged((user) => {
+            if (!user) {
+                console.log("No user logged in, redirecting to login");
+                window.location.href = "/Login";
                 return;
             }
-        }
-    });
+
+            if (firebaseIdInput) {
+                firebaseIdInput.value = user.uid;
+                console.log("Firebase ID set from auth state:", user.uid);
+            }
+        });
+    } else {
+        console.warn("Firebase not available and no cookie set; redirecting to login");
+        window.location.href = "/Login";
+    }
 });

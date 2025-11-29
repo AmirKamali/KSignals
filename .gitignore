@@ -6,3 +6,5 @@ web/bin
 web/obj
 shared/KSignals.DTO/bin
 shared/KSignals.DTO/obj
+firebase_credentials_raw.json
+.env

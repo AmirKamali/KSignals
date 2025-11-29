@@ -42,13 +42,13 @@ echo ""
 
 # Check ports
 echo -e "${YELLOW}Checking ports...${NC}"
-check_port 5271 || exit 1
+check_port 3006 || exit 1
 check_port 3011 || exit 1
 echo -e "${GREEN}✓ Ports available${NC}"
 echo ""
 
 # Set environment variables
-export BACKEND_API_BASE_URL="http://localhost:5271"
+export BACKEND_API_BASE_URL="http://localhost:3006"
 export JWT_SECRET="vS2d7BbiCp5AKQBaKnKzhuDTamgh1g+Sw0vFkbQ/qKxRnEqUlenrYH4ZCDk5tUoW"
 
 # Create logs directory if it doesn't exist
@@ -60,12 +60,12 @@ PROJECT_ROOT="$(pwd)"
 # Start Backend API
 echo -e "${BLUE}Starting Backend API...${NC}"
 cd backend/KSignal.API
-dotnet watch run --non-interactive > "$PROJECT_ROOT/logs/backend.log" 2>&1 &
+dotnet watch run --non-interactive --urls "http://localhost:3006" > "$PROJECT_ROOT/logs/backend.log" 2>&1 &
 BACKEND_PID=$!
 cd "$PROJECT_ROOT"
 echo -e "${GREEN}✓ Backend API starting (PID: $BACKEND_PID)${NC}"
-echo -e "  ${BLUE}→${NC} http://localhost:5271"
-echo -e "  ${BLUE}→${NC} Swagger: http://localhost:5271/swagger"
+echo -e "  ${BLUE}→${NC} http://localhost:3006"
+echo -e "  ${BLUE}→${NC} Swagger: http://localhost:3006/swagger"
 echo ""
 
 # Wait a bit for backend to start
@@ -86,8 +86,8 @@ echo -e "${GREEN}║       Services Running!               ║${NC}"
 echo -e "${GREEN}╚═══════════════════════════════════════╝${NC}"
 echo ""
 echo -e "Frontend:  ${BLUE}http://localhost:3011${NC}"
-echo -e "Backend:   ${BLUE}http://localhost:5271${NC}"
-echo -e "Swagger:   ${BLUE}http://localhost:5271/swagger${NC}"
+echo -e "Backend:   ${BLUE}http://localhost:3006${NC}"
+echo -e "Swagger:   ${BLUE}http://localhost:3006/swagger${NC}"
 echo ""
 echo -e "${YELLOW}Logs:${NC}"
 echo -e "  Backend:  ${BLUE}tail -f logs/backend.log${NC}"

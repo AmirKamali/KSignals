@@ -84,7 +84,7 @@
             logoutBtn.addEventListener("click", async () => {
                 // Ask server to clear HttpOnly cookies
                 try {
-                    await fetch("/logout", { method: "POST", credentials: "include" });
+                    await fetch("/auth/logout", { method: "POST", credentials: "include" });
                 } catch (err) {
                     console.warn("Logout request failed", err);
                 }

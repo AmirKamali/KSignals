@@ -1,4 +1,4 @@
-@KSignal.API_HostAddress = http://localhost:5271
+@KSignal.API_HostAddress = http://localhost:3006
 
 GET {{KSignal.API_HostAddress}}/weatherforecast/
 Accept: application/json

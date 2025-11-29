@@ -11,8 +11,8 @@ The easiest way to run both the backend and frontend with hot reload is to use t
 ```
 
 This will:
-- ✅ Check if required ports (3011, 5271) are available
-- ✅ Start the backend API on `http://localhost:5271` with hot reload
+- ✅ Check if required ports (3011, 3006) are available
+- ✅ Start the backend API on `http://localhost:3006` with hot reload
 - ✅ Start the frontend on `http://localhost:3011` with hot reload
 - ✅ Set up proper environment variables
 - ✅ Create and stream logs to `logs/backend.log` and `logs/frontend.log`
@@ -25,8 +25,8 @@ Once running, you can access:
 | Service | URL |
 |---------|-----|
 | **Frontend** | http://localhost:3011 |
-| **Backend API** | http://localhost:5271 |
-| **Swagger Docs** | http://localhost:5271/swagger |
+| **Backend API** | http://localhost:3006 |
+| **Swagger Docs** | http://localhost:3006/swagger |
 
 ### Viewing Logs
 
@@ -48,14 +48,14 @@ If you need to run services individually:
 
 ```bash
 cd backend/KSignal.API
-dotnet watch run
+dotnet watch run --urls "http://localhost:3006"
 ```
 
 ### Frontend Only
 
 ```bash
 cd web
-export BACKEND_API_BASE_URL="http://localhost:5271"
+export BACKEND_API_BASE_URL="http://localhost:3006"
 dotnet watch run
 ```
 
@@ -102,7 +102,7 @@ kalshi-signals/
 If you get a "port already in use" error:
 
 ```bash
-# Use the kill_backend script to kill processes on port 5271
+# Use the kill_backend script to kill processes on port 3006
 ./kill_backend.sh
 
 # Kill all dotnet processes
@@ -110,7 +110,7 @@ killall -9 dotnet
 
 # Or kill specific ports manually
 lsof -ti :3011 | xargs kill -9
-lsof -ti :5271 | xargs kill -9
+lsof -ti :3006 | xargs kill -9
 ```
 
 ### Firebase Not Loading
@@ -134,7 +134,7 @@ rm -rf web/bin web/obj backend/KSignal.API/bin backend/KSignal.API/obj
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `BACKEND_API_BASE_URL` | `http://localhost:5271` | Backend API base URL |
+| `BACKEND_API_BASE_URL` | `http://localhost:3006` | Backend API base URL |
 | `JWT_SECRET` | `dev-secret-key-...` | Secret key for JWT token signing (min 32 chars) |
 | `ASPNETCORE_ENVIRONMENT` | `Development` | ASP.NET environment |
 
