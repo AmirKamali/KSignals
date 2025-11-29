@@ -24,7 +24,7 @@ builder.Services.Configure<FirebaseOptions>(options =>
         ?? options.CredentialPath;
 
     options.CredentialJson =
-        ?? builder.Configuration["FIREBASE_CREDENTIALS_BASE64"]
+        builder.Configuration["FIREBASE_CREDENTIALS_BASE64"]
         ?? options.CredentialJson;
 
     options.CookieDomain =
