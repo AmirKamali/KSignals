@@ -9,10 +9,16 @@ builder.Services.AddRazorPages();
 builder.Services.Configure<BackendOptions>(options =>
 {
     // Prefer env var to match the Next.js app default, fall back to appsettings.
-    options.BaseUrl =
+    var baseUrl =
         builder.Configuration["BACKEND_API_BASE_URL"]
         ?? builder.Configuration.GetSection("Backend")["BaseUrl"]
         ?? "http://localhost:3006";
+
+    options.BaseUrl = baseUrl;
+    options.PublicBaseUrl =
+        builder.Configuration["BACKEND_API_PUBLIC_URL"]
+        ?? builder.Configuration.GetSection("Backend")["PublicBaseUrl"]
+        ?? baseUrl;
 });
 
 builder.Services.AddHttpClient<BackendClient>();

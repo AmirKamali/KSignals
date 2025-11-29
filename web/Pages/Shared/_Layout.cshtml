@@ -1,5 +1,8 @@
 ﻿@using Microsoft.Extensions.Configuration
+@using Microsoft.Extensions.Options
+@using web_asp.Models
 @inject IConfiguration Configuration
+@inject IOptions<BackendOptions> BackendOptions
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -49,10 +52,20 @@
         </div>
     </header>
 
+    @{
+        var backendBaseUrl =
+            BackendOptions?.Value?.PublicBaseUrl
+            ?? Configuration["BACKEND_API_PUBLIC_URL"]
+            ?? Configuration.GetSection("Backend")["PublicBaseUrl"]
+            ?? Configuration["BACKEND_API_BASE_URL"]
+            ?? Configuration.GetSection("Backend")["BaseUrl"]
+            ?? "https://api.kalshisignals.com";
+    }
+
     @RenderBody()
 
     <script>
-        window.backendBaseUrl = '@(Environment.GetEnvironmentVariable("BACKEND_API_BASE_URL") ?? Configuration.GetSection("Backend")["BaseUrl"] ?? "http://localhost:5271")';
+        window.backendBaseUrl = '@backendBaseUrl';
     </script>
     <script src="https://www.gstatic.com/firebasejs/11.0.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/11.0.1/firebase-auth-compat.js"></script>

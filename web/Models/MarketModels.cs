@@ -44,4 +44,5 @@ public class MarketQuery
 public class BackendOptions
 {
     public string BaseUrl { get; set; } = "http://localhost:3006";
+    public string PublicBaseUrl { get; set; } = "http://localhost:3006";
 }
