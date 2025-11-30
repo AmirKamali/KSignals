@@ -2,12 +2,10 @@ using Kalshi.Api;
 using Kalshi.Api.Client;
 using Kalshi.Api.Model;
 using KSignal.API.Data;
-using KSignal.API.Extensions;
 using KSignal.API.Models;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
-using Newtonsoft.Json;
 
 namespace KSignal.API.Services;
 
@@ -120,7 +118,6 @@ public class KalshiService
         var markets = await marketsQuery
             .Skip(skip)
             .Take(safePageSize)
-            .SelectWithoutJsonResponse()
             .ToListAsync(cancellationToken);
         return new MarketPageResult
             {
@@ -294,7 +291,6 @@ CREATE TABLE IF NOT EXISTS Markets (
     SettlementValueDollars VARCHAR(255),
     NotionalValue INT,
     NotionalValueDollars VARCHAR(255),
-    JsonResponse LONGTEXT,
     LastUpdate DATETIME,
     PRIMARY KEY (TickerId),
     KEY idx_series_ticker (SeriesTicker)
@@ -338,22 +334,28 @@ CREATE TABLE IF NOT EXISTS Markets (
         target.SettlementValueDollars = source.SettlementValueDollars;
         target.NotionalValue = source.NotionalValue;
         target.NotionalValueDollars = source.NotionalValueDollars;
-        target.JsonResponse = source.JsonResponse;
         target.LastUpdate = source.LastUpdate;
     }
 
     internal static MarketCache MapMarket(string seriesTicker, Market market, DateTime lastUpdate)
     {
+        var expirationTime = market.ExpectedExpirationTime ?? market.LatestExpirationTime;
+
+#pragma warning disable CS0612 // title/subtitle are deprecated in Kalshi API; still used as fallback until replacements are provided in responses
+        var legacyTitle = market.Title;
+        var legacySubtitle = market.Subtitle;
+#pragma warning restore CS0612
+
         return new MarketCache
         {
             TickerId = market.Ticker,
             SeriesTicker = seriesTicker,
-            Title = market.Title,
-            Subtitle = market.Subtitle,
+            Title = string.IsNullOrWhiteSpace(market.YesSubTitle) ? legacyTitle : market.YesSubTitle,
+            Subtitle = string.IsNullOrWhiteSpace(market.NoSubTitle) ? legacySubtitle : market.NoSubTitle,
             Volume = market.Volume,
             Volume24h = market.Volume24h,
             CreatedTime = market.CreatedTime,
-            ExpirationTime = market.ExpirationTime,
+            ExpirationTime = expirationTime,
             CloseTime = market.CloseTime,
             LatestExpirationTime = market.LatestExpirationTime,
             OpenTime = market.OpenTime,
@@ -380,7 +382,6 @@ CREATE TABLE IF NOT EXISTS Markets (
             SettlementValueDollars = market.SettlementValueDollars,
             NotionalValue = market.NotionalValue,
             NotionalValueDollars = market.NotionalValueDollars,
-            JsonResponse = JsonConvert.SerializeObject(market),
             LastUpdate = lastUpdate
         };
     }

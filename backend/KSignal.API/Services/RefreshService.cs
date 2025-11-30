@@ -1009,7 +1009,6 @@ public class RefreshService
         target.SettlementValueDollars = source.SettlementValueDollars;
         target.NotionalValue = source.NotionalValue;
         target.NotionalValueDollars = source.NotionalValueDollars;
-        target.JsonResponse = source.JsonResponse;
         target.LastUpdate = source.LastUpdate;
     }
 

@@ -14,12 +14,14 @@ public class BackendPrivateController : ControllerBase
 {
     private readonly KalshiService _kalshiService;
     private readonly RefreshService _refreshService;
+    private readonly SynchronizationService _synchronizationService;
     private readonly ILogger<BackendPrivateController> _logger;
 
-    public BackendPrivateController(KalshiService kalshiService, RefreshService refreshService, ILogger<BackendPrivateController> logger)
+    public BackendPrivateController(KalshiService kalshiService, RefreshService refreshService, SynchronizationService synchronizationService, ILogger<BackendPrivateController> logger)
     {
         _kalshiService = kalshiService ?? throw new ArgumentNullException(nameof(kalshiService));
         _refreshService = refreshService ?? throw new ArgumentNullException(nameof(refreshService));
+        _synchronizationService = synchronizationService ?? throw new ArgumentNullException(nameof(synchronizationService));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
 
@@ -164,6 +166,27 @@ public class BackendPrivateController : ControllerBase
         {
             _logger.LogError(ex, "Failed to refresh today markets");
             return StatusCode(StatusCodes.Status500InternalServerError, new { error = "Failed to refresh today markets", message = ex.Message });
+        }
+    }
+
+    [HttpPost("synchronize-market-data")]
+    [ProducesResponseType(StatusCodes.Status202Accepted)]
+    [ProducesResponseType(StatusCodes.Status500InternalServerError)]
+    public async Task<IActionResult> SynchronizeMarketData([FromQuery] string? cursor = null)
+    {
+        try
+        {
+            await _synchronizationService.EnqueueMarketSyncAsync(cursor, HttpContext.RequestAborted);
+            return Accepted(new
+            {
+                started = true,
+                cursor = cursor ?? "<start>"
+            });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to enqueue market synchronization");
+            return StatusCode(StatusCodes.Status500InternalServerError, new { error = "Failed to enqueue market synchronization", message = ex.Message });
         }
     }
 }

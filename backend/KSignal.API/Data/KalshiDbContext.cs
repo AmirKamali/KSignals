@@ -69,7 +69,6 @@ namespace KSignal.API.Data;
         market.Property(e => e.SettlementValueDollars);
         market.Property(e => e.NotionalValue);
         market.Property(e => e.NotionalValueDollars);
-        market.Property(e => e.JsonResponse);
         market.Property(e => e.LastUpdate).IsRequired();
 
         var user = modelBuilder.Entity<User>();

@@ -1,5 +1,4 @@
 using System.ComponentModel.DataAnnotations;
-using System.Text.Json.Serialization;
 
 namespace KSignal.API.Models;
 
@@ -40,7 +39,5 @@ public class MarketCache
     public string? SettlementValueDollars { get; set; }
     public int NotionalValue { get; set; }
     public string? NotionalValueDollars { get; set; }
-    public string? JsonResponse { get; set; }
     public DateTime LastUpdate { get; set; }
 }
-

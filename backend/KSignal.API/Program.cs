@@ -7,6 +7,7 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
 using System.Text;
 using Microsoft.Extensions.Logging;
+using MassTransit;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -115,7 +116,56 @@ else
     builder.Services.AddSingleton(new KalshiClient());
 }
 
+var rabbitSection = builder.Configuration.GetSection("RabbitMq");
+var rabbitAddress = Environment.GetEnvironmentVariable("RABBITMQ_ADDRESS") ?? rabbitSection["Address"];
+var rabbitHost = Environment.GetEnvironmentVariable("RABBITMQ_HOST") ?? rabbitSection["Host"] ?? "localhost";
+var rabbitPortEnv = Environment.GetEnvironmentVariable("RABBITMQ_PORT") ?? rabbitSection["Port"];
+var rabbitUser = Environment.GetEnvironmentVariable("RABBITMQ_USERNAME") ?? rabbitSection["Username"] ?? "guest";
+var rabbitPass = Environment.GetEnvironmentVariable("RABBITMQ_PASSWORD") ?? rabbitSection["Password"] ?? "guest";
+var rabbitVirtualHost = Environment.GetEnvironmentVariable("RABBITMQ_VHOST") ?? rabbitSection["VirtualHost"] ?? "/";
+var rabbitPort = ushort.TryParse(rabbitPortEnv, out var parsedPort) ? parsedPort : (ushort)5672;
+
+if (!string.IsNullOrWhiteSpace(rabbitAddress))
+{
+    var uri = new Uri(rabbitAddress);
+    rabbitHost = string.IsNullOrWhiteSpace(uri.Host) ? rabbitHost : uri.Host;
+    if (!uri.IsDefaultPort)
+    {
+        rabbitPort = uri.Port <= ushort.MaxValue ? (ushort)uri.Port : rabbitPort;
+    }
+    rabbitVirtualHost = string.IsNullOrWhiteSpace(uri.AbsolutePath) ? rabbitVirtualHost : uri.AbsolutePath.TrimStart('/');
+
+    if (!string.IsNullOrWhiteSpace(uri.UserInfo))
+    {
+        var parts = uri.UserInfo.Split(':', 2);
+        rabbitUser = parts.Length > 0 && !string.IsNullOrWhiteSpace(parts[0]) ? parts[0] : rabbitUser;
+        if (parts.Length > 1 && !string.IsNullOrWhiteSpace(parts[1]))
+        {
+            rabbitPass = parts[1];
+        }
+    }
+}
+
+builder.Services.AddMassTransit(x =>
+{
+    x.SetKebabCaseEndpointNameFormatter();
+
+    x.AddConsumer<SynchronizeMarketDataConsumer>();
+
+    x.UsingRabbitMq((context, cfg) =>
+    {
+        cfg.Host(rabbitHost, rabbitPort, rabbitVirtualHost, h =>
+        {
+            h.Username(rabbitUser);
+            h.Password(rabbitPass);
+        });
+
+        cfg.ConfigureEndpoints(context);
+    });
+});
+
 builder.Services.AddScoped<KalshiService>();
+builder.Services.AddScoped<SynchronizationService>();
 builder.Services.AddSingleton<RefreshService>();
 
 // Register Redis cache service as singleton (connection pooling)

@@ -10,6 +10,7 @@ services:
       - ASPNETCORE_ENVIRONMENT=Development
       - ASPNETCORE_URLS=http://+:3006
       - ASPNETCORE_HTTP_PORTS=3006
+      - RABBITMQ_ADDRESS=${RABBITMQ_ADDRESS:-amqp://rabbitmq:5672/}
       - KALSHI_REDIS_CONNECTION=${KALSHI_REDIS_CONNECTION:-redis:6379}
       - KALSHI_DB_HOST=${KALSHI_DB_HOST:?Set KALSHI_DB_HOST}
       - KALSHI_DB_USER=${KALSHI_DB_USER:?Set KALSHI_DB_USER}
@@ -34,6 +35,22 @@ services:
       - "traefik.http.routers.ksignals-backend.tls.certresolver=letsencrypt"
       - "traefik.http.services.ksignals-backend.loadbalancer.server.port=3006"
       - "traefik.http.routers.ksignals-backend.middlewares=default-secure-headers@file"
+
+  rabbitmq:
+    image: rabbitmq:3.13-management
+    container_name: rabbitmq
+    platform: ${DOCKER_PLATFORM:-linux/amd64}
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    environment:
+      - RABBITMQ_DEFAULT_USER=${RABBITMQ_DEFAULT_USER:-guest}
+      - RABBITMQ_DEFAULT_PASS=${RABBITMQ_DEFAULT_PASS:-guest}
+    volumes:
+      - rabbitmq-data:/var/lib/rabbitmq
+    networks:
+      - kalshi-network
+    restart: unless-stopped
 
   # Web Client
   web:
@@ -69,3 +86,7 @@ networks:
     name: kalshi-network
   web:
     external: true
+
+volumes:
+  rabbitmq-data:
+    driver: local
