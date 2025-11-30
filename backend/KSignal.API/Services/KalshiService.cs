@@ -23,7 +23,7 @@ public class KalshiService
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _db = db ?? throw new ArgumentNullException(nameof(db));
 
-        var connectionString = configuration.GetConnectionString("KalshiMySql");
+        var connectionString = configuration.GetConnectionString("KalshiClickHouse");
         if (string.IsNullOrWhiteSpace(connectionString))
         {
             throw new InvalidOperationException("Database connection string is missing. Set KALSHI_DB_HOST, KALSHI_DB_USER, KALSHI_DB_PASSWORD, and KALSHI_DB_NAME or KALSHI_DB_CONNECTION.");

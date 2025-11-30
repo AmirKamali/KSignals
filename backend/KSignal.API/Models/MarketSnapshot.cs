@@ -1,5 +1,4 @@
 using System.ComponentModel.DataAnnotations;
-using System.ComponentModel.DataAnnotations.Schema;
 
 
 namespace KSignal.API.Models;
@@ -7,7 +6,6 @@ namespace KSignal.API.Models;
 public class MarketSnapshot
 {
     [Key]
-    [DatabaseGenerated(DatabaseGeneratedOption.Identity)]
 
     public long MarketSnapshotID { get; set; }
     

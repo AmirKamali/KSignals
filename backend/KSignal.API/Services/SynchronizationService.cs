@@ -329,6 +329,14 @@ public class SynchronizationService
             return;
         }
 
+        // Generate IDs manually (ClickHouse generateSerialID requires ZooKeeper which may not be configured)
+        var maxId = await _dbContext.MarketSnapshots.MaxAsync(s => (long?)s.MarketSnapshotID, cancellationToken) ?? 0;
+        var nextId = maxId + 1;
+        
+        foreach (var market in markets)
+        {
+            market.MarketSnapshotID = nextId++;
+        }
 
         // Always insert new snapshots (no updates needed for snapshot table)
         await _dbContext.MarketSnapshots.AddRangeAsync(markets, cancellationToken);
