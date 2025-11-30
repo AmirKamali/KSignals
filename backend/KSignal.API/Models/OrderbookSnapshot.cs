@@ -1,0 +1,72 @@
+using System.ComponentModel.DataAnnotations;
+
+namespace KSignal.API.Models;
+
+/// <summary>
+/// Represents a point-in-time snapshot of a market's orderbook
+/// </summary>
+public class OrderbookSnapshot
+{
+    /// <summary>
+    /// Unique identifier for this snapshot
+    /// </summary>
+    [Key]
+    public long Id { get; set; }
+    
+    /// <summary>
+    /// Market ticker ID
+    /// </summary>
+    [Required]
+    [MaxLength(255)]
+    public string MarketId { get; set; } = string.Empty;
+    
+    /// <summary>
+    /// Timestamp when this snapshot was captured
+    /// </summary>
+    public DateTime CapturedAt { get; set; }
+    
+    /// <summary>
+    /// Yes bid levels as JSON array of [price, size] pairs
+    /// </summary>
+    public string? YesLevels { get; set; }
+    
+    /// <summary>
+    /// No bid levels as JSON array of [price, size] pairs
+    /// </summary>
+    public string? NoLevels { get; set; }
+    
+    /// <summary>
+    /// Yes bid levels in dollars as JSON array
+    /// </summary>
+    public string? YesDollars { get; set; }
+    
+    /// <summary>
+    /// No bid levels in dollars as JSON array
+    /// </summary>
+    public string? NoDollars { get; set; }
+    
+    /// <summary>
+    /// Best (highest) yes bid price
+    /// </summary>
+    public double? BestYes { get; set; }
+    
+    /// <summary>
+    /// Best (highest) no bid price
+    /// </summary>
+    public double? BestNo { get; set; }
+    
+    /// <summary>
+    /// Spread between best yes and best no (100 - bestYes - bestNo)
+    /// </summary>
+    public double? Spread { get; set; }
+    
+    /// <summary>
+    /// Total liquidity on yes side (sum of all yes quantities)
+    /// </summary>
+    public double TotalYesLiquidity { get; set; }
+    
+    /// <summary>
+    /// Total liquidity on no side (sum of all no quantities)
+    /// </summary>
+    public double TotalNoLiquidity { get; set; }
+}

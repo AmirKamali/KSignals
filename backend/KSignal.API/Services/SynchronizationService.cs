@@ -572,4 +572,292 @@ public class SynchronizationService
             IsDeleted = false
         };
     }
+
+    public async Task EnqueueOrderbookSyncAsync(CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            _logger.LogInformation("Queueing orderbook synchronization");
+            await _publishEndpoint.Publish(new SynchronizeOrderbook(), cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Unexpected error while trying to enqueue orderbook synchronization. Exception type: {ExceptionType}", ex.GetType().Name);
+            throw;
+        }
+    }
+
+    public async Task SynchronizeOrderbooksAsync(CancellationToken cancellationToken)
+    {
+        try
+        {
+            // Get top 5 high-priority markets ordered by priority (descending)
+            // Use AsNoTracking since we only read these records
+            var highPriorityMarkets = await _dbContext.MarketHighPriorities
+                .AsNoTracking()
+                .OrderByDescending(m => m.Priority)
+                .Take(5)
+                .ToListAsync(cancellationToken);
+
+            if (highPriorityMarkets.Count == 0)
+            {
+                _logger.LogWarning("No high-priority markets configured for orderbook sync");
+                return;
+            }
+
+            _logger.LogInformation("Syncing orderbooks for {Count} high-priority markets", highPriorityMarkets.Count);
+
+            var now = DateTime.UtcNow;
+            var snapshotsToInsert = new List<OrderbookSnapshot>();
+            var eventsToInsert = new List<OrderbookEvent>();
+
+            // Get max ID for generating new IDs
+            var maxSnapshotId = await _dbContext.OrderbookSnapshots.MaxAsync(s => (long?)s.Id, cancellationToken) ?? 0;
+            var maxEventId = await _dbContext.OrderbookEvents.MaxAsync(e => (long?)e.Id, cancellationToken) ?? 0;
+            var nextSnapshotId = maxSnapshotId + 1;
+            var nextEventId = maxEventId + 1;
+
+            foreach (var market in highPriorityMarkets)
+            {
+                try
+                {
+                    _logger.LogDebug("Fetching orderbook for market {TickerId}", market.TickerId);
+                    
+                    var response = await _kalshiClient.Markets.GetMarketOrderbookAsync(
+                        market.TickerId,
+                        depth: 0, // Get all levels
+                        cancellationToken: cancellationToken);
+
+                    if (response?.Orderbook == null || (response.Orderbook.Yes == null && response.Orderbook.No == null))
+                    {
+                        _logger.LogWarning("No orderbook data for market {TickerId}", market.TickerId);
+                        continue;
+                    }
+
+                    var orderbook = response.Orderbook;
+                    
+                    // Handle null arrays from API (empty orderbook)
+                    var yesLevels = orderbook.Yes ?? new List<List<decimal>>();
+                    var noLevels = orderbook.No ?? new List<List<decimal>>();
+                    var yesDollars = orderbook.YesDollars ?? new List<List<string>>();
+                    var noDollars = orderbook.NoDollars ?? new List<List<string>>();
+                    
+                    // Get the previous snapshot to compute events
+                    var previousSnapshot = await _dbContext.OrderbookSnapshots
+                        .Where(s => s.MarketId == market.TickerId)
+                        .OrderByDescending(s => s.CapturedAt)
+                        .FirstOrDefaultAsync(cancellationToken);
+
+                    // Calculate metrics
+                    var bestYes = yesLevels.Count > 0 ? (double)yesLevels[0][0] : (double?)null;
+                    var bestNo = noLevels.Count > 0 ? (double)noLevels[0][0] : (double?)null;
+                    var spread = (bestYes.HasValue && bestNo.HasValue) ? 100 - bestYes.Value - bestNo.Value : (double?)null;
+                    var totalYesLiquidity = yesLevels.Sum(level => (double)level[1]);
+                    var totalNoLiquidity = noLevels.Sum(level => (double)level[1]);
+
+                    // Create snapshot
+                    var snapshot = new OrderbookSnapshot
+                    {
+                        Id = nextSnapshotId++,
+                        MarketId = market.TickerId,
+                        CapturedAt = now,
+                        YesLevels = JsonConvert.SerializeObject(yesLevels),
+                        NoLevels = JsonConvert.SerializeObject(noLevels),
+                        YesDollars = JsonConvert.SerializeObject(yesDollars),
+                        NoDollars = JsonConvert.SerializeObject(noDollars),
+                        BestYes = bestYes,
+                        BestNo = bestNo,
+                        Spread = spread,
+                        TotalYesLiquidity = totalYesLiquidity,
+                        TotalNoLiquidity = totalNoLiquidity
+                    };
+                    snapshotsToInsert.Add(snapshot);
+
+                    // Compute orderbook events by comparing with previous snapshot
+                    if (previousSnapshot != null)
+                    {
+                        var events = ComputeOrderbookEvents(
+                            market.TickerId, 
+                            previousSnapshot, 
+                            yesLevels,
+                            noLevels,
+                            now, 
+                            ref nextEventId);
+                        eventsToInsert.AddRange(events);
+                    }
+                    
+                    // Note: We don't update LastUpdate on market_highpriority here because
+                    // ClickHouse ReplacingMergeTree uses LastUpdate as the version column
+                    // and doesn't allow direct updates. The sync time can be tracked via
+                    // orderbook_snapshots.CapturedAt instead.
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Error fetching orderbook for market {TickerId}", market.TickerId);
+                }
+            }
+
+            // Save all snapshots and events
+            if (snapshotsToInsert.Count > 0)
+            {
+                await _dbContext.OrderbookSnapshots.AddRangeAsync(snapshotsToInsert, cancellationToken);
+            }
+            if (eventsToInsert.Count > 0)
+            {
+                await _dbContext.OrderbookEvents.AddRangeAsync(eventsToInsert, cancellationToken);
+            }
+            
+            await _dbContext.SaveChangesAsync(cancellationToken);
+
+            _logger.LogInformation("Orderbook sync complete: {Snapshots} snapshots, {Events} events created",
+                snapshotsToInsert.Count, eventsToInsert.Count);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error synchronizing orderbooks");
+            throw;
+        }
+    }
+
+    /// <summary>
+    /// Computes incremental orderbook events by diffing previous snapshot with current orderbook.
+    /// 
+    /// Event types:
+    /// - add: A new price level appears (previously no orders at this price, now size > 0)
+    /// - update: A price level's total size changes (was > 0, still > 0 but different)
+    /// - remove: A price level disappears (was > 0, now 0 or missing)
+    /// 
+    /// Note: Size field represents the TOTAL size at that price level after the event (not delta).
+    /// This allows simple replay: just set book[side, price] = size (or remove if size == 0).
+    /// </summary>
+    private static List<OrderbookEvent> ComputeOrderbookEvents(
+        string marketId,
+        OrderbookSnapshot previousSnapshot,
+        List<List<decimal>> currentYesLevels,
+        List<List<decimal>> currentNoLevels,
+        DateTime eventTime,
+        ref long nextEventId)
+    {
+        var events = new List<OrderbookEvent>();
+
+        // Parse previous levels from JSON
+        var prevYes = !string.IsNullOrEmpty(previousSnapshot.YesLevels) 
+            ? JsonConvert.DeserializeObject<List<List<decimal>>>(previousSnapshot.YesLevels) ?? new List<List<decimal>>()
+            : new List<List<decimal>>();
+        var prevNo = !string.IsNullOrEmpty(previousSnapshot.NoLevels)
+            ? JsonConvert.DeserializeObject<List<List<decimal>>>(previousSnapshot.NoLevels) ?? new List<List<decimal>>()
+            : new List<List<decimal>>();
+
+        // Convert to dictionaries for comparison (price -> size)
+        var prevYesDict = prevYes.ToDictionary(l => l[0], l => l[1]);
+        var prevNoDict = prevNo.ToDictionary(l => l[0], l => l[1]);
+        var currYesDict = currentYesLevels.ToDictionary(l => l[0], l => l[1]);
+        var currNoDict = currentNoLevels.ToDictionary(l => l[0], l => l[1]);
+
+        // Compare YES side - detect ADD and UPDATE events
+        foreach (var (price, size) in currYesDict)
+        {
+            if (!prevYesDict.TryGetValue(price, out var prevSize) || prevSize == 0)
+            {
+                // ADD: Previously no orders at this price, now there are
+                events.Add(new OrderbookEvent
+                {
+                    Id = nextEventId++,
+                    MarketId = marketId,
+                    EventTime = eventTime,
+                    Side = "YES",
+                    Price = (double)price,
+                    Size = (double)size, // Total size after event
+                    EventType = "add"
+                });
+            }
+            else if (size != prevSize)
+            {
+                // UPDATE: Price level still exists but size changed
+                events.Add(new OrderbookEvent
+                {
+                    Id = nextEventId++,
+                    MarketId = marketId,
+                    EventTime = eventTime,
+                    Side = "YES",
+                    Price = (double)price,
+                    Size = (double)size, // Total size after event (NOT delta)
+                    EventType = "update"
+                });
+            }
+        }
+        
+        // Compare YES side - detect REMOVE events
+        foreach (var (price, prevSize) in prevYesDict)
+        {
+            if (prevSize > 0 && (!currYesDict.TryGetValue(price, out var currSize) || currSize == 0))
+            {
+                // REMOVE: Price level disappeared
+                events.Add(new OrderbookEvent
+                {
+                    Id = nextEventId++,
+                    MarketId = marketId,
+                    EventTime = eventTime,
+                    Side = "YES",
+                    Price = (double)price,
+                    Size = 0, // Explicit zero for remove
+                    EventType = "remove"
+                });
+            }
+        }
+
+        // Compare NO side - detect ADD and UPDATE events
+        foreach (var (price, size) in currNoDict)
+        {
+            if (!prevNoDict.TryGetValue(price, out var prevSize) || prevSize == 0)
+            {
+                // ADD: Previously no orders at this price, now there are
+                events.Add(new OrderbookEvent
+                {
+                    Id = nextEventId++,
+                    MarketId = marketId,
+                    EventTime = eventTime,
+                    Side = "NO",
+                    Price = (double)price,
+                    Size = (double)size, // Total size after event
+                    EventType = "add"
+                });
+            }
+            else if (size != prevSize)
+            {
+                // UPDATE: Price level still exists but size changed
+                events.Add(new OrderbookEvent
+                {
+                    Id = nextEventId++,
+                    MarketId = marketId,
+                    EventTime = eventTime,
+                    Side = "NO",
+                    Price = (double)price,
+                    Size = (double)size, // Total size after event (NOT delta)
+                    EventType = "update"
+                });
+            }
+        }
+        
+        // Compare NO side - detect REMOVE events
+        foreach (var (price, prevSize) in prevNoDict)
+        {
+            if (prevSize > 0 && (!currNoDict.TryGetValue(price, out var currSize) || currSize == 0))
+            {
+                // REMOVE: Price level disappeared
+                events.Add(new OrderbookEvent
+                {
+                    Id = nextEventId++,
+                    MarketId = marketId,
+                    EventTime = eventTime,
+                    Side = "NO",
+                    Price = (double)price,
+                    Size = 0, // Explicit zero for remove
+                    EventType = "remove"
+                });
+            }
+        }
+
+        return events;
+    }
 }

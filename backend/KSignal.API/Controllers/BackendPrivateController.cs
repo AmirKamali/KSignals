@@ -149,4 +149,30 @@ public class BackendPrivateController : ControllerBase
             return StatusCode(StatusCodes.Status500InternalServerError, new { error = "Failed to enqueue events synchronization", message = ex.Message });
         }
     }
+
+    [HttpPost("sync-orderbook")]
+    [ProducesResponseType(StatusCodes.Status202Accepted)]
+    [ProducesResponseType(StatusCodes.Status500InternalServerError)]
+    public async Task<IActionResult> SynchronizeOrderbook()
+    {
+        try
+        {
+            await _synchronizationService.EnqueueOrderbookSyncAsync(HttpContext.RequestAborted);
+            return Accepted(new
+            {
+                started = true,
+                message = "Orderbook synchronization queued for high-priority markets"
+            });
+        }
+        catch (RabbitMqUnavailableException ex)
+        {
+            _logger.LogWarning(ex, "RabbitMQ unavailable while trying to enqueue orderbook synchronization");
+            return StatusCode(StatusCodes.Status503ServiceUnavailable, new { error = "RabbitMQ unavailable", message = ex.Message });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to enqueue orderbook synchronization");
+            return StatusCode(StatusCodes.Status500InternalServerError, new { error = "Failed to enqueue orderbook synchronization", message = ex.Message });
+        }
+    }
 }

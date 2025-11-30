@@ -165,3 +165,57 @@ CREATE TABLE IF NOT EXISTS kalshi_signals.market_events
 ENGINE = ReplacingMergeTree(LastUpdate)
 ORDER BY (EventTicker)
 SETTINGS index_granularity = 8192;
+
+-- Create market_highpriority table
+-- Tracks markets that should have orderbook synced frequently
+CREATE TABLE IF NOT EXISTS kalshi_signals.market_highpriority
+(
+    TickerId String,
+    Priority Int32,
+    LastUpdate DateTime,
+    INDEX idx_market_highpriority_priority Priority TYPE minmax GRANULARITY 1
+)
+ENGINE = ReplacingMergeTree(LastUpdate)
+ORDER BY (TickerId)
+SETTINGS index_granularity = 8192;
+
+-- Create orderbook_snapshots table
+-- Stores point-in-time snapshots of orderbook state
+CREATE TABLE IF NOT EXISTS kalshi_signals.orderbook_snapshots
+(
+    Id Int64,
+    MarketId String,
+    CapturedAt DateTime,
+    YesLevels Nullable(String),
+    NoLevels Nullable(String),
+    YesDollars Nullable(String),
+    NoDollars Nullable(String),
+    BestYes Nullable(Float64),
+    BestNo Nullable(Float64),
+    Spread Nullable(Float64),
+    TotalYesLiquidity Float64,
+    TotalNoLiquidity Float64,
+    INDEX idx_orderbook_snapshots_market_id MarketId TYPE bloom_filter GRANULARITY 1,
+    INDEX idx_orderbook_snapshots_captured_at CapturedAt TYPE minmax GRANULARITY 1
+)
+ENGINE = MergeTree()
+ORDER BY (MarketId, CapturedAt)
+SETTINGS index_granularity = 8192;
+
+-- Create orderbook_events table
+-- Stores computed changes between orderbook snapshots
+CREATE TABLE IF NOT EXISTS kalshi_signals.orderbook_events
+(
+    Id Int64,
+    MarketId String,
+    EventTime DateTime,
+    Side String,
+    Price Float64,
+    Size Float64,
+    EventType String,
+    INDEX idx_orderbook_events_market_id MarketId TYPE bloom_filter GRANULARITY 1,
+    INDEX idx_orderbook_events_event_time EventTime TYPE minmax GRANULARITY 1
+)
+ENGINE = MergeTree()
+ORDER BY (MarketId, EventTime)
+SETTINGS index_granularity = 8192;

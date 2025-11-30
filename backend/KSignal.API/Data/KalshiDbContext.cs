@@ -15,6 +15,9 @@ namespace KSignal.API.Data;
         public DbSet<User> Users => Set<User>();
         public DbSet<MarketSeries> MarketSeries => Set<MarketSeries>();
         public DbSet<MarketEvent> MarketEvents => Set<MarketEvent>();
+        public DbSet<MarketHighPriority> MarketHighPriorities => Set<MarketHighPriority>();
+        public DbSet<OrderbookSnapshot> OrderbookSnapshots => Set<OrderbookSnapshot>();
+        public DbSet<OrderbookEvent> OrderbookEvents => Set<OrderbookEvent>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -160,5 +163,44 @@ namespace KSignal.API.Data;
         marketEvent.Property(e => e.ProductMetadata);
         marketEvent.Property(e => e.LastUpdate).IsRequired();
         marketEvent.Property(e => e.IsDeleted).IsRequired();
+
+        var marketHighPriority = modelBuilder.Entity<MarketHighPriority>();
+        marketHighPriority.ToTable("market_highpriority");
+        marketHighPriority.HasKey(e => e.TickerId);
+        marketHighPriority.Property(e => e.TickerId).HasMaxLength(255).IsRequired();
+        marketHighPriority.Property(e => e.Priority).IsRequired();
+        marketHighPriority.HasIndex(e => e.Priority).HasDatabaseName("idx_market_highpriority_priority");
+        marketHighPriority.Property(e => e.LastUpdate).IsRequired();
+
+        var orderbookSnapshot = modelBuilder.Entity<OrderbookSnapshot>();
+        orderbookSnapshot.ToTable("orderbook_snapshots");
+        orderbookSnapshot.HasKey(e => e.Id);
+        orderbookSnapshot.Property(e => e.Id).ValueGeneratedNever();
+        orderbookSnapshot.Property(e => e.MarketId).HasMaxLength(255).IsRequired();
+        orderbookSnapshot.HasIndex(e => e.MarketId).HasDatabaseName("idx_orderbook_snapshots_market_id");
+        orderbookSnapshot.HasIndex(e => e.CapturedAt).HasDatabaseName("idx_orderbook_snapshots_captured_at");
+        orderbookSnapshot.Property(e => e.CapturedAt).IsRequired();
+        orderbookSnapshot.Property(e => e.YesLevels);
+        orderbookSnapshot.Property(e => e.NoLevels);
+        orderbookSnapshot.Property(e => e.YesDollars);
+        orderbookSnapshot.Property(e => e.NoDollars);
+        orderbookSnapshot.Property(e => e.BestYes);
+        orderbookSnapshot.Property(e => e.BestNo);
+        orderbookSnapshot.Property(e => e.Spread);
+        orderbookSnapshot.Property(e => e.TotalYesLiquidity).IsRequired();
+        orderbookSnapshot.Property(e => e.TotalNoLiquidity).IsRequired();
+
+        var orderbookEvent = modelBuilder.Entity<OrderbookEvent>();
+        orderbookEvent.ToTable("orderbook_events");
+        orderbookEvent.HasKey(e => e.Id);
+        orderbookEvent.Property(e => e.Id).ValueGeneratedNever();
+        orderbookEvent.Property(e => e.MarketId).HasMaxLength(255).IsRequired();
+        orderbookEvent.HasIndex(e => e.MarketId).HasDatabaseName("idx_orderbook_events_market_id");
+        orderbookEvent.HasIndex(e => e.EventTime).HasDatabaseName("idx_orderbook_events_event_time");
+        orderbookEvent.Property(e => e.EventTime).IsRequired();
+        orderbookEvent.Property(e => e.Side).HasMaxLength(10).IsRequired();
+        orderbookEvent.Property(e => e.Price).IsRequired();
+        orderbookEvent.Property(e => e.Size).IsRequired();
+        orderbookEvent.Property(e => e.EventType).HasMaxLength(20).IsRequired();
     }
 }
