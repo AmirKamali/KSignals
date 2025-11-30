@@ -133,7 +133,13 @@ if (!string.IsNullOrWhiteSpace(rabbitAddress))
     {
         rabbitPort = uri.Port <= ushort.MaxValue ? (ushort)uri.Port : rabbitPort;
     }
-    rabbitVirtualHost = string.IsNullOrWhiteSpace(uri.AbsolutePath) ? rabbitVirtualHost : uri.AbsolutePath.TrimStart('/');
+    // Parse virtual host from URI path
+    if (!string.IsNullOrWhiteSpace(uri.AbsolutePath))
+    {
+        var vhost = uri.AbsolutePath.TrimStart('/');
+        // If path is "/" or empty after trimming, use default "/"
+        rabbitVirtualHost = string.IsNullOrWhiteSpace(vhost) ? "/" : vhost;
+    }
 
     if (!string.IsNullOrWhiteSpace(uri.UserInfo))
     {
@@ -154,6 +160,10 @@ builder.Services.AddMassTransit(x =>
 
     x.UsingRabbitMq((context, cfg) =>
     {
+        var logger = context.GetRequiredService<ILogger<Program>>();
+        logger.LogInformation("Configuring MassTransit RabbitMQ connection: Host={Host}, Port={Port}, VirtualHost={VirtualHost}, Username={Username}",
+            rabbitHost, rabbitPort, rabbitVirtualHost, rabbitUser);
+
         cfg.Host(rabbitHost, rabbitPort, rabbitVirtualHost, h =>
         {
             h.Username(rabbitUser);

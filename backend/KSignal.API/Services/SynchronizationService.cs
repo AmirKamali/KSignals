@@ -29,10 +29,19 @@ public class SynchronizationService
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
 
-    public Task EnqueueMarketSyncAsync(string? cursor, CancellationToken cancellationToken = default)
+    public async Task EnqueueMarketSyncAsync(string? cursor, CancellationToken cancellationToken = default)
     {
-        _logger.LogInformation("Queueing market synchronization (cursor={Cursor})", cursor ?? "<start>");
-        return _publishEndpoint.Publish(new SynchronizeMarketData(cursor), cancellationToken);
+        try
+        {
+            _logger.LogInformation("Queueing market synchronization (cursor={Cursor})", cursor ?? "<start>");
+            await _publishEndpoint.Publish(new SynchronizeMarketData(cursor), cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            // Re-throw other exceptions as-is
+            _logger.LogError(ex, "Unexpected error while trying to enqueue synchronization. Exception type: {ExceptionType}", exceptionTypeName);
+            throw;
+        }
     }
 
     public async Task SynchronizeMarketDataAsync(SynchronizeMarketData command, CancellationToken cancellationToken)

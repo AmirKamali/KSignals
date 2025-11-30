@@ -183,6 +183,11 @@ public class BackendPrivateController : ControllerBase
                 cursor = cursor ?? "<start>"
             });
         }
+        catch (RabbitMqUnavailableException ex)
+        {
+            _logger.LogWarning(ex, "RabbitMQ unavailable while trying to enqueue synchronization");
+            return StatusCode(StatusCodes.Status503ServiceUnavailable, new { error = "RabbitMQ unavailable", message = ex.Message });
+        }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Failed to enqueue market synchronization");
