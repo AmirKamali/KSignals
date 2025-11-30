@@ -1,6 +1,6 @@
 -- Create tables for Kalshi Signals application
--- Note: ClickHouse doesn't support auto-increment, so IDs will need to be generated manually in application code
--- Using Int64 for ID fields to match .NET int type (though ClickHouse Int64 is 64-bit, .NET int is 32-bit)
+-- Using generateSerialID() for auto-increment IDs (ClickHouse 25.1+)
+-- Using UInt64 for ID fields with generateSerialID default
 
 -- Create market_categories table
 CREATE TABLE IF NOT EXISTS kalshi_signals.market_categories
@@ -19,10 +19,10 @@ ORDER BY (SeriesId)
 SETTINGS index_granularity = 8192;
 
 -- Create market_snapshots table
--- Using Int64 for MarketSnapshotID (will need manual ID generation in app code)
+-- Using generateSerialID for auto-increment MarketSnapshotID
 CREATE TABLE IF NOT EXISTS kalshi_signals.market_snapshots
 (
-    MarketSnapshotID Int64,
+    MarketSnapshotID UInt64 DEFAULT generateSerialID('market_snapshots'),
     Ticker String,
     SeriesId String,
     EventTicker String,
@@ -87,10 +87,10 @@ ORDER BY (Ticker, SeriesId, GenerateDate)
 SETTINGS index_granularity = 8192;
 
 -- Create TagsCategories table
--- Using Int64 for Id (will need manual ID generation in app code)
+-- Using generateSerialID for auto-increment Id
 CREATE TABLE IF NOT EXISTS kalshi_signals.TagsCategories
 (
-    Id Int64,
+    Id UInt64 DEFAULT generateSerialID('tags_categories'),
     Category String,
     Tag String,
     LastUpdate DateTime,
@@ -101,10 +101,10 @@ ORDER BY (Category, Tag)
 SETTINGS index_granularity = 8192;
 
 -- Create Users table
--- Using Int64 for Id (will need manual ID generation in app code)
+-- Using generateSerialID for auto-increment Id
 CREATE TABLE IF NOT EXISTS kalshi_signals.Users
 (
-    Id Int64,
+    Id UInt64 DEFAULT generateSerialID('users'),
     FirebaseId String,
     Username Nullable(String),
     FirstName Nullable(String),

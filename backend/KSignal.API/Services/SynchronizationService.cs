@@ -329,15 +329,6 @@ public class SynchronizationService
             return;
         }
 
-        // Get max ID for generating new IDs (ClickHouse doesn't support auto-increment)
-        var maxId = await _dbContext.MarketSnapshots.MaxAsync(s => (long?)s.MarketSnapshotID, cancellationToken) ?? 0;
-        var nextId = maxId + 1;
-
-        // Assign IDs to each snapshot
-        foreach (var snapshot in markets)
-        {
-            snapshot.MarketSnapshotID = nextId++;
-        }
 
         // Always insert new snapshots (no updates needed for snapshot table)
         await _dbContext.MarketSnapshots.AddRangeAsync(markets, cancellationToken);
