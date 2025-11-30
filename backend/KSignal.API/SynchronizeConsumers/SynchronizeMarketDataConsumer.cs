@@ -20,7 +20,14 @@ public class SynchronizeMarketDataConsumer : IConsumer<SynchronizeMarketData>
 
     public async Task Consume(ConsumeContext<SynchronizeMarketData> context)
     {
-        _logger.LogInformation("Starting market synchronization for cursor={Cursor}", context.Message.Cursor ?? "<start>");
+        if (!string.IsNullOrWhiteSpace(context.Message.MarketTickerId))
+        {
+            _logger.LogInformation("Starting single market synchronization for ticker={TickerId}", context.Message.MarketTickerId);
+        }
+        else
+        {
+            _logger.LogInformation("Starting market synchronization for cursor={Cursor}", context.Message.Cursor ?? "<start>");
+        }
         await _synchronizationService.SynchronizeMarketDataAsync(context.Message, context.CancellationToken);
     }
 }

@@ -29,12 +29,19 @@ public class SynchronizationService
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
 
-    public async Task EnqueueMarketSyncAsync(string? cursor, CancellationToken cancellationToken = default)
+    public async Task EnqueueMarketSyncAsync(string? cursor, string? marketTickerId = null, CancellationToken cancellationToken = default)
     {
         try
         {
-            _logger.LogInformation("Queueing market synchronization (cursor={Cursor})", cursor ?? "<start>");
-            await _publishEndpoint.Publish(new SynchronizeMarketData(cursor), cancellationToken);
+            if (!string.IsNullOrWhiteSpace(marketTickerId))
+            {
+                _logger.LogInformation("Queueing single market synchronization for ticker={TickerId}", marketTickerId);
+            }
+            else
+            {
+                _logger.LogInformation("Queueing market synchronization (cursor={Cursor})", cursor ?? "<start>");
+            }
+            await _publishEndpoint.Publish(new SynchronizeMarketData(cursor, marketTickerId), cancellationToken);
         }
         catch (Exception ex)
         {
@@ -46,6 +53,14 @@ public class SynchronizationService
 
     public async Task SynchronizeMarketDataAsync(SynchronizeMarketData command, CancellationToken cancellationToken)
     {
+        // If a specific market ticker is provided, sync only that market
+        if (!string.IsNullOrWhiteSpace(command.MarketTickerId))
+        {
+            await SynchronizeSingleMarketAsync(command.MarketTickerId, cancellationToken);
+            return;
+        }
+
+        // Otherwise, sync all markets (existing behavior)
         var request = BuildRequest(command.Cursor);
         var response = await _kalshiClient.Markets.AsynchronousClient.GetAsync<GetMarketsResponse>(
             "/markets",
@@ -72,6 +87,41 @@ public class SynchronizationService
         {
             _logger.LogInformation("Queueing next market sync page (cursor={Cursor})", payload.Cursor);
             await _publishEndpoint.Publish(new SynchronizeMarketData(payload.Cursor), cancellationToken);
+        }
+    }
+
+    private async Task SynchronizeSingleMarketAsync(string marketTickerId, CancellationToken cancellationToken)
+    {
+        try
+        {
+            _logger.LogInformation("Fetching single market from Kalshi API: {TickerId}", marketTickerId);
+
+            var response = await _kalshiClient.Markets.GetMarketAsync(marketTickerId, cancellationToken: cancellationToken);
+            var market = response?.Market;
+
+            if (market == null)
+            {
+                _logger.LogWarning("Market {TickerId} was not returned from Kalshi API", marketTickerId);
+                return;
+            }
+
+            var fetchedAt = DateTime.UtcNow;
+            var seriesKey = string.IsNullOrWhiteSpace(market.EventTicker) ? market.Ticker : market.EventTicker;
+            var mapped = KalshiService.MapMarket(seriesKey ?? marketTickerId, market, fetchedAt);
+
+            await InsertMarketSnapshotsAsync(new[] { mapped }, cancellationToken);
+            
+            _logger.LogInformation("Successfully synchronized market {TickerId}", marketTickerId);
+        }
+        catch (ApiException apiEx)
+        {
+            _logger.LogError(apiEx, "Kalshi API error fetching market {TickerId}", marketTickerId);
+            throw;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error synchronizing market {TickerId}", marketTickerId);
+            throw;
         }
     }
 

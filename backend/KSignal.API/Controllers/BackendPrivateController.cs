@@ -32,16 +32,31 @@ public class BackendPrivateController : ControllerBase
 
     [HttpPost("sync-market-snapshots")]
     [ProducesResponseType(StatusCodes.Status202Accepted)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status500InternalServerError)]
-    public async Task<IActionResult> SynchronizeMarketData([FromQuery] string? cursor = null)
+    public async Task<IActionResult> SynchronizeMarketData(
+        [FromQuery] string? cursor = null,
+        [FromQuery] string? market_ticker_id = null)
     {
         try
         {
-            await _synchronizationService.EnqueueMarketSyncAsync(cursor, HttpContext.RequestAborted);
+            await _synchronizationService.EnqueueMarketSyncAsync(cursor, market_ticker_id, HttpContext.RequestAborted);
+            
+            if (!string.IsNullOrWhiteSpace(market_ticker_id))
+            {
+                return Accepted(new
+                {
+                    started = true,
+                    message = $"Market synchronization queued for ticker: {market_ticker_id}",
+                    market_ticker_id = market_ticker_id
+                });
+            }
+            
             return Accepted(new
             {
                 started = true,
-                cursor = cursor ?? "<start>"
+                cursor = cursor ?? "<start>",
+                message = "Market synchronization queued"
             });
         }
         catch (RabbitMqUnavailableException ex)
