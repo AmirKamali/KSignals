@@ -24,6 +24,7 @@ CREATE TABLE IF NOT EXISTS kalshi_signals.market_snapshots
 (
     MarketSnapshotID Int64,
     Ticker String,
+    SeriesId String,
     EventTicker String,
     MarketType String,
     YesSubTitle String,
@@ -82,7 +83,7 @@ CREATE TABLE IF NOT EXISTS kalshi_signals.market_snapshots
     GenerateDate DateTime
 )
 ENGINE = MergeTree()
-ORDER BY (Ticker, GenerateDate)
+ORDER BY (Ticker, SeriesId, GenerateDate)
 SETTINGS index_granularity = 8192;
 
 -- Create TagsCategories table

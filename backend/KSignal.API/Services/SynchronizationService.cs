@@ -37,12 +37,29 @@ public class SynchronizationService
             if (!string.IsNullOrWhiteSpace(marketTickerId))
             {
                 _logger.LogInformation("Queueing single market synchronization for ticker={TickerId}", marketTickerId);
+                await _publishEndpoint.Publish(new SynchronizeMarketData(null, cursor, marketTickerId), cancellationToken);
+                return;
             }
-            else
+            
+            // Load all seriesIds from market_series and enqueue each
+            var seriesIds = await _dbContext.MarketSeries
+                .AsNoTracking()
+                .Where(s => !s.IsDeleted)
+                .Select(s => s.Ticker)
+                .ToListAsync(cancellationToken);
+
+            if (seriesIds.Count == 0)
             {
-                _logger.LogInformation("Queueing market synchronization (cursor={Cursor})", cursor ?? "<start>");
+                _logger.LogWarning("No series found in market_series table. Please sync market series first.");
+                return;
             }
-            await _publishEndpoint.Publish(new SynchronizeMarketData(cursor, marketTickerId), cancellationToken);
+
+            _logger.LogInformation("Queueing market synchronization for {Count} series", seriesIds.Count);
+            
+            foreach (var seriesId in seriesIds)
+            {
+                await _publishEndpoint.Publish(new SynchronizeMarketData(seriesId, null), cancellationToken);
+            }
         }
         catch (Exception ex)
         {
@@ -61,8 +78,15 @@ public class SynchronizationService
             return;
         }
 
-        // Otherwise, sync all markets (existing behavior)
-        var request = BuildRequest(command.Cursor);
+        // SeriesId is required for bulk sync
+        if (string.IsNullOrWhiteSpace(command.SeriesId))
+        {
+            _logger.LogWarning("SeriesId is required for market synchronization");
+            return;
+        }
+
+        // Sync markets for a specific series
+        var request = BuildRequest(command.SeriesId, command.Cursor);
         var response = await _kalshiClient.Markets.AsynchronousClient.GetAsync<GetMarketsResponse>(
             "/markets",
             request,
@@ -71,14 +95,15 @@ public class SynchronizationService
 
         var payload = response?.Data ?? new GetMarketsResponse();
         var fetchedAt = DateTime.UtcNow;
-        _logger.LogInformation("Fetched {Count} markets from Kalshi.API (cursor={Cursor})", payload.Markets.Count, command.Cursor ?? "<start>");
+        _logger.LogInformation("Fetched {Count} markets from Kalshi.API for series={SeriesId} (cursor={Cursor})", 
+            payload.Markets.Count, command.SeriesId, command.Cursor ?? "<start>");
 
         var mapped = payload.Markets
             .Where(m => m != null)
             .Select(m =>
             {
                 var seriesKey = string.IsNullOrWhiteSpace(m.EventTicker) ? m.Ticker : m.EventTicker;
-                return KalshiService.MapMarket(seriesKey ?? m.Ticker, m, fetchedAt);
+                return KalshiService.MapMarket(seriesKey ?? m.Ticker, command.SeriesId, m, fetchedAt);
             })
             .ToList();
 
@@ -86,8 +111,8 @@ public class SynchronizationService
 
         if (!string.IsNullOrWhiteSpace(payload.Cursor))
         {
-            _logger.LogInformation("Queueing next market sync page (cursor={Cursor})", payload.Cursor);
-            await _publishEndpoint.Publish(new SynchronizeMarketData(payload.Cursor), cancellationToken);
+            _logger.LogInformation("Queueing next market sync page for series={SeriesId} (cursor={Cursor})", command.SeriesId, payload.Cursor);
+            await _publishEndpoint.Publish(new SynchronizeMarketData(command.SeriesId, payload.Cursor), cancellationToken);
         }
     }
 
@@ -108,7 +133,19 @@ public class SynchronizationService
 
             var fetchedAt = DateTime.UtcNow;
             var seriesKey = string.IsNullOrWhiteSpace(market.EventTicker) ? market.Ticker : market.EventTicker;
-            var mapped = KalshiService.MapMarket(seriesKey ?? marketTickerId, market, fetchedAt);
+            
+            // Look up the seriesId from market_events table using EventTicker
+            var seriesId = string.Empty;
+            if (!string.IsNullOrWhiteSpace(market.EventTicker))
+            {
+                var marketEvent = await _dbContext.MarketEvents
+                    .AsNoTracking()
+                    .Where(e => e.EventTicker == market.EventTicker)
+                    .FirstOrDefaultAsync(cancellationToken);
+                seriesId = marketEvent?.SeriesTicker ?? string.Empty;
+            }
+            
+            var mapped = KalshiService.MapMarket(seriesKey ?? marketTickerId, seriesId, market, fetchedAt);
 
             await InsertMarketSnapshotsAsync(new[] { mapped }, cancellationToken);
             
@@ -126,7 +163,7 @@ public class SynchronizationService
         }
     }
 
-    private static RequestOptions BuildRequest(string? cursor)
+    private static RequestOptions BuildRequest(string seriesId, string? cursor)
     {
         var requestOptions = new RequestOptions
         {
@@ -136,6 +173,7 @@ public class SynchronizationService
         requestOptions.QueryParameters.Add(ClientUtils.ParameterToMultiMap("", "limit", 250));
         requestOptions.QueryParameters.Add(ClientUtils.ParameterToMultiMap("", "status", "open"));
         requestOptions.QueryParameters.Add(ClientUtils.ParameterToMultiMap("", "with_nested_markets", true));
+        requestOptions.QueryParameters.Add(ClientUtils.ParameterToMultiMap("", "series_ticker", seriesId));
 
         if (!string.IsNullOrWhiteSpace(cursor))
         {
@@ -289,6 +327,16 @@ public class SynchronizationService
         {
             _logger.LogInformation("No market snapshots to insert for this page");
             return;
+        }
+
+        // Get max ID for generating new IDs (ClickHouse doesn't support auto-increment)
+        var maxId = await _dbContext.MarketSnapshots.MaxAsync(s => (long?)s.MarketSnapshotID, cancellationToken) ?? 0;
+        var nextId = maxId + 1;
+
+        // Assign IDs to each snapshot
+        foreach (var snapshot in markets)
+        {
+            snapshot.MarketSnapshotID = nextId++;
         }
 
         // Always insert new snapshots (no updates needed for snapshot table)

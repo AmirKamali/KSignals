@@ -159,7 +159,19 @@ public class KalshiService
 
             var fetchedAtUtc = DateTime.UtcNow;
             var seriesTicker = string.IsNullOrWhiteSpace(market.EventTicker) ? market.Ticker : market.EventTicker;
-            var mapped = MapMarket(seriesTicker ?? tickerId, market, fetchedAtUtc);
+            
+            // Look up the seriesId from market_events table using EventTicker
+            var seriesId = string.Empty;
+            if (!string.IsNullOrWhiteSpace(market.EventTicker))
+            {
+                var marketEvent = await _db.MarketEvents
+                    .AsNoTracking()
+                    .Where(e => e.EventTicker == market.EventTicker)
+                    .FirstOrDefaultAsync(cancellationToken);
+                seriesId = marketEvent?.SeriesTicker ?? string.Empty;
+            }
+            
+            var mapped = MapMarket(seriesTicker ?? tickerId, seriesId, market, fetchedAtUtc);
 
             // Find the most recent snapshot for this ticker
             var existing = await _db.MarketSnapshots
@@ -169,6 +181,9 @@ public class KalshiService
             
             if (existing == null)
             {
+                // Generate ID manually (ClickHouse doesn't support auto-increment)
+                var maxId = await _db.MarketSnapshots.MaxAsync(s => (long?)s.MarketSnapshotID, cancellationToken) ?? 0;
+                mapped.MarketSnapshotID = maxId + 1;
                 await _db.MarketSnapshots.AddAsync(mapped, cancellationToken);
             }
             else
@@ -326,11 +341,12 @@ public class KalshiService
         return targetDate;
     }
 
-    internal static MarketSnapshot MapMarket(string seriesTicker, Market market, DateTime generateDate)
+    internal static MarketSnapshot MapMarket(string seriesTicker, string seriesId, Market market, DateTime generateDate)
     {
         return new MarketSnapshot
         {
             Ticker = market.Ticker,
+            SeriesId = seriesId,
             EventTicker = market.EventTicker,
             MarketType = market.MarketType.ToString(),
             YesSubTitle = market.YesSubTitle,

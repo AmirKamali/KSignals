@@ -1,15 +1,18 @@
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 
+
 namespace KSignal.API.Models;
 
 public class MarketSnapshot
 {
     [Key]
     [DatabaseGenerated(DatabaseGeneratedOption.Identity)]
-    public int MarketSnapshotID { get; set; }
+
+    public long MarketSnapshotID { get; set; }
     
     public string Ticker { get; set; } = string.Empty;
+    public string SeriesId { get; set; } = string.Empty;
     public string EventTicker { get; set; } = string.Empty;
     public string MarketType { get; set; } = string.Empty;
     public string YesSubTitle { get; set; } = string.Empty;

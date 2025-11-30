@@ -24,9 +24,14 @@ public class SynchronizeMarketDataConsumer : IConsumer<SynchronizeMarketData>
         {
             _logger.LogInformation("Starting single market synchronization for ticker={TickerId}", context.Message.MarketTickerId);
         }
+        else if (!string.IsNullOrWhiteSpace(context.Message.SeriesId))
+        {
+            _logger.LogInformation("Starting market synchronization for series={SeriesId} cursor={Cursor}", 
+                context.Message.SeriesId, context.Message.Cursor ?? "<start>");
+        }
         else
         {
-            _logger.LogInformation("Starting market synchronization for cursor={Cursor}", context.Message.Cursor ?? "<start>");
+            _logger.LogWarning("Market synchronization message missing both MarketTickerId and SeriesId");
         }
         await _synchronizationService.SynchronizeMarketDataAsync(context.Message, context.CancellationToken);
     }
