@@ -256,11 +256,15 @@ string BuildConnectionString(ConfigurationManager configuration)
     var dbUser = Environment.GetEnvironmentVariable("KALSHI_DB_USER");
     var dbPassword = Environment.GetEnvironmentVariable("KALSHI_DB_PASSWORD");
     var dbName = Environment.GetEnvironmentVariable("KALSHI_DB_NAME") ?? "kalshi_signals";
-    var dbPort = Environment.GetEnvironmentVariable("KALSHI_DB_PORT") ?? "9000";
+    var dbPort = Environment.GetEnvironmentVariable("KALSHI_DB_PORT") ?? "8123";
+    var dbProtocol = Environment.GetEnvironmentVariable("KALSHI_DB_PROTOCOL") ?? "http";
 
     if (!string.IsNullOrWhiteSpace(dbUser) && !string.IsNullOrWhiteSpace(dbPassword))
     {
-        return $"Host={dbHost};Port={dbPort};Database={dbName};User={dbUser};Password={dbPassword}";
+        // ClickHouse.Driver uses HTTP protocol on port 8123 by default
+        // Format per official documentation: https://clickhouse.com/docs/integrations/csharp
+        // ClickHouse.Driver expects 'Username' parameter
+        return $"Host={dbHost};Port={dbPort};Database={dbName};Username={dbUser};Password={dbPassword}";
     }
 
     var envConnectionString = Environment.GetEnvironmentVariable("KALSHI_DB_CONNECTION");

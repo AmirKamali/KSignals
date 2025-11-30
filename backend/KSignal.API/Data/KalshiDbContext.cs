@@ -98,11 +98,14 @@ namespace KSignal.API.Data;
         var tagsCategory = modelBuilder.Entity<TagsCategory>();
         tagsCategory.ToTable("TagsCategories");
         tagsCategory.HasKey(e => e.Id);
+        // ClickHouse doesn't support RETURNING clause, so generate values client-side
+        tagsCategory.Property(e => e.Id).ValueGeneratedNever();
         tagsCategory.HasIndex(e => new { e.Category, e.Tag }).IsUnique();
         tagsCategory.Property(e => e.Category).HasMaxLength(255).IsRequired();
         tagsCategory.Property(e => e.Tag).HasMaxLength(255).IsRequired();
         tagsCategory.Property(e => e.LastUpdate).IsRequired();
-        tagsCategory.Property(e => e.IsDeleted).HasDefaultValue(false);
+        // Don't use HasDefaultValue as it triggers RETURNING clause in ClickHouse
+        tagsCategory.Property(e => e.IsDeleted).IsRequired();
 
         var user = modelBuilder.Entity<User>();
         user.ToTable("Users");

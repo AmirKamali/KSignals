@@ -5,7 +5,7 @@ namespace KSignal.API.Models;
 public class TagsCategory
 {
     [Key]
-    public int Id { get; set; }
+    public long Id { get; set; }
     
     [Required]
     [MaxLength(255)]

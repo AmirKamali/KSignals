@@ -216,6 +216,9 @@ public class SynchronizationService
 
             var existingDict = existingRecords
                 .ToDictionary(e => (e.Category, e.Tag), e => e);
+            
+            // Get max ID for generating new IDs (ClickHouse doesn't support auto-increment)
+            var nextId = existingRecords.Count > 0 ? existingRecords.Max(e => e.Id) + 1 : 1;
 
             var updatedCount = 0;
             var insertedCount = 0;
@@ -246,7 +249,8 @@ public class SynchronizationService
                 }
                 else
                 {
-                    // New record - insert it
+                    // New record - assign ID and insert it
+                    incoming.Id = nextId++;
                     await _dbContext.TagsCategories.AddAsync(incoming, cancellationToken);
                     insertedCount++;
                 }

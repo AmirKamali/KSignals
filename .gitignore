@@ -8,3 +8,5 @@ shared/KSignals.DTO/bin
 shared/KSignals.DTO/obj
 firebase_credentials_raw.json
 .env
+logs/backend.log
+logs/frontend.log
