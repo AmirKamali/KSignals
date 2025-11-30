@@ -333,7 +333,7 @@ public class SynchronizationService
             
             // Build a set of incoming ticker keys for quick lookup
             var incomingTickers = new HashSet<string>();
-            var incomingRecords = new List<SeriesData>();
+            var incomingRecords = new List<MarketSeries>();
 
             foreach (var series in response.Series)
             {
@@ -341,7 +341,7 @@ public class SynchronizationService
                     continue;
 
                 incomingTickers.Add(series.Ticker);
-                incomingRecords.Add(MapSeriesToSeriesData(series, now));
+                incomingRecords.Add(MapSeriesToMarketSeries(series, now));
             }
 
             if (incomingRecords.Count == 0)
@@ -351,7 +351,7 @@ public class SynchronizationService
             }
 
             // Load all existing records
-            var existingRecords = await _dbContext.Series
+            var existingRecords = await _dbContext.MarketSeries
                 .ToListAsync(cancellationToken);
 
             _logger.LogInformation("Found {Count} existing series records", existingRecords.Count);
@@ -395,7 +395,7 @@ public class SynchronizationService
                 else
                 {
                     // New record - insert it (Ticker is the primary key)
-                    await _dbContext.Series.AddAsync(incoming, cancellationToken);
+                    await _dbContext.MarketSeries.AddAsync(incoming, cancellationToken);
                     insertedCount++;
                 }
             }
@@ -424,9 +424,9 @@ public class SynchronizationService
         }
     }
 
-    private static SeriesData MapSeriesToSeriesData(Series series, DateTime timestamp)
+    private static MarketSeries MapSeriesToMarketSeries(Series series, DateTime timestamp)
     {
-        return new SeriesData
+        return new MarketSeries
         {
             Ticker = series.Ticker,
             Frequency = series.Frequency ?? string.Empty,

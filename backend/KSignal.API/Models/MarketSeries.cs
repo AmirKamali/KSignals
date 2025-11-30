@@ -5,7 +5,7 @@ namespace KSignal.API.Models;
 /// <summary>
 /// Represents a Kalshi series - a template for recurring events
 /// </summary>
-public class SeriesData
+public class MarketSeries
 {
     /// <summary>
     /// Ticker that identifies this series (primary key)
