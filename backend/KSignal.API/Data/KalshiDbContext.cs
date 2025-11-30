@@ -14,6 +14,7 @@ namespace KSignal.API.Data;
         public DbSet<TagsCategory> TagsCategories => Set<TagsCategory>();
         public DbSet<User> Users => Set<User>();
         public DbSet<MarketSeries> MarketSeries => Set<MarketSeries>();
+        public DbSet<MarketEvent> MarketEvents => Set<MarketEvent>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -140,5 +141,24 @@ namespace KSignal.API.Data;
         marketSeries.Property(e => e.AdditionalProhibitions);
         marketSeries.Property(e => e.LastUpdate).IsRequired();
         marketSeries.Property(e => e.IsDeleted).IsRequired();
+
+        var marketEvent = modelBuilder.Entity<MarketEvent>();
+        marketEvent.ToTable("market_events");
+        marketEvent.HasKey(e => e.EventTicker);
+        marketEvent.Property(e => e.EventTicker).HasMaxLength(255).IsRequired();
+        marketEvent.Property(e => e.SeriesTicker).HasMaxLength(255).IsRequired();
+        marketEvent.HasIndex(e => e.SeriesTicker).HasDatabaseName("idx_market_events_series_ticker");
+        marketEvent.Property(e => e.SubTitle).IsRequired();
+        marketEvent.Property(e => e.Title).IsRequired();
+        marketEvent.Property(e => e.CollateralReturnType).HasMaxLength(50).IsRequired();
+        marketEvent.Property(e => e.MutuallyExclusive).IsRequired();
+        marketEvent.Property(e => e.Category).HasMaxLength(255).IsRequired();
+        marketEvent.HasIndex(e => e.Category).HasDatabaseName("idx_market_events_category");
+        marketEvent.Property(e => e.StrikeDate);
+        marketEvent.Property(e => e.StrikePeriod).HasMaxLength(50);
+        marketEvent.Property(e => e.AvailableOnBrokers).IsRequired();
+        marketEvent.Property(e => e.ProductMetadata);
+        marketEvent.Property(e => e.LastUpdate).IsRequired();
+        marketEvent.Property(e => e.IsDeleted).IsRequired();
     }
 }

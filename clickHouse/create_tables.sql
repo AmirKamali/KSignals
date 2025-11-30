@@ -141,3 +141,27 @@ CREATE TABLE IF NOT EXISTS kalshi_signals.market_series
 ENGINE = ReplacingMergeTree(LastUpdate)
 ORDER BY (Ticker)
 SETTINGS index_granularity = 8192;
+
+-- Create market_events table
+-- EventTicker is the primary key
+CREATE TABLE IF NOT EXISTS kalshi_signals.market_events
+(
+    EventTicker String,
+    SeriesTicker String,
+    SubTitle String,
+    Title String,
+    CollateralReturnType String,
+    MutuallyExclusive UInt8,
+    Category String,
+    StrikeDate Nullable(DateTime),
+    StrikePeriod Nullable(String),
+    AvailableOnBrokers UInt8,
+    ProductMetadata Nullable(String),
+    LastUpdate DateTime,
+    IsDeleted UInt8 DEFAULT 0,
+    INDEX idx_market_events_series_ticker SeriesTicker TYPE bloom_filter GRANULARITY 1,
+    INDEX idx_market_events_category Category TYPE bloom_filter GRANULARITY 1
+)
+ENGINE = ReplacingMergeTree(LastUpdate)
+ORDER BY (EventTicker)
+SETTINGS index_granularity = 8192;

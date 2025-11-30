@@ -448,4 +448,128 @@ public class SynchronizationService
             IsDeleted = false
         };
     }
+
+    public async Task EnqueueEventsSyncAsync(string? cursor = null, CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            _logger.LogInformation("Queueing events synchronization (cursor={Cursor})", cursor ?? "<start>");
+            await _publishEndpoint.Publish(new SynchronizeEvents(cursor), cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Unexpected error while trying to enqueue events synchronization. Exception type: {ExceptionType}", ex.GetType().Name);
+            throw;
+        }
+    }
+
+    public async Task SynchronizeEventsAsync(SynchronizeEvents command, CancellationToken cancellationToken)
+    {
+        try
+        {
+            _logger.LogInformation("Fetching events from Kalshi API (cursor={Cursor})", command.Cursor ?? "<start>");
+            
+            var response = await _kalshiClient.Events.GetEventsAsync(
+                limit: 200,
+                cursor: command.Cursor,
+                withNestedMarkets: false,
+                cancellationToken: cancellationToken);
+            
+            if (response?.Events == null || response.Events.Count == 0)
+            {
+                _logger.LogInformation("No more events to sync");
+                return;
+            }
+
+            _logger.LogInformation("Received {Count} events from Kalshi API", response.Events.Count);
+
+            var now = DateTime.UtcNow;
+            var eventsToInsert = new List<MarketEvent>();
+            var existingTickers = new HashSet<string>();
+
+            // Get existing event tickers for this batch
+            var incomingTickers = response.Events.Select(e => e.EventTicker).ToList();
+            var existingEvents = await _dbContext.MarketEvents
+                .Where(e => incomingTickers.Contains(e.EventTicker))
+                .ToDictionaryAsync(e => e.EventTicker, e => e, cancellationToken);
+
+            foreach (var eventData in response.Events)
+            {
+                if (string.IsNullOrWhiteSpace(eventData.EventTicker))
+                    continue;
+
+                if (existingEvents.TryGetValue(eventData.EventTicker, out var existing))
+                {
+                    // Update existing record
+                    existing.SeriesTicker = eventData.SeriesTicker;
+                    existing.SubTitle = eventData.SubTitle;
+                    existing.Title = eventData.Title;
+                    existing.CollateralReturnType = eventData.CollateralReturnType;
+                    existing.MutuallyExclusive = eventData.MutuallyExclusive;
+                    existing.Category = eventData.Category;
+                    existing.StrikeDate = eventData.StrikeDate;
+                    existing.StrikePeriod = eventData.StrikePeriod;
+                    existing.AvailableOnBrokers = eventData.AvailableOnBrokers;
+                    existing.ProductMetadata = eventData.ProductMetadata != null 
+                        ? JsonConvert.SerializeObject(eventData.ProductMetadata) 
+                        : null;
+                    existing.LastUpdate = now;
+                    existing.IsDeleted = false;
+                }
+                else
+                {
+                    // Insert new record
+                    eventsToInsert.Add(MapEventDataToMarketEvent(eventData, now));
+                }
+            }
+
+            if (eventsToInsert.Count > 0)
+            {
+                await _dbContext.MarketEvents.AddRangeAsync(eventsToInsert, cancellationToken);
+            }
+
+            await _dbContext.SaveChangesAsync(cancellationToken);
+            
+            _logger.LogInformation("Synchronized {Updated} updated, {Inserted} inserted events", 
+                existingEvents.Count, eventsToInsert.Count);
+
+            // Queue next page if there's more data
+            if (!string.IsNullOrWhiteSpace(response.Cursor))
+            {
+                _logger.LogInformation("Queueing next events sync page (cursor={Cursor})", response.Cursor);
+                await _publishEndpoint.Publish(new SynchronizeEvents(response.Cursor), cancellationToken);
+            }
+            else
+            {
+                _logger.LogInformation("Events synchronization complete - no more pages");
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error synchronizing events");
+            throw;
+        }
+    }
+
+    private static MarketEvent MapEventDataToMarketEvent(EventData eventData, DateTime timestamp)
+    {
+        return new MarketEvent
+        {
+            EventTicker = eventData.EventTicker,
+            SeriesTicker = eventData.SeriesTicker,
+            SubTitle = eventData.SubTitle,
+            Title = eventData.Title,
+            CollateralReturnType = eventData.CollateralReturnType,
+            MutuallyExclusive = eventData.MutuallyExclusive,
+            Category = eventData.Category,
+            StrikeDate = eventData.StrikeDate,
+            StrikePeriod = eventData.StrikePeriod,
+            AvailableOnBrokers = eventData.AvailableOnBrokers,
+            ProductMetadata = eventData.ProductMetadata != null 
+                ? JsonConvert.SerializeObject(eventData.ProductMetadata) 
+                : null,
+            LastUpdate = timestamp,
+            IsDeleted = false
+        };
+    }
 }
