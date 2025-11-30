@@ -168,15 +168,17 @@ SETTINGS index_granularity = 8192;
 
 -- Create market_highpriority table
 -- Tracks markets that should have orderbook synced frequently
+-- TickerId is the PRIMARY KEY (via ORDER BY) - no duplicates allowed
+-- ReplacingMergeTree ensures only one row per TickerId (latest by LastUpdate)
 CREATE TABLE IF NOT EXISTS kalshi_signals.market_highpriority
 (
-    TickerId String,
+    TickerId String,  -- Primary Key
     Priority Int32,
     LastUpdate DateTime,
     INDEX idx_market_highpriority_priority Priority TYPE minmax GRANULARITY 1
 )
 ENGINE = ReplacingMergeTree(LastUpdate)
-ORDER BY (TickerId)
+ORDER BY (TickerId)  -- This defines the primary key
 SETTINGS index_granularity = 8192;
 
 -- Create orderbook_snapshots table
