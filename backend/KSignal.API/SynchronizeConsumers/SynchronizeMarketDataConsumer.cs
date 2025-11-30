@@ -1,8 +1,9 @@
 using KSignal.API.Messaging;
+using KSignal.API.Services;
 using MassTransit;
 using Microsoft.Extensions.Logging;
 
-namespace KSignal.API.Services;
+namespace KSignal.API.SynchronizeConsumers;
 
 public class SynchronizeMarketDataConsumer : IConsumer<SynchronizeMarketData>
 {

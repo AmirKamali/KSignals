@@ -7,7 +7,7 @@ namespace KSignal.API.Controllers;
 
 internal static class MarketResponseMapper
 {
-    public static IEnumerable<object> Shape(IEnumerable<MarketCache> markets, bool detailed = false)
+    public static IEnumerable<object> Shape(IEnumerable<MarketSnapshot> markets, bool detailed = false)
     {
         if (markets == null) yield break;
 
@@ -17,20 +17,22 @@ internal static class MarketResponseMapper
         }
     }
 
-    public static object ToResponse(MarketCache market, bool detailed = false, string? category = null, IEnumerable<string>? tags = null)
+    public static object ToResponse(MarketSnapshot market, bool detailed = false, string? category = null, IEnumerable<string>? tags = null)
     {
         return new
         {
-            market.TickerId,
-            market.SeriesTicker,
-            market.Title,
-            market.Subtitle,
+            market.MarketSnapshotID,
+            market.Ticker,
+            market.EventTicker,
+            market.MarketType,
+            market.YesSubTitle,
+            market.NoSubTitle,
             market.Volume,
             market.Volume24h,
             market.CreatedTime,
-            market.ExpirationTime,
-            market.CloseTime,
+            market.ExpectedExpirationTime,
             market.LatestExpirationTime,
+            market.CloseTime,
             market.OpenTime,
             market.Status,
             market.YesBid,
@@ -55,7 +57,7 @@ internal static class MarketResponseMapper
             market.SettlementValueDollars,
             market.NotionalValue,
             market.NotionalValueDollars,
-            market.LastUpdate,
+            market.GenerateDate,
             Category = category,
             Tags = tags?.ToArray()
         };

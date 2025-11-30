@@ -1,3 +1,4 @@
+using System.Linq;
 using Kalshi.Api;
 using Kalshi.Api.Client;
 using Kalshi.Api.Model;
@@ -6,6 +7,7 @@ using KSignal.API.Models;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
+using Newtonsoft.Json;
 
 namespace KSignal.API.Services;
 
@@ -64,7 +66,7 @@ public class KalshiService
                 _logger.LogWarning("No series found for category={Category}, tag={Tag}", category, tag);
                 return new MarketPageResult
                 {
-                    Markets = new List<MarketCache>(),
+                    Markets = new List<MarketSnapshot>(),
                     TotalCount = 0,
                     TotalPages = 0,
                     CurrentPage = 1,
@@ -76,13 +78,19 @@ public class KalshiService
         var nowUtc = DateTime.UtcNow;
         var maxCloseTime = GetMaxCloseTimeFromDateType(closeDateType, nowUtc);
 
-        var marketsQuery = _db.Markets
+        // Get the most recent snapshot for each ticker using a subquery
+        var marketsQuery = _db.MarketSnapshots
             .AsNoTracking()
-            .Where(p => p.CloseTime > nowUtc && p.Status == status);
+            .Where(p => p.CloseTime > nowUtc && p.Status == status)
+            .Where(p => p.GenerateDate == _db.MarketSnapshots
+                .Where(s => s.Ticker == p.Ticker && s.CloseTime > nowUtc && s.Status == status)
+                .Select(s => s.GenerateDate)
+                .DefaultIfEmpty()
+                .Max());
 
          if (seriesIds != null)
         {
-            marketsQuery = marketsQuery.Where(p => seriesIds.Contains(p.SeriesTicker));
+            marketsQuery = marketsQuery.Where(p => seriesIds.Contains(p.EventTicker));
         }
 
         if (maxCloseTime.HasValue)
@@ -94,10 +102,10 @@ public class KalshiService
         {
             var likePattern = $"%{searchTerm}%";
             marketsQuery = marketsQuery.Where(p =>
-                (p.Title != null && EF.Functions.Like(p.Title, likePattern)) ||
-                (p.Subtitle != null && EF.Functions.Like(p.Subtitle, likePattern)) ||
-                (p.SeriesTicker != null && EF.Functions.Like(p.SeriesTicker, likePattern)) ||
-                (p.TickerId != null && EF.Functions.Like(p.TickerId, likePattern)));
+                (p.YesSubTitle != null && EF.Functions.Like(p.YesSubTitle, likePattern)) ||
+                (p.NoSubTitle != null && EF.Functions.Like(p.NoSubTitle, likePattern)) ||
+                (p.EventTicker != null && EF.Functions.Like(p.EventTicker, likePattern)) ||
+                (p.Ticker != null && EF.Functions.Like(p.Ticker, likePattern)));
         }
 
         if (sortBy == MarketSort.Volume)
@@ -110,7 +118,7 @@ public class KalshiService
 
 
         var safePageSize = Math.Max(1, pageSize);
-        var totalCount = await marketsQuery.Select(m => m.TickerId).CountAsync();
+        var totalCount = await marketsQuery.Select(m => m.Ticker).CountAsync();
         var totalPages = (int)Math.Ceiling(totalCount / (double)safePageSize);
         var safePage = totalPages > 0 ? Math.Min(Math.Max(1, page), totalPages) : 1;
         var skip = (safePage - 1) * safePageSize;
@@ -129,14 +137,14 @@ public class KalshiService
             };
     }
 
-    public async Task<MarketCache?> GetMarketDetailsAsync(string tickerId, CancellationToken cancellationToken = default)
+    public async Task<MarketSnapshot?> GetMarketDetailsAsync(string tickerId, CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrWhiteSpace(tickerId))
         {
             throw new ArgumentException("TickerId is required", nameof(tickerId));
         }
 
-        await EnsureMarketsTableAsync(cancellationToken);
+        await _db.Database.EnsureCreatedAsync(cancellationToken);
 
         try
         {
@@ -153,14 +161,19 @@ public class KalshiService
             var seriesTicker = string.IsNullOrWhiteSpace(market.EventTicker) ? market.Ticker : market.EventTicker;
             var mapped = MapMarket(seriesTicker ?? tickerId, market, fetchedAtUtc);
 
-            var existing = await _db.Markets.FirstOrDefaultAsync(m => m.TickerId == mapped.TickerId, cancellationToken);
+            // Find the most recent snapshot for this ticker
+            var existing = await _db.MarketSnapshots
+                .Where(m => m.Ticker == mapped.Ticker)
+                .OrderByDescending(m => m.GenerateDate)
+                .FirstOrDefaultAsync(cancellationToken);
+            
             if (existing == null)
             {
-                await _db.Markets.AddAsync(mapped, cancellationToken);
+                await _db.MarketSnapshots.AddAsync(mapped, cancellationToken);
             }
             else
             {
-                CopyMarket(existing, mapped);
+                CopyMarketSnapshot(existing, mapped);
             }
 
             await _db.SaveChangesAsync(cancellationToken);
@@ -174,7 +187,7 @@ public class KalshiService
         }
     }
 
-    public async Task<(MarketCache? Market, MarketCategory? Category)> GetMarketDetailsWithCategoryAsync(string tickerId, CancellationToken cancellationToken = default)
+    public async Task<(MarketSnapshot? Market, MarketCategory? Category)> GetMarketDetailsWithCategoryAsync(string tickerId, CancellationToken cancellationToken = default)
     {
         var market = await GetMarketDetailsAsync(tickerId, cancellationToken);
         if (market == null)
@@ -184,10 +197,10 @@ public class KalshiService
 
         // Derive series id from tickerId by taking the first component before '-'
         var seriesId = string.Empty;
-        if (!string.IsNullOrWhiteSpace(market.TickerId))
+        if (!string.IsNullOrWhiteSpace(market.Ticker))
         {
-            var parts = market.TickerId.Split('-', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
-            seriesId = parts.Length > 0 ? parts[0] : market.TickerId;
+            var parts = market.Ticker.Split('-', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+            seriesId = parts.Length > 0 ? parts[0] : market.Ticker;
         }
 
         MarketCategory? category = null;
@@ -204,6 +217,67 @@ public class KalshiService
         }
 
         return (market, category);
+    }
+
+    private static void CopyMarketSnapshot(MarketSnapshot target, MarketSnapshot source)
+    {
+        target.Ticker = source.Ticker;
+        target.EventTicker = source.EventTicker;
+        target.MarketType = source.MarketType;
+        target.YesSubTitle = source.YesSubTitle;
+        target.NoSubTitle = source.NoSubTitle;
+        target.CreatedTime = source.CreatedTime;
+        target.OpenTime = source.OpenTime;
+        target.CloseTime = source.CloseTime;
+        target.ExpectedExpirationTime = source.ExpectedExpirationTime;
+        target.LatestExpirationTime = source.LatestExpirationTime;
+        target.SettlementTimerSeconds = source.SettlementTimerSeconds;
+        target.Status = source.Status;
+        target.ResponsePriceUnits = source.ResponsePriceUnits;
+        target.YesBid = source.YesBid;
+        target.YesBidDollars = source.YesBidDollars;
+        target.YesAsk = source.YesAsk;
+        target.YesAskDollars = source.YesAskDollars;
+        target.NoBid = source.NoBid;
+        target.NoBidDollars = source.NoBidDollars;
+        target.NoAsk = source.NoAsk;
+        target.NoAskDollars = source.NoAskDollars;
+        target.LastPrice = source.LastPrice;
+        target.LastPriceDollars = source.LastPriceDollars;
+        target.Volume = source.Volume;
+        target.Volume24h = source.Volume24h;
+        target.Result = source.Result;
+        target.CanCloseEarly = source.CanCloseEarly;
+        target.OpenInterest = source.OpenInterest;
+        target.NotionalValue = source.NotionalValue;
+        target.NotionalValueDollars = source.NotionalValueDollars;
+        target.PreviousYesBid = source.PreviousYesBid;
+        target.PreviousYesBidDollars = source.PreviousYesBidDollars;
+        target.PreviousYesAsk = source.PreviousYesAsk;
+        target.PreviousYesAskDollars = source.PreviousYesAskDollars;
+        target.PreviousPrice = source.PreviousPrice;
+        target.PreviousPriceDollars = source.PreviousPriceDollars;
+        target.Liquidity = source.Liquidity;
+        target.LiquidityDollars = source.LiquidityDollars;
+        target.SettlementValue = source.SettlementValue;
+        target.SettlementValueDollars = source.SettlementValueDollars;
+        target.ExpirationValue = source.ExpirationValue;
+        target.FeeWaiverExpirationTime = source.FeeWaiverExpirationTime;
+        target.EarlyCloseCondition = source.EarlyCloseCondition;
+        target.TickSize = source.TickSize;
+        target.StrikeType = source.StrikeType;
+        target.FloorStrike = source.FloorStrike;
+        target.CapStrike = source.CapStrike;
+        target.FunctionalStrike = source.FunctionalStrike;
+        target.CustomStrike = source.CustomStrike;
+        target.RulesPrimary = source.RulesPrimary;
+        target.RulesSecondary = source.RulesSecondary;
+        target.MveCollectionTicker = source.MveCollectionTicker;
+        target.MveSelectedLegs = source.MveSelectedLegs;
+        target.PrimaryParticipantKey = source.PrimaryParticipantKey;
+        target.PriceLevelStructure = source.PriceLevelStructure;
+        target.PriceRanges = source.PriceRanges;
+        target.GenerateDate = source.GenerateDate;
     }
 
     private static DateTime? GetMaxCloseTimeFromDateType(string? closeDateType, DateTime nowUtc)
@@ -252,114 +326,23 @@ public class KalshiService
         return targetDate;
     }
 
-
-    private async Task EnsureMarketsTableAsync(CancellationToken cancellationToken)
+    internal static MarketSnapshot MapMarket(string seriesTicker, Market market, DateTime generateDate)
     {
-        const string createSql = @"
-CREATE TABLE IF NOT EXISTS Markets (
-    TickerId VARCHAR(255) NOT NULL,
-    SeriesTicker VARCHAR(255) NOT NULL,
-    Title TEXT,
-    Subtitle TEXT,
-    Volume INT,
-    Volume24h INT,
-    CreatedTime DATETIME,
-    ExpirationTime DATETIME,
-    CloseTime DATETIME,
-    LatestExpirationTime DATETIME,
-    OpenTime DATETIME,
-    Status VARCHAR(64),
-    YesBid DECIMAL(18,4),
-    YesBidDollars VARCHAR(255),
-    YesAsk DECIMAL(18,4),
-    YesAskDollars VARCHAR(255),
-    NoBid DECIMAL(18,4),
-    NoBidDollars VARCHAR(255),
-    NoAsk DECIMAL(18,4),
-    NoAskDollars VARCHAR(255),
-    LastPrice DECIMAL(18,4),
-    LastPriceDollars VARCHAR(255),
-    PreviousYesBid INT,
-    PreviousYesBidDollars VARCHAR(255),
-    PreviousYesAsk INT,
-    PreviousYesAskDollars VARCHAR(255),
-    PreviousPrice INT,
-    PreviousPriceDollars VARCHAR(255),
-    Liquidity INT,
-    LiquidityDollars VARCHAR(255),
-    SettlementValue INT,
-    SettlementValueDollars VARCHAR(255),
-    NotionalValue INT,
-    NotionalValueDollars VARCHAR(255),
-    LastUpdate DATETIME,
-    PRIMARY KEY (TickerId),
-    KEY idx_series_ticker (SeriesTicker)
-) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;";
-
-        await _db.Database.ExecuteSqlRawAsync(createSql, cancellationToken);
-    }
-
-    private static void CopyMarket(MarketCache target, MarketCache source)
-    {
-        target.SeriesTicker = source.SeriesTicker;
-        target.Title = source.Title;
-        target.Subtitle = source.Subtitle;
-        target.Volume = source.Volume;
-        target.Volume24h = source.Volume24h;
-        target.CreatedTime = source.CreatedTime;
-        target.ExpirationTime = source.ExpirationTime;
-        target.CloseTime = source.CloseTime;
-        target.LatestExpirationTime = source.LatestExpirationTime;
-        target.OpenTime = source.OpenTime;
-        target.Status = source.Status;
-        target.YesBid = source.YesBid;
-        target.YesBidDollars = source.YesBidDollars;
-        target.YesAsk = source.YesAsk;
-        target.YesAskDollars = source.YesAskDollars;
-        target.NoBid = source.NoBid;
-        target.NoBidDollars = source.NoBidDollars;
-        target.NoAsk = source.NoAsk;
-        target.NoAskDollars = source.NoAskDollars;
-        target.LastPrice = source.LastPrice;
-        target.LastPriceDollars = source.LastPriceDollars;
-        target.PreviousYesBid = source.PreviousYesBid;
-        target.PreviousYesBidDollars = source.PreviousYesBidDollars;
-        target.PreviousYesAsk = source.PreviousYesAsk;
-        target.PreviousYesAskDollars = source.PreviousYesAskDollars;
-        target.PreviousPrice = source.PreviousPrice;
-        target.PreviousPriceDollars = source.PreviousPriceDollars;
-        target.Liquidity = source.Liquidity;
-        target.LiquidityDollars = source.LiquidityDollars;
-        target.SettlementValue = source.SettlementValue;
-        target.SettlementValueDollars = source.SettlementValueDollars;
-        target.NotionalValue = source.NotionalValue;
-        target.NotionalValueDollars = source.NotionalValueDollars;
-        target.LastUpdate = source.LastUpdate;
-    }
-
-    internal static MarketCache MapMarket(string seriesTicker, Market market, DateTime lastUpdate)
-    {
-        var expirationTime = market.ExpectedExpirationTime ?? market.LatestExpirationTime;
-
-#pragma warning disable CS0612 // title/subtitle are deprecated in Kalshi API; still used as fallback until replacements are provided in responses
-        var legacyTitle = market.Title;
-        var legacySubtitle = market.Subtitle;
-#pragma warning restore CS0612
-
-        return new MarketCache
+        return new MarketSnapshot
         {
-            TickerId = market.Ticker,
-            SeriesTicker = seriesTicker,
-            Title = string.IsNullOrWhiteSpace(market.YesSubTitle) ? legacyTitle : market.YesSubTitle,
-            Subtitle = string.IsNullOrWhiteSpace(market.NoSubTitle) ? legacySubtitle : market.NoSubTitle,
-            Volume = market.Volume,
-            Volume24h = market.Volume24h,
+            Ticker = market.Ticker,
+            EventTicker = market.EventTicker,
+            MarketType = market.MarketType.ToString(),
+            YesSubTitle = market.YesSubTitle,
+            NoSubTitle = market.NoSubTitle,
             CreatedTime = market.CreatedTime,
-            ExpirationTime = expirationTime,
-            CloseTime = market.CloseTime,
-            LatestExpirationTime = market.LatestExpirationTime,
             OpenTime = market.OpenTime,
+            CloseTime = market.CloseTime,
+            ExpectedExpirationTime = market.ExpectedExpirationTime,
+            LatestExpirationTime = market.LatestExpirationTime,
+            SettlementTimerSeconds = market.SettlementTimerSeconds,
             Status = market.Status.ToString(),
+            ResponsePriceUnits = market.ResponsePriceUnits.ToString(),
             YesBid = market.YesBid,
             YesBidDollars = market.YesBidDollars,
             YesAsk = market.YesAsk,
@@ -370,6 +353,13 @@ CREATE TABLE IF NOT EXISTS Markets (
             NoAskDollars = market.NoAskDollars,
             LastPrice = market.LastPrice,
             LastPriceDollars = market.LastPriceDollars,
+            Volume = market.Volume,
+            Volume24h = market.Volume24h,
+            Result = market.Result.ToString(),
+            CanCloseEarly = market.CanCloseEarly,
+            OpenInterest = market.OpenInterest,
+            NotionalValue = market.NotionalValue,
+            NotionalValueDollars = market.NotionalValueDollars,
             PreviousYesBid = market.PreviousYesBid,
             PreviousYesBidDollars = market.PreviousYesBidDollars,
             PreviousYesAsk = market.PreviousYesAsk,
@@ -380,9 +370,23 @@ CREATE TABLE IF NOT EXISTS Markets (
             LiquidityDollars = market.LiquidityDollars,
             SettlementValue = market.SettlementValue,
             SettlementValueDollars = market.SettlementValueDollars,
-            NotionalValue = market.NotionalValue,
-            NotionalValueDollars = market.NotionalValueDollars,
-            LastUpdate = lastUpdate
+            ExpirationValue = market.ExpirationValue,
+            FeeWaiverExpirationTime = market.FeeWaiverExpirationTime,
+            EarlyCloseCondition = market.EarlyCloseCondition,
+            TickSize = market.TickSize,
+            StrikeType = market.StrikeType?.ToString(),
+            FloorStrike = market.FloorStrike,
+            CapStrike = market.CapStrike,
+            FunctionalStrike = market.FunctionalStrike,
+            CustomStrike = market.CustomStrike != null ? JsonConvert.SerializeObject(market.CustomStrike) : null,
+            RulesPrimary = market.RulesPrimary,
+            RulesSecondary = market.RulesSecondary,
+            MveCollectionTicker = market.MveCollectionTicker,
+            MveSelectedLegs = market.MveSelectedLegs != null && market.MveSelectedLegs.Any() ? JsonConvert.SerializeObject(market.MveSelectedLegs) : null,
+            PrimaryParticipantKey = market.PrimaryParticipantKey,
+            PriceLevelStructure = market.PriceLevelStructure,
+            PriceRanges = market.PriceRanges != null && market.PriceRanges.Any() ? JsonConvert.SerializeObject(market.PriceRanges) : null,
+            GenerateDate = generateDate
         };
     }
 
