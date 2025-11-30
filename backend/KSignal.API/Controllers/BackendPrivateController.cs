@@ -30,7 +30,7 @@ public class BackendPrivateController : ControllerBase
     // [HttpGet("cache-market-status")]
     // [HttpPost("refresh-today-market")]
 
-    [HttpPost("synchronize-market-data")]
+    [HttpPost("sync-market-snapshots")]
     [ProducesResponseType(StatusCodes.Status202Accepted)]
     [ProducesResponseType(StatusCodes.Status500InternalServerError)]
     public async Task<IActionResult> SynchronizeMarketData([FromQuery] string? cursor = null)
