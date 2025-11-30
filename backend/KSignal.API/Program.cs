@@ -8,6 +8,7 @@ using Microsoft.IdentityModel.Tokens;
 using System.Text;
 using Microsoft.Extensions.Logging;
 using MassTransit;
+using ClickHouse.EntityFrameworkCore.Extensions;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -37,30 +38,10 @@ builder.Services.AddSwaggerGen(c =>
 
 // Prefer environment variables for all settings; fall back to configuration placeholders only
 var connectionString = BuildConnectionString(builder.Configuration);
-builder.Configuration["ConnectionStrings:KalshiMySql"] = connectionString;
-
-var dbVersionString = Environment.GetEnvironmentVariable("KALSHI_DB_VERSION");
-ServerVersion? dbServerVersion = null;
-
-if (!string.IsNullOrWhiteSpace(dbVersionString) && Version.TryParse(dbVersionString, out var parsedVersion))
-{
-    dbServerVersion = new MySqlServerVersion(parsedVersion);
-}
-else
-{
-    try
-    {
-        dbServerVersion = ServerVersion.AutoDetect(connectionString);
-    }
-    catch
-    {
-        // Default to a recent MySQL 8 version when auto-detect fails (e.g., DB unreachable at startup)
-        dbServerVersion = new MySqlServerVersion(new Version(8, 0, 32));
-    }
-}
+builder.Configuration["ConnectionStrings:KalshiClickHouse"] = connectionString;
 
 builder.Services.AddDbContext<KalshiDbContext>(options =>
-    options.UseMySql(connectionString, dbServerVersion));
+    options.UseClickHouse(connectionString));
 
 // Register Kalshi API Client
 // For public endpoints, we can use without authentication
@@ -271,25 +252,21 @@ app.Run();
 
 string BuildConnectionString(ConfigurationManager configuration)
 {
-    var dbHost = Environment.GetEnvironmentVariable("KALSHI_DB_HOST");
+    var dbHost = Environment.GetEnvironmentVariable("KALSHI_DB_HOST") ?? "localhost";
     var dbUser = Environment.GetEnvironmentVariable("KALSHI_DB_USER");
     var dbPassword = Environment.GetEnvironmentVariable("KALSHI_DB_PASSWORD");
-    var dbName = Environment.GetEnvironmentVariable("KALSHI_DB_NAME");
-    var dbSslMode = Environment.GetEnvironmentVariable("KALSHI_DB_SSL_MODE");
+    var dbName = Environment.GetEnvironmentVariable("KALSHI_DB_NAME") ?? "kalshi_signals";
+    var dbPort = Environment.GetEnvironmentVariable("KALSHI_DB_PORT") ?? "9000";
 
-    if (!string.IsNullOrWhiteSpace(dbHost)
-        && !string.IsNullOrWhiteSpace(dbUser)
-        && !string.IsNullOrWhiteSpace(dbPassword)
-        && !string.IsNullOrWhiteSpace(dbName))
+    if (!string.IsNullOrWhiteSpace(dbUser) && !string.IsNullOrWhiteSpace(dbPassword))
     {
-        var sslModeSegment = string.IsNullOrWhiteSpace(dbSslMode) ? "SslMode=Disabled" : $"SslMode={dbSslMode}";
-        return $"Server={dbHost};Database={dbName};User ID={dbUser};Password={dbPassword};{sslModeSegment}";
+        return $"Host={dbHost};Port={dbPort};Database={dbName};User={dbUser};Password={dbPassword}";
     }
 
     var envConnectionString = Environment.GetEnvironmentVariable("KALSHI_DB_CONNECTION");
     var connectionString = !string.IsNullOrWhiteSpace(envConnectionString)
         ? envConnectionString
-        : configuration.GetConnectionString("KalshiMySql");
+        : configuration.GetConnectionString("KalshiClickHouse");
 
     if (string.IsNullOrWhiteSpace(connectionString))
     {
