@@ -182,7 +182,7 @@ public class KalshiService
             if (existing == null)
             {
                 // Generate ID manually (ClickHouse doesn't support auto-increment)
-                var maxId = await _db.MarketSnapshots.MaxAsync(s => (long?)s.MarketSnapshotID, cancellationToken) ?? 0;
+                var maxId = await _db.MarketSnapshots.MaxAsync(s => (ulong?)s.MarketSnapshotID, cancellationToken) ?? 0;
                 mapped.MarketSnapshotID = maxId + 1;
                 await _db.MarketSnapshots.AddAsync(mapped, cancellationToken);
             }

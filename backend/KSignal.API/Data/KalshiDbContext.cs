@@ -18,6 +18,7 @@ namespace KSignal.API.Data;
         public DbSet<MarketHighPriority> MarketHighPriorities => Set<MarketHighPriority>();
         public DbSet<OrderbookSnapshot> OrderbookSnapshots => Set<OrderbookSnapshot>();
         public DbSet<OrderbookEvent> OrderbookEvents => Set<OrderbookEvent>();
+        public DbSet<MarketCandlestickData> MarketCandlesticks => Set<MarketCandlestickData>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -172,6 +173,8 @@ namespace KSignal.API.Data;
         marketHighPriority.Property(e => e.TickerId).HasMaxLength(255).IsRequired();
         marketHighPriority.Property(e => e.Priority).IsRequired();
         marketHighPriority.HasIndex(e => e.Priority).HasDatabaseName("idx_market_highpriority_priority");
+        marketHighPriority.Property(e => e.FetchCandlesticks).IsRequired();
+        marketHighPriority.Property(e => e.FetchOrderbook).IsRequired();
         marketHighPriority.Property(e => e.LastUpdate).IsRequired();
 
         var orderbookSnapshot = modelBuilder.Entity<OrderbookSnapshot>();
@@ -204,5 +207,53 @@ namespace KSignal.API.Data;
         orderbookEvent.Property(e => e.Price).IsRequired();
         orderbookEvent.Property(e => e.Size).IsRequired();
         orderbookEvent.Property(e => e.EventType).HasMaxLength(20).IsRequired();
+
+        var marketCandlestick = modelBuilder.Entity<MarketCandlestickData>();
+        marketCandlestick.ToTable("market_candlesticks");
+        marketCandlestick.HasKey(e => e.Id);
+        marketCandlestick.Property(e => e.Id).ValueGeneratedNever();
+        marketCandlestick.Property(e => e.Ticker).HasMaxLength(255).IsRequired();
+        marketCandlestick.HasIndex(e => e.Ticker).HasDatabaseName("idx_market_candlesticks_ticker");
+        marketCandlestick.Property(e => e.SeriesTicker).HasMaxLength(255).IsRequired();
+        marketCandlestick.HasIndex(e => e.SeriesTicker).HasDatabaseName("idx_market_candlesticks_series_ticker");
+        marketCandlestick.Property(e => e.PeriodInterval).IsRequired();
+        marketCandlestick.Property(e => e.EndPeriodTs).IsRequired();
+        marketCandlestick.Property(e => e.EndPeriodTime).IsRequired();
+        marketCandlestick.HasIndex(e => e.EndPeriodTime).HasDatabaseName("idx_market_candlesticks_end_period_time");
+        // Yes Bid OHLC
+        marketCandlestick.Property(e => e.YesBidOpen).IsRequired();
+        marketCandlestick.Property(e => e.YesBidLow).IsRequired();
+        marketCandlestick.Property(e => e.YesBidHigh).IsRequired();
+        marketCandlestick.Property(e => e.YesBidClose).IsRequired();
+        marketCandlestick.Property(e => e.YesBidOpenDollars).IsRequired();
+        marketCandlestick.Property(e => e.YesBidLowDollars).IsRequired();
+        marketCandlestick.Property(e => e.YesBidHighDollars).IsRequired();
+        marketCandlestick.Property(e => e.YesBidCloseDollars).IsRequired();
+        // Yes Ask OHLC
+        marketCandlestick.Property(e => e.YesAskOpen).IsRequired();
+        marketCandlestick.Property(e => e.YesAskLow).IsRequired();
+        marketCandlestick.Property(e => e.YesAskHigh).IsRequired();
+        marketCandlestick.Property(e => e.YesAskClose).IsRequired();
+        marketCandlestick.Property(e => e.YesAskOpenDollars).IsRequired();
+        marketCandlestick.Property(e => e.YesAskLowDollars).IsRequired();
+        marketCandlestick.Property(e => e.YesAskHighDollars).IsRequired();
+        marketCandlestick.Property(e => e.YesAskCloseDollars).IsRequired();
+        // Price OHLC (nullable)
+        marketCandlestick.Property(e => e.PriceOpen);
+        marketCandlestick.Property(e => e.PriceLow);
+        marketCandlestick.Property(e => e.PriceHigh);
+        marketCandlestick.Property(e => e.PriceClose);
+        marketCandlestick.Property(e => e.PriceMean);
+        marketCandlestick.Property(e => e.PricePrevious);
+        marketCandlestick.Property(e => e.PriceOpenDollars);
+        marketCandlestick.Property(e => e.PriceLowDollars);
+        marketCandlestick.Property(e => e.PriceHighDollars);
+        marketCandlestick.Property(e => e.PriceCloseDollars);
+        marketCandlestick.Property(e => e.PriceMeanDollars);
+        marketCandlestick.Property(e => e.PricePreviousDollars);
+        // Volume and open interest
+        marketCandlestick.Property(e => e.Volume).IsRequired();
+        marketCandlestick.Property(e => e.OpenInterest).IsRequired();
+        marketCandlestick.Property(e => e.FetchedAt).IsRequired();
     }
 }

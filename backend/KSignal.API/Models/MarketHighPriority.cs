@@ -3,7 +3,7 @@ using System.ComponentModel.DataAnnotations;
 namespace KSignal.API.Models;
 
 /// <summary>
-/// Tracks high-priority markets for orderbook syncing
+/// Tracks high-priority markets for orderbook and candlestick syncing
 /// </summary>
 public class MarketHighPriority
 {
@@ -19,6 +19,16 @@ public class MarketHighPriority
     /// Priority level (higher = more important, synced more frequently)
     /// </summary>
     public int Priority { get; set; }
+    
+    /// <summary>
+    /// Whether to fetch candlestick data for this market
+    /// </summary>
+    public bool FetchCandlesticks { get; set; } = true;
+    
+    /// <summary>
+    /// Whether to fetch orderbook data for this market
+    /// </summary>
+    public bool FetchOrderbook { get; set; } = true;
     
     /// <summary>
     /// Timestamp when this record was last updated

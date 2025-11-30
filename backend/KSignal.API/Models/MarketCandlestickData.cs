@@ -1,0 +1,99 @@
+using System.ComponentModel.DataAnnotations;
+
+namespace KSignal.API.Models;
+
+/// <summary>
+/// Stores candlestick data for markets (flattened from API response)
+/// </summary>
+public class MarketCandlestickData
+{
+    /// <summary>
+    /// Unique identifier for the candlestick record
+    /// </summary>
+    [Key]
+    public long Id { get; set; }
+    
+    /// <summary>
+    /// Market ticker ID
+    /// </summary>
+    [Required]
+    [MaxLength(255)]
+    public string Ticker { get; set; } = string.Empty;
+    
+    /// <summary>
+    /// Series ticker ID
+    /// </summary>
+    [Required]
+    [MaxLength(255)]
+    public string SeriesTicker { get; set; } = string.Empty;
+    
+    /// <summary>
+    /// Time period interval in minutes (1, 60, or 1440)
+    /// </summary>
+    public int PeriodInterval { get; set; }
+    
+    /// <summary>
+    /// Unix timestamp for the inclusive end of the candlestick period
+    /// </summary>
+    public long EndPeriodTs { get; set; }
+    
+    /// <summary>
+    /// DateTime representation of EndPeriodTs
+    /// </summary>
+    public DateTime EndPeriodTime { get; set; }
+    
+    // Yes Bid OHLC (in cents)
+    public int YesBidOpen { get; set; }
+    public int YesBidLow { get; set; }
+    public int YesBidHigh { get; set; }
+    public int YesBidClose { get; set; }
+    
+    // Yes Bid OHLC (in dollars)
+    public string YesBidOpenDollars { get; set; } = string.Empty;
+    public string YesBidLowDollars { get; set; } = string.Empty;
+    public string YesBidHighDollars { get; set; } = string.Empty;
+    public string YesBidCloseDollars { get; set; } = string.Empty;
+    
+    // Yes Ask OHLC (in cents)
+    public int YesAskOpen { get; set; }
+    public int YesAskLow { get; set; }
+    public int YesAskHigh { get; set; }
+    public int YesAskClose { get; set; }
+    
+    // Yes Ask OHLC (in dollars)
+    public string YesAskOpenDollars { get; set; } = string.Empty;
+    public string YesAskLowDollars { get; set; } = string.Empty;
+    public string YesAskHighDollars { get; set; } = string.Empty;
+    public string YesAskCloseDollars { get; set; } = string.Empty;
+    
+    // Price OHLC (in cents, nullable - no trades during period)
+    public int? PriceOpen { get; set; }
+    public int? PriceLow { get; set; }
+    public int? PriceHigh { get; set; }
+    public int? PriceClose { get; set; }
+    public int? PriceMean { get; set; }
+    public int? PricePrevious { get; set; }
+    
+    // Price OHLC (in dollars, nullable)
+    public string? PriceOpenDollars { get; set; }
+    public string? PriceLowDollars { get; set; }
+    public string? PriceHighDollars { get; set; }
+    public string? PriceCloseDollars { get; set; }
+    public string? PriceMeanDollars { get; set; }
+    public string? PricePreviousDollars { get; set; }
+    
+    /// <summary>
+    /// Number of contracts bought on the market during the candlestick period
+    /// </summary>
+    public long Volume { get; set; }
+    
+    /// <summary>
+    /// Number of contracts bought on the market by end of the candlestick period
+    /// </summary>
+    public long OpenInterest { get; set; }
+    
+    /// <summary>
+    /// Timestamp when this record was fetched/created
+    /// </summary>
+    public DateTime FetchedAt { get; set; }
+}

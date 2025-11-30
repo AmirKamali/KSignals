@@ -7,7 +7,7 @@ public class MarketSnapshot
 {
     [Key]
 
-    public long MarketSnapshotID { get; set; }
+    public ulong MarketSnapshotID { get; set; }
     
     public string Ticker { get; set; } = string.Empty;
     public string SeriesId { get; set; } = string.Empty;

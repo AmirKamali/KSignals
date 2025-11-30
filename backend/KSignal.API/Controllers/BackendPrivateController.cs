@@ -175,4 +175,30 @@ public class BackendPrivateController : ControllerBase
             return StatusCode(StatusCodes.Status500InternalServerError, new { error = "Failed to enqueue orderbook synchronization", message = ex.Message });
         }
     }
+
+    [HttpPost("sync-candlesticks")]
+    [ProducesResponseType(StatusCodes.Status202Accepted)]
+    [ProducesResponseType(StatusCodes.Status500InternalServerError)]
+    public async Task<IActionResult> SynchronizeCandlesticks()
+    {
+        try
+        {
+            await _synchronizationService.EnqueueCandlesticksSyncAsync(HttpContext.RequestAborted);
+            return Accepted(new
+            {
+                started = true,
+                message = "Candlesticks synchronization queued for high-priority markets"
+            });
+        }
+        catch (RabbitMqUnavailableException ex)
+        {
+            _logger.LogWarning(ex, "RabbitMQ unavailable while trying to enqueue candlesticks synchronization");
+            return StatusCode(StatusCodes.Status503ServiceUnavailable, new { error = "RabbitMQ unavailable", message = ex.Message });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to enqueue candlesticks synchronization");
+            return StatusCode(StatusCodes.Status500InternalServerError, new { error = "Failed to enqueue candlesticks synchronization", message = ex.Message });
+        }
+    }
 }

@@ -330,7 +330,7 @@ public class SynchronizationService
         }
 
         // Generate IDs manually (ClickHouse generateSerialID requires ZooKeeper which may not be configured)
-        var maxId = await _dbContext.MarketSnapshots.MaxAsync(s => (long?)s.MarketSnapshotID, cancellationToken) ?? 0;
+        var maxId = await _dbContext.MarketSnapshots.MaxAsync(s => (ulong?)s.MarketSnapshotID, cancellationToken) ?? 0;
         var nextId = maxId + 1;
         
         foreach (var market in markets)
@@ -906,5 +906,161 @@ public class SynchronizationService
         }
 
         return events;
+    }
+
+    public async Task EnqueueCandlesticksSyncAsync(CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            _logger.LogInformation("Queueing candlesticks synchronization");
+            await _publishEndpoint.Publish(new SynchronizeCandlesticks(), cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Unexpected error while trying to enqueue candlesticks synchronization. Exception type: {ExceptionType}", ex.GetType().Name);
+            throw;
+        }
+    }
+
+    public async Task SynchronizeCandlesticksAsync(CancellationToken cancellationToken)
+    {
+        try
+        {
+            // Get markets with FetchCandlesticks = true from market_highpriority
+            var highPriorityMarkets = await _dbContext.MarketHighPriorities
+                .AsNoTracking()
+                .Where(m => m.FetchCandlesticks)
+                .OrderByDescending(m => m.Priority)
+                .ToListAsync(cancellationToken);
+
+            if (highPriorityMarkets.Count == 0)
+            {
+                _logger.LogWarning("No high-priority markets configured for candlestick sync");
+                return;
+            }
+
+            _logger.LogInformation("Syncing candlesticks for {Count} high-priority markets", highPriorityMarkets.Count);
+
+            var now = DateTime.UtcNow;
+            var candlesticksToInsert = new List<MarketCandlestickData>();
+
+            // Get max ID for generating new IDs
+            var maxId = await _dbContext.MarketCandlesticks.MaxAsync(c => (long?)c.Id, cancellationToken) ?? 0;
+            var nextId = maxId + 1;
+
+            // Calculate time range: last 24 hours
+            var endTs = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
+            var startTs = endTs - (24 * 60 * 60); // 24 hours ago
+
+            foreach (var market in highPriorityMarkets)
+            {
+                try
+                {
+                    // Find the market snapshot to get SeriesId
+                    var snapshot = await _dbContext.MarketSnapshots
+                        .AsNoTracking()
+                        .Where(s => s.Ticker == market.TickerId && s.Status == "Active")
+                        .OrderByDescending(s => s.GenerateDate)
+                        .FirstOrDefaultAsync(cancellationToken);
+
+                    if (snapshot == null)
+                    {
+                        _logger.LogWarning("No active market snapshot found for ticker {TickerId}", market.TickerId);
+                        continue;
+                    }
+
+                    if (string.IsNullOrWhiteSpace(snapshot.SeriesId))
+                    {
+                        _logger.LogWarning("Market snapshot for ticker {TickerId} has no SeriesId", market.TickerId);
+                        continue;
+                    }
+
+                    _logger.LogDebug("Fetching candlesticks for market {TickerId} (series: {SeriesId})", market.TickerId, snapshot.SeriesId);
+
+                    var response = await _kalshiClient.Markets.GetMarketCandlesticksAsync(
+                        snapshot.SeriesId,
+                        market.TickerId,
+                        startTs,
+                        endTs,
+                        60, // 1-hour period interval
+                        cancellationToken: cancellationToken);
+
+                    if (response?.Candlesticks == null || response.Candlesticks.Count == 0)
+                    {
+                        _logger.LogDebug("No candlestick data for market {TickerId}", market.TickerId);
+                        continue;
+                    }
+
+                    _logger.LogInformation("Fetched {Count} candlesticks for market {TickerId}", response.Candlesticks.Count, market.TickerId);
+
+                    foreach (var candle in response.Candlesticks)
+                    {
+                        var candlestickData = new MarketCandlestickData
+                        {
+                            Id = nextId++,
+                            Ticker = response.Ticker,
+                            SeriesTicker = snapshot.SeriesId,
+                            PeriodInterval = 60,
+                            EndPeriodTs = candle.EndPeriodTs,
+                            EndPeriodTime = DateTimeOffset.FromUnixTimeSeconds(candle.EndPeriodTs).UtcDateTime,
+                            // Yes Bid
+                            YesBidOpen = candle.YesBid.Open,
+                            YesBidLow = candle.YesBid.Low,
+                            YesBidHigh = candle.YesBid.High,
+                            YesBidClose = candle.YesBid.Close,
+                            YesBidOpenDollars = candle.YesBid.OpenDollars,
+                            YesBidLowDollars = candle.YesBid.LowDollars,
+                            YesBidHighDollars = candle.YesBid.HighDollars,
+                            YesBidCloseDollars = candle.YesBid.CloseDollars,
+                            // Yes Ask
+                            YesAskOpen = candle.YesAsk.Open,
+                            YesAskLow = candle.YesAsk.Low,
+                            YesAskHigh = candle.YesAsk.High,
+                            YesAskClose = candle.YesAsk.Close,
+                            YesAskOpenDollars = candle.YesAsk.OpenDollars,
+                            YesAskLowDollars = candle.YesAsk.LowDollars,
+                            YesAskHighDollars = candle.YesAsk.HighDollars,
+                            YesAskCloseDollars = candle.YesAsk.CloseDollars,
+                            // Price (nullable)
+                            PriceOpen = candle.Price?.Open,
+                            PriceLow = candle.Price?.Low,
+                            PriceHigh = candle.Price?.High,
+                            PriceClose = candle.Price?.Close,
+                            PriceMean = candle.Price?.Mean,
+                            PricePrevious = candle.Price?.Previous,
+                            PriceOpenDollars = candle.Price?.OpenDollars,
+                            PriceLowDollars = candle.Price?.LowDollars,
+                            PriceHighDollars = candle.Price?.HighDollars,
+                            PriceCloseDollars = candle.Price?.CloseDollars,
+                            PriceMeanDollars = candle.Price?.MeanDollars,
+                            PricePreviousDollars = candle.Price?.PreviousDollars,
+                            // Volume and interest
+                            Volume = candle.Volume,
+                            OpenInterest = candle.OpenInterest,
+                            FetchedAt = now
+                        };
+                        candlesticksToInsert.Add(candlestickData);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Error fetching candlesticks for market {TickerId}", market.TickerId);
+                }
+            }
+
+            // Save all candlesticks
+            if (candlesticksToInsert.Count > 0)
+            {
+                await _dbContext.MarketCandlesticks.AddRangeAsync(candlesticksToInsert, cancellationToken);
+                await _dbContext.SaveChangesAsync(cancellationToken);
+            }
+
+            _logger.LogInformation("Candlestick sync complete: {Count} candlesticks created", candlesticksToInsert.Count);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error synchronizing candlesticks");
+            throw;
+        }
     }
 }
