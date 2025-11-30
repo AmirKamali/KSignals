@@ -13,6 +13,7 @@ namespace KSignal.API.Data;
         public DbSet<MarketSnapshot> MarketSnapshots => Set<MarketSnapshot>();
         public DbSet<TagsCategory> TagsCategories => Set<TagsCategory>();
         public DbSet<User> Users => Set<User>();
+        public DbSet<SeriesData> Series => Set<SeriesData>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -119,5 +120,25 @@ namespace KSignal.API.Data;
         user.Property(e => e.IsComnEmailOn).HasDefaultValue(false);
         user.Property(e => e.CreatedAt).IsRequired();
         user.Property(e => e.UpdatedAt).IsRequired();
+
+        var seriesData = modelBuilder.Entity<SeriesData>();
+        seriesData.ToTable("market_series");
+        seriesData.HasKey(e => e.Ticker);
+        seriesData.Property(e => e.Ticker).HasMaxLength(255).IsRequired();
+        seriesData.Property(e => e.Frequency).HasMaxLength(255).IsRequired();
+        seriesData.Property(e => e.Title).IsRequired();
+        seriesData.Property(e => e.Category).HasMaxLength(255).IsRequired();
+        seriesData.HasIndex(e => e.Category).HasDatabaseName("idx_market_series_category");
+        seriesData.Property(e => e.Tags);
+        seriesData.HasIndex(e => e.Tags).HasDatabaseName("idx_market_series_tags");
+        seriesData.Property(e => e.SettlementSources);
+        seriesData.Property(e => e.ContractUrl);
+        seriesData.Property(e => e.ContractTermsUrl);
+        seriesData.Property(e => e.ProductMetadata);
+        seriesData.Property(e => e.FeeType).HasMaxLength(50).IsRequired();
+        seriesData.Property(e => e.FeeMultiplier).IsRequired();
+        seriesData.Property(e => e.AdditionalProhibitions);
+        seriesData.Property(e => e.LastUpdate).IsRequired();
+        seriesData.Property(e => e.IsDeleted).IsRequired();
     }
 }

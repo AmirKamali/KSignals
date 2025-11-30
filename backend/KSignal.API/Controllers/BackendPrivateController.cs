@@ -96,4 +96,30 @@ public class BackendPrivateController : ControllerBase
             return StatusCode(StatusCodes.Status500InternalServerError, new { error = "Failed to enqueue tags/categories synchronization", message = ex.Message });
         }
     }
+
+    [HttpPost("sync-market-series")]
+    [ProducesResponseType(StatusCodes.Status202Accepted)]
+    [ProducesResponseType(StatusCodes.Status500InternalServerError)]
+    public async Task<IActionResult> SynchronizeMarketSeries()
+    {
+        try
+        {
+            await _synchronizationService.EnqueueSeriesSyncAsync(HttpContext.RequestAborted);
+            return Accepted(new
+            {
+                started = true,
+                message = "Market series synchronization queued"
+            });
+        }
+        catch (RabbitMqUnavailableException ex)
+        {
+            _logger.LogWarning(ex, "RabbitMQ unavailable while trying to enqueue market series synchronization");
+            return StatusCode(StatusCodes.Status503ServiceUnavailable, new { error = "RabbitMQ unavailable", message = ex.Message });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to enqueue market series synchronization");
+            return StatusCode(StatusCodes.Status500InternalServerError, new { error = "Failed to enqueue market series synchronization", message = ex.Message });
+        }
+    }
 }

@@ -116,3 +116,28 @@ CREATE TABLE IF NOT EXISTS kalshi_signals.Users
 ENGINE = MergeTree()
 ORDER BY (FirebaseId)
 SETTINGS index_granularity = 8192;
+
+-- Create market_series table
+-- Ticker is the primary key (SeriesId)
+CREATE TABLE IF NOT EXISTS kalshi_signals.market_series
+(
+    Ticker String,
+    Frequency String,
+    Title String,
+    Category String,
+    Tags Nullable(String),
+    SettlementSources Nullable(String),
+    ContractUrl Nullable(String),
+    ContractTermsUrl Nullable(String),
+    ProductMetadata Nullable(String),
+    FeeType String,
+    FeeMultiplier Float64,
+    AdditionalProhibitions Nullable(String),
+    LastUpdate DateTime,
+    IsDeleted UInt8 DEFAULT 0,
+    INDEX idx_market_series_category Category TYPE bloom_filter GRANULARITY 1,
+    INDEX idx_market_series_tags Tags TYPE bloom_filter GRANULARITY 1
+)
+ENGINE = ReplacingMergeTree(LastUpdate)
+ORDER BY (Ticker)
+SETTINGS index_granularity = 8192;

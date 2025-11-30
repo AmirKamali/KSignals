@@ -139,6 +139,7 @@ builder.Services.AddMassTransit(x =>
 
     x.AddConsumer<KSignal.API.SynchronizeConsumers.SynchronizeMarketDataConsumer>();
     x.AddConsumer<KSignal.API.SynchronizeConsumers.SynchronizeTagsCategoriesConsumer>();
+    x.AddConsumer<KSignal.API.SynchronizeConsumers.SynchronizeSeriesConsumer>();
 
     x.UsingRabbitMq((context, cfg) =>
     {

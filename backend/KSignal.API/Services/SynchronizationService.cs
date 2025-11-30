@@ -7,6 +7,7 @@ using KSignal.API.Models;
 using MassTransit;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
+using Newtonsoft.Json;
 
 namespace KSignal.API.Services;
 
@@ -294,5 +295,157 @@ public class SynchronizationService
         await _dbContext.MarketSnapshots.AddRangeAsync(markets, cancellationToken);
         await _dbContext.SaveChangesAsync(cancellationToken);
         _logger.LogInformation("Inserted {Count} market snapshots", markets.Count);
+    }
+
+    public async Task EnqueueSeriesSyncAsync(CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            _logger.LogInformation("Queueing series synchronization");
+            await _publishEndpoint.Publish(new SynchronizeSeries(), cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Unexpected error while trying to enqueue series synchronization. Exception type: {ExceptionType}", ex.GetType().Name);
+            throw;
+        }
+    }
+
+    public async Task SynchronizeSeriesAsync(CancellationToken cancellationToken)
+    {
+        try
+        {
+            _logger.LogInformation("Fetching series list from Kalshi API");
+            
+            var response = await _kalshiClient.Markets.GetSeriesListAsync(
+                includeProductMetadata: true,
+                cancellationToken: cancellationToken);
+            
+            if (response?.Series == null || response.Series.Count == 0)
+            {
+                _logger.LogWarning("No series data received from Kalshi API");
+                return;
+            }
+
+            _logger.LogInformation("Received {Count} series from Kalshi API", response.Series.Count);
+
+            var now = DateTime.UtcNow;
+            
+            // Build a set of incoming ticker keys for quick lookup
+            var incomingTickers = new HashSet<string>();
+            var incomingRecords = new List<SeriesData>();
+
+            foreach (var series in response.Series)
+            {
+                if (string.IsNullOrWhiteSpace(series.Ticker))
+                    continue;
+
+                incomingTickers.Add(series.Ticker);
+                incomingRecords.Add(MapSeriesToSeriesData(series, now));
+            }
+
+            if (incomingRecords.Count == 0)
+            {
+                _logger.LogWarning("No valid series to save");
+                return;
+            }
+
+            // Load all existing records
+            var existingRecords = await _dbContext.Series
+                .ToListAsync(cancellationToken);
+
+            _logger.LogInformation("Found {Count} existing series records", existingRecords.Count);
+
+            var existingDict = existingRecords
+                .ToDictionary(e => e.Ticker, e => e);
+
+            var updatedCount = 0;
+            var insertedCount = 0;
+            var deletedCount = 0;
+            var restoredCount = 0;
+
+            // Process incoming records: upsert logic
+            foreach (var incoming in incomingRecords)
+            {
+                if (existingDict.TryGetValue(incoming.Ticker, out var existing))
+                {
+                    // Record exists - update it
+                    if (existing.IsDeleted)
+                    {
+                        restoredCount++;
+                    }
+                    
+                    // Update all fields
+                    existing.Frequency = incoming.Frequency;
+                    existing.Title = incoming.Title;
+                    existing.Category = incoming.Category;
+                    existing.Tags = incoming.Tags;
+                    existing.SettlementSources = incoming.SettlementSources;
+                    existing.ContractUrl = incoming.ContractUrl;
+                    existing.ContractTermsUrl = incoming.ContractTermsUrl;
+                    existing.ProductMetadata = incoming.ProductMetadata;
+                    existing.FeeType = incoming.FeeType;
+                    existing.FeeMultiplier = incoming.FeeMultiplier;
+                    existing.AdditionalProhibitions = incoming.AdditionalProhibitions;
+                    existing.LastUpdate = now;
+                    existing.IsDeleted = false;
+                    
+                    updatedCount++;
+                }
+                else
+                {
+                    // New record - insert it (Ticker is the primary key)
+                    await _dbContext.Series.AddAsync(incoming, cancellationToken);
+                    insertedCount++;
+                }
+            }
+
+            // Mark records as deleted if they're not in incoming data
+            foreach (var existing in existingRecords)
+            {
+                if (!incomingTickers.Contains(existing.Ticker) && !existing.IsDeleted)
+                {
+                    existing.IsDeleted = true;
+                    existing.LastUpdate = now;
+                    deletedCount++;
+                }
+            }
+
+            await _dbContext.SaveChangesAsync(cancellationToken);
+            
+            _logger.LogInformation(
+                "Successfully synchronized series: {Inserted} inserted, {Updated} updated, {Restored} restored, {Deleted} marked as deleted",
+                insertedCount, updatedCount, restoredCount, deletedCount);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error synchronizing series");
+            throw;
+        }
+    }
+
+    private static SeriesData MapSeriesToSeriesData(Series series, DateTime timestamp)
+    {
+        return new SeriesData
+        {
+            Ticker = series.Ticker,
+            Frequency = series.Frequency ?? string.Empty,
+            Title = series.Title ?? string.Empty,
+            Category = series.Category ?? string.Empty,
+            Tags = series.Tags != null ? JsonConvert.SerializeObject(series.Tags) : null,
+            SettlementSources = series.SettlementSources != null 
+                ? JsonConvert.SerializeObject(series.SettlementSources.Select(s => new { name = s.Name, url = s.Url })) 
+                : null,
+            ContractUrl = series.ContractUrl,
+            ContractTermsUrl = series.ContractTermsUrl,
+            ProductMetadata = series.ProductMetadata != null ? JsonConvert.SerializeObject(series.ProductMetadata) : null,
+            FeeType = series.FeeType.ToString().ToLowerInvariant(),
+            FeeMultiplier = series.FeeMultiplier,
+            AdditionalProhibitions = series.AdditionalProhibitions != null 
+                ? JsonConvert.SerializeObject(series.AdditionalProhibitions) 
+                : null,
+            LastUpdate = timestamp,
+            IsDeleted = false
+        };
     }
 }
