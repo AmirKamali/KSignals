@@ -674,17 +674,15 @@ public class SynchronizationService
                     snapshotsToInsert.Add(snapshot);
 
                     // Compute orderbook events by comparing with previous snapshot
-                    if (previousSnapshot != null)
-                    {
-                        var events = ComputeOrderbookEvents(
-                            market.TickerId, 
-                            previousSnapshot, 
-                            yesLevels,
-                            noLevels,
-                            now, 
-                            ref nextEventId);
-                        eventsToInsert.AddRange(events);
-                    }
+                    // For first snapshot, generate "add" events for all levels
+                    var events = ComputeOrderbookEvents(
+                        market.TickerId, 
+                        previousSnapshot, // null for first snapshot
+                        yesLevels,
+                        noLevels,
+                        now, 
+                        ref nextEventId);
+                    eventsToInsert.AddRange(events);
                     
                     // Note: We don't update LastUpdate on market_highpriority here because
                     // ClickHouse ReplacingMergeTree uses LastUpdate as the version column
@@ -729,10 +727,12 @@ public class SynchronizationService
     /// 
     /// Note: Size field represents the TOTAL size at that price level after the event (not delta).
     /// This allows simple replay: just set book[side, price] = size (or remove if size == 0).
+    /// 
+    /// When previousSnapshot is null (first sync), all current levels are treated as "add" events.
     /// </summary>
     private static List<OrderbookEvent> ComputeOrderbookEvents(
         string marketId,
-        OrderbookSnapshot previousSnapshot,
+        OrderbookSnapshot? previousSnapshot,
         List<List<decimal>> currentYesLevels,
         List<List<decimal>> currentNoLevels,
         DateTime eventTime,
@@ -740,11 +740,11 @@ public class SynchronizationService
     {
         var events = new List<OrderbookEvent>();
 
-        // Parse previous levels from JSON
-        var prevYes = !string.IsNullOrEmpty(previousSnapshot.YesLevels) 
+        // Parse previous levels from JSON (empty if first snapshot)
+        var prevYes = previousSnapshot != null && !string.IsNullOrEmpty(previousSnapshot.YesLevels) 
             ? JsonConvert.DeserializeObject<List<List<decimal>>>(previousSnapshot.YesLevels) ?? new List<List<decimal>>()
             : new List<List<decimal>>();
-        var prevNo = !string.IsNullOrEmpty(previousSnapshot.NoLevels)
+        var prevNo = previousSnapshot != null && !string.IsNullOrEmpty(previousSnapshot.NoLevels)
             ? JsonConvert.DeserializeObject<List<List<decimal>>>(previousSnapshot.NoLevels) ?? new List<List<decimal>>()
             : new List<List<decimal>>();
 
