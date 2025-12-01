@@ -33,6 +33,11 @@ public class SynchronizeMarketDataConsumer : IConsumer<SynchronizeMarketData>
         {
             _logger.LogWarning("Market synchronization message missing both MarketTickerId and Category");
         }
+        try {
         await _synchronizationService.SynchronizeMarketDataAsync(context.Message, context.CancellationToken);
+        }catch(Exception ex)
+        {
+            _logger.LogError(ex, "Error during market data synchronization");
+        }
     }
 }
