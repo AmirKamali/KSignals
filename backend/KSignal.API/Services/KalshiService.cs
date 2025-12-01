@@ -78,24 +78,32 @@ public class KalshiService
         var nowUtc = DateTime.UtcNow;
         var maxCloseTime = GetMaxCloseTimeFromDateType(closeDateType, nowUtc);
 
-        // Get the most recent snapshot for each ticker using a subquery
-        var marketsQuery = _db.MarketSnapshots
+        // ClickHouse doesn't support correlated subqueries in JOINs, so we use a two-step approach:
+        // Step 1: Get the max GenerateDate for each ticker using GROUP BY
+        var baseFilter = _db.MarketSnapshots
             .AsNoTracking()
-            .Where(p => p.CloseTime > nowUtc && p.Status == status)
-            .Where(p => p.GenerateDate == _db.MarketSnapshots
-                .Where(s => s.Ticker == p.Ticker && s.CloseTime > nowUtc && s.Status == status)
-                .Select(s => s.GenerateDate)
-                .DefaultIfEmpty()
-                .Max());
-
-         if (seriesIds != null)
-        {
-            marketsQuery = marketsQuery.Where(p => seriesIds.Contains(p.EventTicker));
-        }
+            .Where(p => p.CloseTime > nowUtc && p.Status == status);
 
         if (maxCloseTime.HasValue)
         {
-            marketsQuery = marketsQuery.Where(p => p.CloseTime <= maxCloseTime.Value);
+            baseFilter = baseFilter.Where(p => p.CloseTime <= maxCloseTime.Value);
+        }
+
+        // Get latest GenerateDate per ticker
+        var latestPerTicker = await baseFilter
+            .GroupBy(p => p.Ticker)
+            .Select(g => new { Ticker = g.Key, MaxDate = g.Max(p => p.GenerateDate) })
+            .ToListAsync(cancellationToken);
+
+        var latestDateDict = latestPerTicker.ToDictionary(x => x.Ticker, x => x.MaxDate);
+        var tickerSet = latestDateDict.Keys.ToHashSet();
+
+        // Step 2: Build query for markets with those tickers
+        var marketsQuery = baseFilter.Where(p => tickerSet.Contains(p.Ticker));
+
+        if (seriesIds != null)
+        {
+            marketsQuery = marketsQuery.Where(p => seriesIds.Contains(p.EventTicker));
         }
 
         if (searchTerm != null)
@@ -108,25 +116,33 @@ public class KalshiService
                 (p.Ticker != null && EF.Functions.Like(p.Ticker, likePattern)));
         }
 
+        // Fetch all matching records
+        var allMatchingMarkets = await marketsQuery.ToListAsync(cancellationToken);
+
+        // Client-side: Filter to keep only the latest GenerateDate per ticker
+        var filteredMarkets = allMatchingMarkets
+            .Where(m => latestDateDict.TryGetValue(m.Ticker, out var maxDate) && m.GenerateDate == maxDate)
+            .ToList();
+
+        // Apply sorting client-side (after the latest-per-ticker filter)
+        IEnumerable<MarketSnapshot> sortedMarkets = filteredMarkets;
         if (sortBy == MarketSort.Volume)
         {
-            marketsQuery = direction == SortDirection.Asc
-                ? marketsQuery.OrderBy(m => m.Volume24h)
-                : marketsQuery.OrderByDescending(m => m.Volume24h);
+            sortedMarkets = direction == SortDirection.Asc
+                ? filteredMarkets.OrderBy(m => m.Volume24h)
+                : filteredMarkets.OrderByDescending(m => m.Volume24h);
         }
 
-
-
         var safePageSize = Math.Max(1, pageSize);
-        var totalCount = await marketsQuery.Select(m => m.Ticker).CountAsync();
+        var totalCount = filteredMarkets.Count;
         var totalPages = (int)Math.Ceiling(totalCount / (double)safePageSize);
         var safePage = totalPages > 0 ? Math.Min(Math.Max(1, page), totalPages) : 1;
         var skip = (safePage - 1) * safePageSize;
 
-        var markets = await marketsQuery
+        var markets = sortedMarkets
             .Skip(skip)
             .Take(safePageSize)
-            .ToListAsync(cancellationToken);
+            .ToList();
         return new MarketPageResult
             {
                 Markets = markets,
