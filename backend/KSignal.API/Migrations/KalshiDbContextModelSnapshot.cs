@@ -20,8 +20,6 @@ namespace KSignal.API.Migrations
                 .HasAnnotation("ProductVersion", "8.0.2")
                 .HasAnnotation("Relational:MaxIdentifierLength", 64);
 
-            MySqlModelBuilderExtensions.AutoIncrementColumns(modelBuilder);
-
             modelBuilder.Entity("KSignal.API.Models.MarketCategory", b =>
                 {
                     b.Property<string>("SeriesId")
@@ -65,8 +63,6 @@ namespace KSignal.API.Migrations
                     b.Property<int>("MarketSnapshotID")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("int");
-
-                    MySqlPropertyBuilderExtensions.UseMySqlIdentityColumn(b.Property<int>("MarketSnapshotID"));
 
                     b.Property<bool>("CanCloseEarly")
                         .HasColumnType("tinyint(1)");
@@ -285,8 +281,6 @@ namespace KSignal.API.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("int");
 
-                    MySqlPropertyBuilderExtensions.UseMySqlIdentityColumn(b.Property<int>("Id"));
-
                     b.Property<string>("Category")
                         .IsRequired()
                         .HasMaxLength(255)
@@ -318,8 +312,6 @@ namespace KSignal.API.Migrations
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("int");
-
-                    MySqlPropertyBuilderExtensions.UseMySqlIdentityColumn(b.Property<int>("Id"));
 
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("datetime(6)");
