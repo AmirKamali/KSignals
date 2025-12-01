@@ -19,6 +19,7 @@ namespace KSignal.API.Data;
         public DbSet<OrderbookSnapshot> OrderbookSnapshots => Set<OrderbookSnapshot>();
         public DbSet<OrderbookEvent> OrderbookEvents => Set<OrderbookEvent>();
         public DbSet<MarketCandlestickData> MarketCandlesticks => Set<MarketCandlestickData>();
+        public DbSet<AnalyticsMarketFeature> AnalyticsMarketFeatures => Set<AnalyticsMarketFeature>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -175,6 +176,9 @@ namespace KSignal.API.Data;
         marketHighPriority.HasIndex(e => e.Priority).HasDatabaseName("idx_market_highpriority_priority");
         marketHighPriority.Property(e => e.FetchCandlesticks).IsRequired();
         marketHighPriority.Property(e => e.FetchOrderbook).IsRequired();
+        marketHighPriority.Property(e => e.ProcessAnalyticsL1).IsRequired();
+        marketHighPriority.Property(e => e.ProcessAnalyticsL2).IsRequired();
+        marketHighPriority.Property(e => e.ProcessAnalyticsL3).IsRequired();
         marketHighPriority.Property(e => e.LastUpdate).IsRequired();
 
         var orderbookSnapshot = modelBuilder.Entity<OrderbookSnapshot>();
@@ -255,5 +259,53 @@ namespace KSignal.API.Data;
         marketCandlestick.Property(e => e.Volume).IsRequired();
         marketCandlestick.Property(e => e.OpenInterest).IsRequired();
         marketCandlestick.Property(e => e.FetchedAt).IsRequired();
+
+        // Analytics Market Features configuration
+        var analyticsFeature = modelBuilder.Entity<AnalyticsMarketFeature>();
+        analyticsFeature.ToTable("analytics_market_features");
+        analyticsFeature.HasKey(e => e.FeatureId);
+        analyticsFeature.Property(e => e.FeatureId).ValueGeneratedNever();
+        analyticsFeature.Property(e => e.Ticker).HasMaxLength(255).IsRequired();
+        analyticsFeature.HasIndex(e => e.Ticker).HasDatabaseName("idx_analytics_market_features_ticker");
+        analyticsFeature.Property(e => e.SeriesId).HasMaxLength(255).IsRequired();
+        analyticsFeature.Property(e => e.EventTicker).HasMaxLength(255).IsRequired();
+        analyticsFeature.Property(e => e.FeatureTime).IsRequired();
+        analyticsFeature.HasIndex(e => e.FeatureTime).HasDatabaseName("idx_analytics_market_features_feature_time");
+        // Time structure
+        analyticsFeature.Property(e => e.TimeToCloseSeconds).IsRequired();
+        analyticsFeature.Property(e => e.TimeToExpirationSeconds).IsRequired();
+        // Prices in probability space
+        analyticsFeature.Property(e => e.YesBidProb).IsRequired();
+        analyticsFeature.Property(e => e.YesAskProb).IsRequired();
+        analyticsFeature.Property(e => e.NoBidProb).IsRequired();
+        analyticsFeature.Property(e => e.NoAskProb).IsRequired();
+        analyticsFeature.Property(e => e.MidProb).IsRequired();
+        analyticsFeature.Property(e => e.ImpliedProbYes).IsRequired();
+        // Volatility / returns
+        analyticsFeature.Property(e => e.Return1h).IsRequired();
+        analyticsFeature.Property(e => e.Return24h).IsRequired();
+        analyticsFeature.Property(e => e.Volatility1h).IsRequired();
+        analyticsFeature.Property(e => e.Volatility24h).IsRequired();
+        // Liquidity
+        analyticsFeature.Property(e => e.BidAskSpread).IsRequired();
+        analyticsFeature.Property(e => e.TopOfBookLiquidityYes).IsRequired();
+        analyticsFeature.Property(e => e.TopOfBookLiquidityNo).IsRequired();
+        analyticsFeature.Property(e => e.TotalLiquidityYes).IsRequired();
+        analyticsFeature.Property(e => e.TotalLiquidityNo).IsRequired();
+        analyticsFeature.Property(e => e.OrderbookImbalance).IsRequired();
+        // Volume / activity
+        analyticsFeature.Property(e => e.Volume1h).IsRequired();
+        analyticsFeature.Property(e => e.Volume24h).IsRequired();
+        analyticsFeature.Property(e => e.OpenInterest).IsRequired();
+        analyticsFeature.Property(e => e.Notional1h).IsRequired();
+        analyticsFeature.Property(e => e.Notional24h).IsRequired();
+        // Categorical
+        analyticsFeature.Property(e => e.Category).HasMaxLength(255).IsRequired();
+        analyticsFeature.Property(e => e.MarketType).HasMaxLength(50).IsRequired();
+        analyticsFeature.Property(e => e.Status).HasMaxLength(64).IsRequired();
+        // External probability
+        analyticsFeature.Property(e => e.FactualProbabilityYes).IsRequired();
+        analyticsFeature.Property(e => e.MispriceScore).IsRequired();
+        analyticsFeature.Property(e => e.GeneratedAt).IsRequired();
     }
 }
