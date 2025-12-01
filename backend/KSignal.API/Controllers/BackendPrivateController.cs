@@ -14,12 +14,18 @@ public class BackendPrivateController : ControllerBase
 {
     private readonly KalshiService _kalshiService;
     private readonly SynchronizationService _synchronizationService;
+    private readonly CleanupService _cleanupService;
     private readonly ILogger<BackendPrivateController> _logger;
 
-    public BackendPrivateController(KalshiService kalshiService, SynchronizationService synchronizationService, ILogger<BackendPrivateController> logger)
+    public BackendPrivateController(
+        KalshiService kalshiService, 
+        SynchronizationService synchronizationService, 
+        CleanupService cleanupService,
+        ILogger<BackendPrivateController> logger)
     {
         _kalshiService = kalshiService ?? throw new ArgumentNullException(nameof(kalshiService));
         _synchronizationService = synchronizationService ?? throw new ArgumentNullException(nameof(synchronizationService));
+        _cleanupService = cleanupService ?? throw new ArgumentNullException(nameof(cleanupService));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
 
@@ -199,6 +205,69 @@ public class BackendPrivateController : ControllerBase
         {
             _logger.LogError(ex, "Failed to enqueue candlesticks synchronization");
             return StatusCode(StatusCodes.Status500InternalServerError, new { error = "Failed to enqueue candlesticks synchronization", message = ex.Message });
+        }
+    }
+
+    /// <summary>
+    /// Cleans up data for finalized/closed markets to free up space.
+    /// Finds all tickers with Finalized or Closed status and removes their data from all related tables.
+    /// </summary>
+    /// <returns>Accepted response with count of markets queued for cleanup</returns>
+    [HttpPost("cleanup")]
+    [ProducesResponseType(StatusCodes.Status202Accepted)]
+    [ProducesResponseType(StatusCodes.Status503ServiceUnavailable)]
+    [ProducesResponseType(StatusCodes.Status500InternalServerError)]
+    public async Task<IActionResult> CleanupMarketData()
+    {
+        try
+        {
+            var count = await _cleanupService.EnqueueCleanupJobsAsync(HttpContext.RequestAborted);
+            
+            return Accepted(new
+            {
+                started = true,
+                markets_queued = count,
+                message = $"Cleanup queued for {count} finalized/closed markets"
+            });
+        }
+        catch (RabbitMqUnavailableException ex)
+        {
+            _logger.LogWarning(ex, "RabbitMQ unavailable while trying to enqueue cleanup jobs");
+            return StatusCode(StatusCodes.Status503ServiceUnavailable, new { error = "RabbitMQ unavailable", message = ex.Message });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to enqueue cleanup jobs");
+            return StatusCode(StatusCodes.Status500InternalServerError, new { error = "Failed to enqueue cleanup jobs", message = ex.Message });
+        }
+    }
+
+    /// <summary>
+    /// Cleans up data for a specific market ticker.
+    /// Removes data from all related tables (snapshots, candlesticks, orderbook, analytics, highpriority).
+    /// </summary>
+    /// <param name="tickerId">The market ticker to clean up</param>
+    /// <returns>OK response when cleanup is complete</returns>
+    [HttpPost("cleanup/{tickerId}")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status500InternalServerError)]
+    public async Task<IActionResult> CleanupMarketDataForTicker(string tickerId)
+    {
+        try
+        {
+            await _cleanupService.CleanupMarketDataAsync(tickerId, HttpContext.RequestAborted);
+            
+            return Ok(new
+            {
+                success = true,
+                ticker_id = tickerId,
+                message = $"Cleanup completed for ticker: {tickerId}"
+            });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to cleanup data for ticker {TickerId}", tickerId);
+            return StatusCode(StatusCodes.Status500InternalServerError, new { error = "Failed to cleanup market data", message = ex.Message });
         }
     }
 }

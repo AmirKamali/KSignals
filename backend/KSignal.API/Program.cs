@@ -144,6 +144,7 @@ builder.Services.AddMassTransit(x =>
     x.AddConsumer<KSignal.API.SynchronizeConsumers.SynchronizeOrderbookConsumer>();
     x.AddConsumer<KSignal.API.SynchronizeConsumers.SynchronizeCandlesticksConsumer>();
     x.AddConsumer<KSignal.API.SynchronizeConsumers.ProcessMarketAnalyticsConsumer>();
+    x.AddConsumer<KSignal.API.SynchronizeConsumers.CleanupMarketDataConsumer>();
 
     x.UsingRabbitMq((context, cfg) =>
     {
@@ -164,6 +165,7 @@ builder.Services.AddMassTransit(x =>
 builder.Services.AddScoped<KalshiService>();
 builder.Services.AddScoped<SynchronizationService>();
 builder.Services.AddScoped<AnalyticsService>();
+builder.Services.AddScoped<CleanupService>();
 // builder.Services.AddSingleton<RefreshService>(); // Commented out - RefreshService is currently commented out
 
 // Register Redis cache service as singleton (connection pooling)
