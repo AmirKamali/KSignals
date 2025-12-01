@@ -111,3 +111,46 @@ CREATE TABLE IF NOT EXISTS kalshi_signals.analytics_market_metrics
 ENGINE = MergeTree()
 ORDER BY (Ticker, MetricDate)
 SETTINGS index_granularity = 8192;
+
+CREATE TABLE IF NOT EXISTS kalshi_signals.analytics_orderbook_features
+(
+    `FeatureId` UInt64 DEFAULT generateSerialID('analytics_orderbook_features'),
+
+    `MarketId` String,              -- Same as orderbook_snapshots.MarketId / market_snapshots.Ticker
+    `CapturedAt` DateTime,          -- Usually = orderbook_snapshots.CapturedAt
+
+    -- Top-of-book
+    `BestYes` Float64,              -- From orderbook_snapshots.BestYes
+    `BestNo` Float64,               -- From orderbook_snapshots.BestNo
+    `Spread` Float64,               -- From orderbook_snapshots.Spread
+    `MidPrice` Float64,             -- (BestYes + BestNo) / 2
+
+    -- Depth + imbalance
+    `TotalYesLiquidity` Float64,    -- From orderbook_snapshots.TotalYesLiquidity
+    `TotalNoLiquidity` Float64,     -- From orderbook_snapshots.TotalNoLiquidity
+    `DepthImbalance` Float64,       -- (TotalYesLiquidity - TotalNoLiquidity)
+    `DepthImbalanceRatio` Float64,  -- (TotalYesLiquidity - TotalNoLiquidity) /
+                                    --  max(1, TotalYesLiquidity + TotalNoLiquidity)
+
+    -- Shape of the book (derived from YesLevels / NoLevels JSON)
+    `SlopeYes` Float64,             -- Approximate slope of price vs cumulative size on Yes side
+    `SlopeNo` Float64,              -- Same for No
+    `Top3YesConcentration` Float64, -- Fraction of liquidity in top 3 levels on Yes
+    `Top3NoConcentration` Float64,  -- Same for No
+
+    -- Event flow (from orderbook_events, aggregated)
+    `AggressiveBuyVolume1m` Float64,-- Volume from marketable orders that lifted offers (last 1m)
+    `AggressiveSellVolume1m` Float64,-- Volume that hit bids (last 1m)
+    `OrderCancelRate1m` Float64,    -- Cancels / (adds + trades) in last 1m
+    `NetOrderFlow1m` Float64,       -- AggressiveBuyVolume1m - AggressiveSellVolume1m
+
+    -- Probability/mispricing view
+    `ImpliedProbYes` Float64,       -- Derived from BestYes / price in cents
+    `FactualProbabilityYes` Float64,-- External real-world or model-based probability at this time
+    `MispriceScore` Float64,        -- Same 0-1 mispricing definition as above
+
+    `GeneratedAt` DateTime
+)
+ENGINE = MergeTree()
+ORDER BY (MarketId, CapturedAt)
+SETTINGS index_granularity = 8192;

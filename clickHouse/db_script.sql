@@ -133,9 +133,9 @@ CREATE TABLE IF NOT EXISTS kalshi_signals.market_highpriority
     `LastUpdate` DateTime,                        -- Last modification timestamp
     `FetchCandlesticks` UInt8 DEFAULT 1,          -- Boolean: fetch candlestick data
     `FetchOrderbook` UInt8 DEFAULT 1,             -- Boolean: fetch orderbook data
-    `ProcessAnalyticsL1` UInt8 DEFAULT 1,         -- Boolean: process L1 analytics (basic features)
-    `ProcessAnalyticsL2` UInt8 DEFAULT 1,         -- Boolean: process L2 analytics (volatility/returns)
-    `ProcessAnalyticsL3` UInt8 DEFAULT 1,         -- Boolean: process L3 analytics (advanced metrics)
+    `ProcessAnalyticsL1` UInt8 DEFAULT 0,         -- Boolean: process L1 analytics (basic features)
+    `ProcessAnalyticsL2` UInt8 DEFAULT 0,         -- Boolean: process L2 analytics (volatility/returns)
+    `ProcessAnalyticsL3` UInt8 DEFAULT 0,         -- Boolean: process L3 analytics (advanced metrics)
     
     INDEX idx_market_highpriority_priority Priority TYPE minmax GRANULARITY 1
 )
@@ -144,9 +144,14 @@ ORDER BY TickerId
 SETTINGS index_granularity = 8192;
 
 -- Migration: Add process analytics columns to existing data (run once)
+-- Step 1: Add with DEFAULT 1 so existing rows get value 1
 -- ALTER TABLE kalshi_signals.market_highpriority ADD COLUMN IF NOT EXISTS `ProcessAnalyticsL1` UInt8 DEFAULT 1;
 -- ALTER TABLE kalshi_signals.market_highpriority ADD COLUMN IF NOT EXISTS `ProcessAnalyticsL2` UInt8 DEFAULT 1;
 -- ALTER TABLE kalshi_signals.market_highpriority ADD COLUMN IF NOT EXISTS `ProcessAnalyticsL3` UInt8 DEFAULT 1;
+-- Step 2: Change default to 0 for new inserts
+-- ALTER TABLE kalshi_signals.market_highpriority MODIFY COLUMN `ProcessAnalyticsL1` UInt8 DEFAULT 0;
+-- ALTER TABLE kalshi_signals.market_highpriority MODIFY COLUMN `ProcessAnalyticsL2` UInt8 DEFAULT 0;
+-- ALTER TABLE kalshi_signals.market_highpriority MODIFY COLUMN `ProcessAnalyticsL3` UInt8 DEFAULT 0;
 
 
 -- =============================================================================
