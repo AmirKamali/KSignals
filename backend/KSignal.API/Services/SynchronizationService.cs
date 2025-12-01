@@ -948,15 +948,14 @@ public class SynchronizationService
             var maxId = await _dbContext.MarketCandlesticks.MaxAsync(c => (long?)c.Id, cancellationToken) ?? 0;
             var nextId = maxId + 1;
 
-            // Calculate time range: last 24 hours
+            // End time is always now
             var endTs = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
-            var startTs = endTs - (24 * 60 * 60); // 24 hours ago
 
             foreach (var market in highPriorityMarkets)
             {
                 try
                 {
-                    // Find the market snapshot to get SeriesId
+                    // Find the market snapshot to get SeriesId and CreatedTime
                     var snapshot = await _dbContext.MarketSnapshots
                         .AsNoTracking()
                         .Where(s => s.Ticker == market.TickerId && s.Status == "Active")
@@ -972,6 +971,36 @@ public class SynchronizationService
                     if (string.IsNullOrWhiteSpace(snapshot.SeriesId))
                     {
                         _logger.LogWarning("Market snapshot for ticker {TickerId} has no SeriesId", market.TickerId);
+                        continue;
+                    }
+
+                    // Determine start time: last synced candlestick or market CreatedTime
+                    long startTs;
+                    var lastCandlestick = await _dbContext.MarketCandlesticks
+                        .AsNoTracking()
+                        .Where(c => c.Ticker == market.TickerId)
+                        .OrderByDescending(c => c.EndPeriodTs)
+                        .FirstOrDefaultAsync(cancellationToken);
+
+                    if (lastCandlestick != null)
+                    {
+                        // Continue from last synced candlestick
+                        startTs = lastCandlestick.EndPeriodTs;
+                        _logger.LogDebug("Fetching candlesticks for market {TickerId} from last sync: {LastSync}", 
+                            market.TickerId, lastCandlestick.EndPeriodTime);
+                    }
+                    else
+                    {
+                        // Start from market creation time
+                        startTs = new DateTimeOffset(snapshot.CreatedTime, TimeSpan.Zero).ToUnixTimeSeconds();
+                        _logger.LogDebug("Fetching candlesticks for market {TickerId} from creation: {CreatedTime}", 
+                            market.TickerId, snapshot.CreatedTime);
+                    }
+
+                    // Skip if start time is in the future or same as end time
+                    if (startTs >= endTs)
+                    {
+                        _logger.LogDebug("No new candlesticks to fetch for market {TickerId} (already up to date)", market.TickerId);
                         continue;
                     }
 
