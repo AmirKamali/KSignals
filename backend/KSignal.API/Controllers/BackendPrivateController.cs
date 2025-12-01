@@ -15,17 +15,20 @@ public class BackendPrivateController : ControllerBase
     private readonly KalshiService _kalshiService;
     private readonly SynchronizationService _synchronizationService;
     private readonly CleanupService _cleanupService;
+    private readonly RabbitMqManagementService _rabbitMqManagementService;
     private readonly ILogger<BackendPrivateController> _logger;
 
     public BackendPrivateController(
         KalshiService kalshiService, 
         SynchronizationService synchronizationService, 
         CleanupService cleanupService,
+        RabbitMqManagementService rabbitMqManagementService,
         ILogger<BackendPrivateController> logger)
     {
         _kalshiService = kalshiService ?? throw new ArgumentNullException(nameof(kalshiService));
         _synchronizationService = synchronizationService ?? throw new ArgumentNullException(nameof(synchronizationService));
         _cleanupService = cleanupService ?? throw new ArgumentNullException(nameof(cleanupService));
+        _rabbitMqManagementService = rabbitMqManagementService ?? throw new ArgumentNullException(nameof(rabbitMqManagementService));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
 
@@ -268,6 +271,92 @@ public class BackendPrivateController : ControllerBase
         {
             _logger.LogError(ex, "Failed to cleanup data for ticker {TickerId}", tickerId);
             return StatusCode(StatusCodes.Status500InternalServerError, new { error = "Failed to cleanup market data", message = ex.Message });
+        }
+    }
+
+    /// <summary>
+    /// Cancels all pending MassTransit RabbitMQ jobs by purging all consumer queues.
+    /// This removes all queued messages but does not stop currently processing jobs.
+    /// </summary>
+    /// <returns>Result with counts of purged queues and any errors</returns>
+    [HttpPost("cancel-all-jobs")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status500InternalServerError)]
+    public async Task<IActionResult> CancelAllJobs()
+    {
+        try
+        {
+            _logger.LogWarning("Cancel all jobs requested - purging all RabbitMQ queues");
+            
+            var result = await _rabbitMqManagementService.PurgeAllQueuesAsync(HttpContext.RequestAborted);
+            
+            if (result.Success)
+            {
+                return Ok(new
+                {
+                    success = true,
+                    purged_queues = result.PurgedQueues,
+                    skipped_queues = result.SkippedQueues,
+                    message = $"Successfully purged {result.PurgedQueues.Count} queues, skipped {result.SkippedQueues.Count} (not found)"
+                });
+            }
+            else
+            {
+                return Ok(new
+                {
+                    success = false,
+                    purged_queues = result.PurgedQueues,
+                    skipped_queues = result.SkippedQueues,
+                    errors = result.Errors,
+                    message = $"Completed with errors: purged {result.PurgedQueues.Count} queues, {result.Errors.Count} errors"
+                });
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to cancel all jobs");
+            return StatusCode(StatusCodes.Status500InternalServerError, new { error = "Failed to cancel all jobs", message = ex.Message });
+        }
+    }
+
+    /// <summary>
+    /// Gets the current status of all MassTransit RabbitMQ queues.
+    /// Shows message counts, consumer counts, and queue health.
+    /// </summary>
+    /// <returns>Queue statistics for all consumer queues</returns>
+    [HttpGet("queue-status")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status500InternalServerError)]
+    public async Task<IActionResult> GetQueueStatus()
+    {
+        try
+        {
+            var stats = await _rabbitMqManagementService.GetQueueStatsAsync(HttpContext.RequestAborted);
+            
+            var totalMessages = stats.Values.Where(q => q.Exists).Sum(q => q.MessageCount);
+            var activeQueues = stats.Values.Count(q => q.Exists);
+            
+            return Ok(new
+            {
+                total_pending_messages = totalMessages,
+                active_queues = activeQueues,
+                total_queues = stats.Count,
+                queues = stats.Select(kvp => new
+                {
+                    name = kvp.Key,
+                    exists = kvp.Value.Exists,
+                    messages = kvp.Value.MessageCount,
+                    messages_ready = kvp.Value.MessagesReady,
+                    messages_unacknowledged = kvp.Value.MessagesUnacknowledged,
+                    consumers = kvp.Value.ConsumerCount,
+                    error = kvp.Value.Error
+                }).ToList()
+            });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to get queue status");
+            return StatusCode(StatusCodes.Status500InternalServerError, new { error = "Failed to get queue status", message = ex.Message });
         }
     }
 }

@@ -167,6 +167,9 @@ builder.Services.AddScoped<AnalyticsService>();
 builder.Services.AddScoped<CleanupService>();
 // builder.Services.AddSingleton<RefreshService>(); // Commented out - RefreshService is currently commented out
 
+// Register RabbitMQ management service for queue administration
+builder.Services.AddSingleton<RabbitMqManagementService>();
+
 // Register Redis cache service as singleton (connection pooling)
 builder.Services.AddSingleton<IRedisCacheService, RedisCacheService>();
 
