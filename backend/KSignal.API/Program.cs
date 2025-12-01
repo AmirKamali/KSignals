@@ -100,15 +100,14 @@ else
 var rabbitSection = builder.Configuration.GetSection("RabbitMq");
 var rabbitAddress = Environment.GetEnvironmentVariable("RABBITMQ_ADDRESS") ?? rabbitSection["Address"];
 var rabbitHost = Environment.GetEnvironmentVariable("RABBITMQ_HOST") ?? rabbitSection["Host"] ?? "localhost";
-var rabbitPortEnv = Environment.GetEnvironmentVariable("RABBITMQ_PORT") ?? rabbitSection["Port"];
+var rabbitPortEnv = Environment.GetEnvironmentVariable("RABBITMQ_PORT") ?? rabbitSection["Port"] ?? "5672";
 var rabbitUser = Environment.GetEnvironmentVariable("RABBITMQ_USERNAME") ?? rabbitSection["Username"] ?? "guest";
 var rabbitPass = Environment.GetEnvironmentVariable("RABBITMQ_PASSWORD") ?? rabbitSection["Password"] ?? "guest";
 var rabbitVirtualHost = Environment.GetEnvironmentVariable("RABBITMQ_VHOST") ?? rabbitSection["VirtualHost"] ?? "/";
 var rabbitPort = ushort.TryParse(rabbitPortEnv, out var parsedPort) ? parsedPort : (ushort)5672;
 
-if (!string.IsNullOrWhiteSpace(rabbitAddress))
+if (!string.IsNullOrWhiteSpace(rabbitAddress) && Uri.TryCreate(rabbitAddress, UriKind.Absolute, out var uri))
 {
-    var uri = new Uri(rabbitAddress);
     rabbitHost = string.IsNullOrWhiteSpace(uri.Host) ? rabbitHost : uri.Host;
     if (!uri.IsDefaultPort)
     {
