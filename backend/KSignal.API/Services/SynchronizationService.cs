@@ -481,9 +481,7 @@ public class SynchronizationService
     public async Task SynchronizeEventsAsync(SynchronizeEvents command, CancellationToken cancellationToken)
     {
         try
-        {
-            _logger.LogInformation("Fetching events from Kalshi API (cursor={Cursor})", command.Cursor ?? "<start>");
-            
+        {   
             var response = await _kalshiClient.Events.GetEventsAsync(
                 limit: 200,
                 cursor: command.Cursor,

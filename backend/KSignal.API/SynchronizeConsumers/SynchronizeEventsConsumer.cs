@@ -20,7 +20,6 @@ public class SynchronizeEventsConsumer : IConsumer<SynchronizeEvents>
 
     public async Task Consume(ConsumeContext<SynchronizeEvents> context)
     {
-        _logger.LogInformation("Starting events synchronization (cursor={Cursor})", context.Message.Cursor ?? "<start>");
         await _synchronizationService.SynchronizeEventsAsync(context.Message, context.CancellationToken);
     }
 }
