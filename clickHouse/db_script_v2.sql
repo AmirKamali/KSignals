@@ -61,14 +61,10 @@ CREATE TABLE IF NOT EXISTS kalshi_signals.market_snapshots
     -- USAGE: Main filter/join key, displayed in UI, used in API calls
     `Ticker` String,
     
-    -- Parent series identifier (e.g., 'KXBEYONCEGENRE', 'KXBTC')
-    -- WHY: Groups related markets together (all BTC price markets, etc.)
-    -- USAGE: Category browsing, series-level analytics, grouping in UI
-    `SeriesId` String,
-    
     -- Associated event ticker (e.g., 'BEYONCEGENRE', 'BTC-24DEC31')
     -- WHY: Links to specific event within a series
     -- USAGE: Event-level filtering, grouping markets by event
+    -- NOTE: SeriesTicker can be looked up via market_events table using EventTicker
     `EventTicker` String,
     
     -- =========================================================================
@@ -354,10 +350,16 @@ CREATE TABLE IF NOT EXISTS kalshi_signals.market_snapshots
     -- When this snapshot was captured
     -- WHY: Primary time dimension for time-series queries
     -- USAGE: ORDER BY, time-range filters, data freshness
-    `GenerateDate` DateTime
+    `GenerateDate` DateTime,
+    
+    -- Skip indexes for common query patterns
+    -- Note: Ticker is first in ORDER BY, so lookups by Ticker are already fast
+    INDEX idx_event_ticker EventTicker TYPE bloom_filter GRANULARITY 1,
+    INDEX idx_volume Volume TYPE minmax GRANULARITY 4,
+    INDEX idx_volume24h Volume24h TYPE minmax GRANULARITY 4
 )
 ENGINE = MergeTree()
-ORDER BY (Ticker, SeriesId, GenerateDate)
+ORDER BY (Ticker, EventTicker, GenerateDate)
 SETTINGS index_granularity = 8192;
 
 
@@ -654,7 +656,7 @@ CREATE TABLE IF NOT EXISTS kalshi_signals.market_series
 (
     -- Series ticker (primary key, e.g., 'KXBTC', 'KXELECTION')
     -- WHY: Unique identifier from Kalshi
-    -- USAGE: Primary key, join to market_snapshots.SeriesId
+    -- USAGE: Primary key, join to market_events.SeriesTicker
     `Ticker` String,
     
     -- Update frequency (e.g., 'daily', 'weekly', 'one-time')

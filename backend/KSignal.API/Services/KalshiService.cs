@@ -172,20 +172,7 @@ public class KalshiService
             }
 
             var fetchedAtUtc = DateTime.UtcNow;
-            var seriesTicker = string.IsNullOrWhiteSpace(market.EventTicker) ? market.Ticker : market.EventTicker;
-            
-            // Look up the seriesId from market_events table using EventTicker
-            var seriesId = string.Empty;
-            if (!string.IsNullOrWhiteSpace(market.EventTicker))
-            {
-                var marketEvent = await _db.MarketEvents
-                    .AsNoTracking()
-                    .Where(e => e.EventTicker == market.EventTicker)
-                    .FirstOrDefaultAsync();
-                seriesId = marketEvent?.SeriesTicker ?? string.Empty;
-            }
-            
-            var mapped = MapMarket(seriesTicker ?? tickerId, seriesId, market, fetchedAtUtc);
+            var mapped = MapMarket( market, fetchedAtUtc);
 
             // Find the most recent snapshot for this ticker
             var existing = await _db.MarketSnapshots
@@ -321,12 +308,11 @@ public class KalshiService
         return targetDate;
     }
 
-    internal static MarketSnapshot MapMarket(string seriesTicker, string seriesId, Market market, DateTime generateDate)
+    internal static MarketSnapshot MapMarket(Market market, DateTime generateDate)
     {
         return new MarketSnapshot
         {
             Ticker = market.Ticker,
-            SeriesId = seriesId,
             EventTicker = market.EventTicker,
             MarketType = market.MarketType.ToString(),
             YesSubTitle = market.YesSubTitle,

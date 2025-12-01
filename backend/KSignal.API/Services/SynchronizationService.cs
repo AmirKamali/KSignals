@@ -40,22 +40,25 @@ public class SynchronizationService
                 return;
             }
             
-            // Load all seriesIds from market_series and enqueue each
-            var seriesIds = await _dbContext.MarketSeries
+            // Load all unique categories from TagsCategories and enqueue each
+            var categories = await _dbContext.TagsCategories
                 .AsNoTracking()
-                .Where(s => !s.IsDeleted)
-                .Select(s => s.Ticker)
+                .Where(tc => !tc.IsDeleted)
+                .Select(tc => tc.Category)
+                .Distinct()
                 .ToListAsync(cancellationToken);
 
-            if (seriesIds.Count == 0)
+            if (categories.Count == 0)
             {
-                _logger.LogWarning("No series found in market_series table. Please sync market series first.");
+                _logger.LogWarning("No categories found in TagsCategories table. Please sync tags/categories first.");
                 return;
             }
 
-            foreach (var seriesId in seriesIds)
+            _logger.LogInformation("Enqueuing market sync for {Count} categories", categories.Count);
+
+            foreach (var category in categories)
             {
-                await _publishEndpoint.Publish(new SynchronizeMarketData(seriesId, null), cancellationToken);
+                await _publishEndpoint.Publish(new SynchronizeMarketData(category, null), cancellationToken);
             }
         }
         catch (Exception ex)
@@ -75,15 +78,15 @@ public class SynchronizationService
             return;
         }
 
-        // SeriesId is required for bulk sync
-        if (string.IsNullOrWhiteSpace(command.SeriesId))
+        // Category is required for bulk sync
+        if (string.IsNullOrWhiteSpace(command.Category))
         {
-            _logger.LogWarning("SeriesId is required for market synchronization");
+            _logger.LogWarning("Category is required for market synchronization");
             return;
         }
 
-        // Sync markets for a specific series
-        var request = BuildRequest(command.SeriesId, command.Cursor);
+        // Sync markets for a specific category
+        var request = BuildRequest(command.Category, command.Cursor);
         var response = await _kalshiClient.Markets.AsynchronousClient.GetAsync<GetMarketsResponse>(
             "/markets",
             request,
@@ -97,16 +100,17 @@ public class SynchronizationService
             .Where(m => m != null)
             .Select(m =>
             {
-                var seriesKey = string.IsNullOrWhiteSpace(m.EventTicker) ? m.Ticker : m.EventTicker;
-                return KalshiService.MapMarket(seriesKey ?? m.Ticker, command.SeriesId, m, fetchedAt);
+                return KalshiService.MapMarket(m, fetchedAt);
             })
             .ToList();
 
         await InsertMarketSnapshotsAsync(mapped, cancellationToken);
 
+        // If cursor exists, enqueue next page with same category
         if (!string.IsNullOrWhiteSpace(payload.Cursor))
         {
-            await _publishEndpoint.Publish(new SynchronizeMarketData(command.SeriesId, payload.Cursor), cancellationToken);
+            _logger.LogDebug("Enqueuing next page for category {Category} with cursor", command.Category);
+            await _publishEndpoint.Publish(new SynchronizeMarketData(command.Category, payload.Cursor), cancellationToken);
         }
     }
 
@@ -124,20 +128,7 @@ public class SynchronizationService
             }
 
             var fetchedAt = DateTime.UtcNow;
-            var seriesKey = string.IsNullOrWhiteSpace(market.EventTicker) ? market.Ticker : market.EventTicker;
-            
-            // Look up the seriesId from market_events table using EventTicker
-            var seriesId = string.Empty;
-            if (!string.IsNullOrWhiteSpace(market.EventTicker))
-            {
-                var marketEvent = await _dbContext.MarketEvents
-                    .AsNoTracking()
-                    .Where(e => e.EventTicker == market.EventTicker)
-                    .FirstOrDefaultAsync(cancellationToken);
-                seriesId = marketEvent?.SeriesTicker ?? string.Empty;
-            }
-            
-            var mapped = KalshiService.MapMarket(seriesKey ?? marketTickerId, seriesId, market, fetchedAt);
+            var mapped = KalshiService.MapMarket(market, fetchedAt);
 
             await InsertMarketSnapshotsAsync(new[] { mapped }, cancellationToken);
         }
@@ -153,7 +144,7 @@ public class SynchronizationService
         }
     }
 
-    private static RequestOptions BuildRequest(string seriesId, string? cursor)
+    private static RequestOptions BuildRequest(string category, string? cursor)
     {
         var requestOptions = new RequestOptions
         {
@@ -163,7 +154,7 @@ public class SynchronizationService
         requestOptions.QueryParameters.Add(ClientUtils.ParameterToMultiMap("", "limit", 250));
         requestOptions.QueryParameters.Add(ClientUtils.ParameterToMultiMap("", "status", "open"));
         requestOptions.QueryParameters.Add(ClientUtils.ParameterToMultiMap("", "with_nested_markets", true));
-        requestOptions.QueryParameters.Add(ClientUtils.ParameterToMultiMap("", "series_ticker", seriesId));
+        requestOptions.QueryParameters.Add(ClientUtils.ParameterToMultiMap("", "category", category));
 
         if (!string.IsNullOrWhiteSpace(cursor))
         {
@@ -892,7 +883,7 @@ public class SynchronizationService
             {
                 try
                 {
-                    // Find the market snapshot to get SeriesId and CreatedTime
+                    // Find the market snapshot and event to get SeriesTicker and CreatedTime
                     var snapshot = await _dbContext.MarketSnapshots
                         .AsNoTracking()
                         .Where(s => s.Ticker == market.TickerId && s.Status == "Active")
@@ -905,9 +896,20 @@ public class SynchronizationService
                         continue;
                     }
 
-                    if (string.IsNullOrWhiteSpace(snapshot.SeriesId))
+                    // Look up the seriesTicker from market_events table using EventTicker
+                    var seriesTicker = string.Empty;
+                    if (!string.IsNullOrWhiteSpace(snapshot.EventTicker))
                     {
-                        _logger.LogWarning("Market snapshot for ticker {TickerId} has no SeriesId", market.TickerId);
+                        var marketEvent = await _dbContext.MarketEvents
+                            .AsNoTracking()
+                            .Where(e => e.EventTicker == snapshot.EventTicker)
+                            .FirstOrDefaultAsync(cancellationToken);
+                        seriesTicker = marketEvent?.SeriesTicker ?? string.Empty;
+                    }
+
+                    if (string.IsNullOrWhiteSpace(seriesTicker))
+                    {
+                        _logger.LogWarning("Could not find SeriesTicker for market {TickerId}", market.TickerId);
                         continue;
                     }
 
@@ -941,10 +943,10 @@ public class SynchronizationService
                         continue;
                     }
 
-                    _logger.LogDebug("Fetching candlesticks for market {TickerId} (series: {SeriesId})", market.TickerId, snapshot.SeriesId);
+                    _logger.LogDebug("Fetching candlesticks for market {TickerId} (series: {SeriesTicker})", market.TickerId, seriesTicker);
 
                     var response = await _kalshiClient.Markets.GetMarketCandlesticksAsync(
-                        snapshot.SeriesId,
+                        seriesTicker,
                         market.TickerId,
                         startTs,
                         endTs,
@@ -963,7 +965,7 @@ public class SynchronizationService
                         {
                             // Id is auto-generated by ClickHouse via generateSerialID
                             Ticker = response.Ticker,
-                            SeriesTicker = snapshot.SeriesId,
+                            SeriesTicker = seriesTicker,
                             PeriodInterval = 60,
                             EndPeriodTs = candle.EndPeriodTs,
                             EndPeriodTime = DateTimeOffset.FromUnixTimeSeconds(candle.EndPeriodTs).UtcDateTime,

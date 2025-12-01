@@ -97,11 +97,22 @@ public class AnalyticsService
                 return;
             }
 
+            // Look up the seriesId from market_events table using EventTicker
+            var seriesId = string.Empty;
+            if (!string.IsNullOrWhiteSpace(snapshot.EventTicker))
+            {
+                var marketEvent = await _dbContext.MarketEvents
+                    .AsNoTracking()
+                    .Where(e => e.EventTicker == snapshot.EventTicker)
+                    .FirstOrDefaultAsync(cancellationToken);
+                seriesId = marketEvent?.SeriesTicker ?? string.Empty;
+            }
+
             var now = DateTime.UtcNow;
             var feature = new AnalyticsMarketFeature
             {
                 Ticker = tickerId,
-                SeriesId = snapshot.SeriesId,
+                SeriesId = seriesId,
                 EventTicker = snapshot.EventTicker,
                 FeatureTime = snapshot.GenerateDate,
                 GeneratedAt = now

@@ -9,7 +9,6 @@ public class MarketSnapshot
     public Guid MarketSnapshotID { get; set; }
     
     public string Ticker { get; set; } = string.Empty;
-    public string SeriesId { get; set; } = string.Empty;
     public string EventTicker { get; set; } = string.Empty;
     public string MarketType { get; set; } = string.Empty;
     public string YesSubTitle { get; set; } = string.Empty;
