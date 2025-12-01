@@ -20,44 +20,6 @@ namespace KSignal.API.Migrations
                 .HasAnnotation("ProductVersion", "8.0.2")
                 .HasAnnotation("Relational:MaxIdentifierLength", 64);
 
-            modelBuilder.Entity("KSignal.API.Models.MarketCategory", b =>
-                {
-                    b.Property<string>("SeriesId")
-                        .HasMaxLength(255)
-                        .HasColumnType("varchar(255)");
-
-                    b.Property<string>("Category")
-                        .HasMaxLength(255)
-                        .HasColumnType("varchar(255)");
-
-                    b.Property<string>("Frequency")
-                        .HasMaxLength(255)
-                        .HasColumnType("varchar(255)");
-
-                    b.Property<string>("JsonResponse")
-                        .HasColumnType("longtext");
-
-                    b.Property<DateTime>("LastUpdate")
-                        .HasColumnType("datetime(6)");
-
-                    b.Property<string>("Tags")
-                        .HasColumnType("longtext");
-
-                    b.Property<string>("Ticker")
-                        .HasMaxLength(255)
-                        .HasColumnType("varchar(255)");
-
-                    b.Property<string>("Title")
-                        .HasColumnType("longtext");
-
-                    b.HasKey("SeriesId");
-
-                    b.HasIndex("SeriesId")
-                        .HasDatabaseName("idx_series_id");
-
-                    b.ToTable("market_categories", (string)null);
-                });
-
             modelBuilder.Entity("KSignal.API.Models.MarketSnapshot", b =>
                 {
                     b.Property<int>("MarketSnapshotID")

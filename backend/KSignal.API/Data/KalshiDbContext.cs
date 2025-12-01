@@ -9,7 +9,6 @@ namespace KSignal.API.Data;
         {
         }
 
-        public DbSet<MarketCategory> MarketCategories => Set<MarketCategory>();
         public DbSet<MarketSnapshot> MarketSnapshots => Set<MarketSnapshot>();
         public DbSet<TagsCategory> TagsCategories => Set<TagsCategory>();
         public DbSet<User> Users => Set<User>();
@@ -24,20 +23,6 @@ namespace KSignal.API.Data;
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
-
-        var entity = modelBuilder.Entity<MarketCategory>();
-        entity.ToTable("market_categories");
-        entity.HasKey(e => e.SeriesId);
-        entity.HasIndex(e => e.SeriesId).HasDatabaseName("idx_series_id");
-
-        entity.Property(e => e.SeriesId).HasMaxLength(255).IsRequired();
-        entity.Property(e => e.Category).HasMaxLength(255);
-        entity.Property(e => e.Tags);
-        entity.Property(e => e.Ticker).HasMaxLength(255);
-        entity.Property(e => e.Title);
-        entity.Property(e => e.Frequency).HasMaxLength(255);
-        entity.Property(e => e.JsonResponse);
-        entity.Property(e => e.LastUpdate).IsRequired();
 
         var marketSnapshot = modelBuilder.Entity<MarketSnapshot>();
         marketSnapshot.ToTable("market_snapshots");

@@ -33,14 +33,13 @@ public class MarketsController : ControllerBase
 
         try
         {
-            var (market, category) = await _kalshiService.GetMarketDetailsWithCategoryAsync(tickerId, cancellationToken);
+            var market = await _kalshiService.GetMarketDetailsAsync(tickerId);
             if (market == null)
             {
                 return NotFound(new { error = "Market not found", tickerId });
             }
 
-            var tags = category?.Tags?.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries) ?? Array.Empty<string>();
-            var shaped = MarketResponseMapper.ToResponse(market, detailed: true, category: category?.Category, tags: tags);
+            var shaped = MarketResponseMapper.ToResponse(market, detailed: true, category: null, tags: Array.Empty<string>());
             return Ok(new { market = shaped });
         }
         catch (ApiException apiEx)
