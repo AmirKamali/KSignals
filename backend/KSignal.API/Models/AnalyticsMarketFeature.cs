@@ -9,10 +9,10 @@ namespace KSignal.API.Models;
 public class AnalyticsMarketFeature
 {
     /// <summary>
-    /// Auto-generated feature ID
+    /// Auto-generated feature ID (via ClickHouse generateUUIDv4)
     /// </summary>
     [Key]
-    public ulong FeatureId { get; set; }
+    public Guid FeatureId { get; set; }
 
     /// <summary>
     /// Market ticker (joins to market_snapshots.Ticker)

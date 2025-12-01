@@ -25,8 +25,8 @@ CREATE DATABASE IF NOT EXISTS kalshi_signals;
 -- =============================================================================
 CREATE TABLE IF NOT EXISTS kalshi_signals.market_snapshots
 (
-    -- Primary identifier (auto-generated, requires ZooKeeper in production)
-    `MarketSnapshotID` UInt64 DEFAULT generateSerialID('market_snapshots'),
+    -- Primary identifier (auto-generated UUID)
+    `MarketSnapshotID` UUID DEFAULT generateUUIDv4(),
     
     -- Market identifiers
     `Ticker` String,                              -- Unique market ticker (e.g., 'BEYONCEGENRE-30-AFA')
@@ -169,7 +169,7 @@ SETTINGS index_granularity = 8192;
 -- =============================================================================
 CREATE TABLE IF NOT EXISTS kalshi_signals.market_candlesticks
 (
-    `Id` Int64,                                   -- Unique record identifier
+    `Id` UUID DEFAULT generateUUIDv4(),  -- Auto-generated UUID
     `Ticker` String,                              -- Market ticker ID
     `SeriesTicker` String,                        -- Parent series ticker
     `PeriodInterval` Int32,                       -- Candle interval in minutes (1, 60, 1440)
@@ -347,7 +347,7 @@ SETTINGS index_granularity = 8192;
 -- =============================================================================
 CREATE TABLE IF NOT EXISTS kalshi_signals.orderbook_snapshots
 (
-    `Id` Int64,                                   -- Unique record identifier
+    `Id` UUID DEFAULT generateUUIDv4(),           -- Auto-generated UUID
     `MarketId` String,                            -- Market ticker ID
     `CapturedAt` DateTime,                        -- Snapshot capture timestamp
     `YesLevels` Nullable(String),                 -- Yes side price levels (JSON)
@@ -381,7 +381,7 @@ SETTINGS index_granularity = 8192;
 -- =============================================================================
 CREATE TABLE IF NOT EXISTS kalshi_signals.orderbook_events
 (
-    `Id` Int64,                                   -- Unique event identifier
+    `Id` UUID DEFAULT generateUUIDv4(),           -- Auto-generated UUID
     `MarketId` String,                            -- Market ticker ID
     `EventTime` DateTime,                         -- When event occurred
     `Side` String,                                -- 'Yes' or 'No'

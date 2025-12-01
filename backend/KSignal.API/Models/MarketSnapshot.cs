@@ -6,8 +6,7 @@ namespace KSignal.API.Models;
 public class MarketSnapshot
 {
     [Key]
-
-    public ulong MarketSnapshotID { get; set; }
+    public Guid MarketSnapshotID { get; set; }
     
     public string Ticker { get; set; } = string.Empty;
     public string SeriesId { get; set; } = string.Empty;
