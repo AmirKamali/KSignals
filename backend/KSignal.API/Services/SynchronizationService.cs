@@ -416,70 +416,50 @@ public class SynchronizationService
                 return;
             }
 
-            // Load all existing records
-            var existingRecords = await _dbContext.MarketSeries
+            // Load existing tickers to track deleted ones (using AsNoTracking to avoid EF updates)
+            var existingTickers = await _dbContext.MarketSeries
+                .AsNoTracking()
+                .Select(e => new { e.Ticker, e.IsDeleted })
                 .ToListAsync(cancellationToken);
 
-            var existingDict = existingRecords
-                .ToDictionary(e => e.Ticker, e => e);
+            var existingTickerSet = existingTickers
+                .Select(e => e.Ticker)
+                .ToHashSet();
 
-            var updatedCount = 0;
-            var insertedCount = 0;
+            var insertedCount = incomingRecords.Count;
             var deletedCount = 0;
-            var restoredCount = 0;
 
-            // Process incoming records: upsert logic
-            foreach (var incoming in incomingRecords)
-            {
-                if (existingDict.TryGetValue(incoming.Ticker, out var existing))
-                {
-                    // Record exists - update it
-                    if (existing.IsDeleted)
-                    {
-                        restoredCount++;
-                    }
-
-                    // Update all fields
-                    existing.Frequency = incoming.Frequency;
-                    existing.Title = incoming.Title;
-                    existing.Category = incoming.Category;
-                    existing.Tags = incoming.Tags;
-                    existing.SettlementSources = incoming.SettlementSources;
-                    existing.ContractUrl = incoming.ContractUrl;
-                    existing.ContractTermsUrl = incoming.ContractTermsUrl;
-                    existing.ProductMetadata = incoming.ProductMetadata;
-                    existing.FeeType = incoming.FeeType;
-                    existing.FeeMultiplier = incoming.FeeMultiplier;
-                    existing.AdditionalProhibitions = incoming.AdditionalProhibitions;
-                    existing.LastUpdate = now;
-                    existing.IsDeleted = false;
-
-                    updatedCount++;
-                }
-                else
-                {
-                    // New record - insert it (Ticker is the primary key)
-                    await _dbContext.MarketSeries.AddAsync(incoming, cancellationToken);
-                    insertedCount++;
-                }
-            }
+            // For ClickHouse ReplacingMergeTree, we always INSERT new rows.
+            // The engine will keep only the row with the latest LastUpdate after background merges.
+            await _dbContext.MarketSeries.AddRangeAsync(incomingRecords, cancellationToken);
 
             // Mark records as deleted if they're not in incoming data
-            foreach (var existing in existingRecords)
+            // Insert new rows with IsDeleted = true for soft delete
+            var tickersToDelete = existingTickers
+                .Where(e => !incomingTickers.Contains(e.Ticker) && !e.IsDeleted)
+                .Select(e => e.Ticker)
+                .ToList();
+
+            foreach (var ticker in tickersToDelete)
             {
-                if (!incomingTickers.Contains(existing.Ticker) && !existing.IsDeleted)
+                var deletedRecord = new MarketSeries
                 {
-                    existing.IsDeleted = true;
-                    existing.LastUpdate = now;
-                    deletedCount++;
-                }
+                    Ticker = ticker,
+                    Frequency = string.Empty,
+                    Title = string.Empty,
+                    Category = string.Empty,
+                    LastUpdate = now,
+                    IsDeleted = true
+                };
+                await _dbContext.MarketSeries.AddAsync(deletedRecord, cancellationToken);
+                deletedCount++;
             }
 
             await _dbContext.SaveChangesAsync(cancellationToken);
 
             _logger.LogInformation(
-                "Successfully synchronized series: {Inserted} inserted, {Updated} updated, {Restored} restored, {Deleted} marked as deleted",
-                insertedCount, updatedCount, restoredCount, deletedCount);
+                "Successfully synchronized series: {Inserted} inserted/updated (ReplacingMergeTree will dedupe), {Deleted} marked as deleted",
+                insertedCount, deletedCount);
         }
         catch (Exception ex)
         {
@@ -600,8 +580,6 @@ public class SynchronizationService
     {
         try
         {
-            _logger.LogInformation("Fetching event detail for {EventTicker}", command.EventTicker);
-
             var response = await _kalshiClient.Events.GetEventAsync(
                 command.EventTicker,
                 withNestedMarkets: false,
@@ -609,46 +587,21 @@ public class SynchronizationService
 
             if (response?.Event == null)
             {
-                _logger.LogWarning("No event data received for {EventTicker}", command.EventTicker);
                 return;
             }
 
             var eventData = response.Event;
             var now = DateTime.UtcNow;
 
-            // Check if event already exists
+            // Check if event already exists (using AsNoTracking to avoid EF change tracking)
             var existingEvent = await _dbContext.MarketEvents
+                .AsNoTracking()
                 .FirstOrDefaultAsync(e => e.EventTicker == eventData.EventTicker, cancellationToken);
 
-            if (existingEvent != null)
-            {
-                // Update existing record
-                existingEvent.SeriesTicker = eventData.SeriesTicker;
-                existingEvent.SubTitle = eventData.SubTitle;
-                existingEvent.Title = eventData.Title;
-                existingEvent.CollateralReturnType = eventData.CollateralReturnType;
-                existingEvent.MutuallyExclusive = eventData.MutuallyExclusive;
-                existingEvent.Category = eventData.Category;
-                existingEvent.StrikeDate = eventData.StrikeDate;
-                existingEvent.StrikePeriod = eventData.StrikePeriod;
-                existingEvent.AvailableOnBrokers = eventData.AvailableOnBrokers;
-                existingEvent.ProductMetadata = eventData.ProductMetadata != null
-                    ? JsonConvert.SerializeObject(eventData.ProductMetadata)
-                    : null;
-                existingEvent.LastUpdate = now;
-                existingEvent.IsDeleted = false;
-
-                _logger.LogInformation("Updated existing event {EventTicker}", command.EventTicker);
-            }
-            else
-            {
-                // Insert new record
-                var newEvent = MapEventDataToMarketEvent(eventData, now);
-                await _dbContext.MarketEvents.AddAsync(newEvent, cancellationToken);
-
-                _logger.LogInformation("Inserted new event {EventTicker}", command.EventTicker);
-            }
-
+            // For ClickHouse ReplacingMergeTree, we always INSERT a new row.
+            // The engine will keep only the row with the latest LastUpdate after background merges.
+            var newEvent = MapEventDataToMarketEvent(eventData, now);
+            await _dbContext.MarketEvents.AddAsync(newEvent, cancellationToken);
             await _dbContext.SaveChangesAsync(cancellationToken);
         }
         catch (ApiException apiEx)
@@ -680,47 +633,21 @@ public class SynchronizationService
 
             var now = DateTime.UtcNow;
             var eventsToInsert = new List<MarketEvent>();
-            var existingTickers = new HashSet<string>();
 
-            // Get existing event tickers for this batch
-            var incomingTickers = response.Events.Select(e => e.EventTicker).ToList();
-            var existingEvents = await _dbContext.MarketEvents
-                .Where(e => incomingTickers.Contains(e.EventTicker))
-                .ToDictionaryAsync(e => e.EventTicker, e => e, cancellationToken);
-
+            // For ClickHouse ReplacingMergeTree, we always INSERT new rows.
+            // The engine will keep only the row with the latest LastUpdate after background merges.
             foreach (var eventData in response.Events)
             {
                 if (string.IsNullOrWhiteSpace(eventData.EventTicker))
                     continue;
 
-                if (existingEvents.TryGetValue(eventData.EventTicker, out var existing))
-                {
-                    // Update existing record
-                    existing.SeriesTicker = eventData.SeriesTicker;
-                    existing.SubTitle = eventData.SubTitle;
-                    existing.Title = eventData.Title;
-                    existing.CollateralReturnType = eventData.CollateralReturnType;
-                    existing.MutuallyExclusive = eventData.MutuallyExclusive;
-                    existing.Category = eventData.Category;
-                    existing.StrikeDate = eventData.StrikeDate;
-                    existing.StrikePeriod = eventData.StrikePeriod;
-                    existing.AvailableOnBrokers = eventData.AvailableOnBrokers;
-                    existing.ProductMetadata = eventData.ProductMetadata != null
-                        ? JsonConvert.SerializeObject(eventData.ProductMetadata)
-                        : null;
-                    existing.LastUpdate = now;
-                    existing.IsDeleted = false;
-                }
-                else
-                {
-                    // Insert new record
-                    eventsToInsert.Add(MapEventDataToMarketEvent(eventData, now));
-                }
+                eventsToInsert.Add(MapEventDataToMarketEvent(eventData, now));
             }
 
             if (eventsToInsert.Count > 0)
             {
                 await _dbContext.MarketEvents.AddRangeAsync(eventsToInsert, cancellationToken);
+                _logger.LogInformation("Inserting {Count} events (ReplacingMergeTree will dedupe)", eventsToInsert.Count);
             }
 
             await _dbContext.SaveChangesAsync(cancellationToken);
