@@ -147,8 +147,6 @@ public class SynchronizationService
         // If cursor exists, enqueue next page with same parameters + cursor
         if (!string.IsNullOrWhiteSpace(response.Cursor))
         {
-            _logger.LogDebug("Enqueuing next page with cursor (MinCreatedTs={MinCreatedTs}, MaxCreatedTs={MaxCreatedTs}, Status={Status})",
-                command.MinCreatedTs, command.MaxCreatedTs, command.Status);
             await _publishEndpoint.Publish(
                 new SynchronizeMarketData(command.MinCreatedTs, command.MaxCreatedTs, command.Status, response.Cursor),
                 cancellationToken);
