@@ -517,7 +517,60 @@ public class SynchronizationService
     {
         try
         {
-            await _publishEndpoint.Publish(new SynchronizeEvents(cursor), cancellationToken);
+            if (!String.IsNullOrEmpty(cursor)){
+                // Always enqueue the bulk events sync (paginated)
+                await _publishEndpoint.Publish(new SynchronizeEvents(cursor), cancellationToken);
+            }
+
+            // If events table is not empty, find missing events from market snapshots
+            var hasEvents = await _dbContext.MarketEvents.AnyAsync(cancellationToken);
+            if (hasEvents)
+            {
+                // Get distinct EventTickers from market_snapshots that don't exist in market_events
+                // Using raw SQL with LEFT ANTI JOIN - optimized for ClickHouse's columnar engine
+                var missingEventTickers = new List<string>();
+                var connection = _dbContext.Database.GetDbConnection();
+                var connectionWasOpen = connection.State == System.Data.ConnectionState.Open;
+                if (!connectionWasOpen)
+                {
+                    await connection.OpenAsync(cancellationToken);
+                }
+                try
+                {
+                    using var command = connection.CreateCommand();
+                    command.CommandText = @"
+                        SELECT DISTINCT ms.EventTicker 
+                        FROM kalshi_signals.market_snapshots ms
+                        LEFT ANTI JOIN kalshi_signals.market_events me ON ms.EventTicker = me.EventTicker
+                        WHERE ms.EventTicker != ''";
+                    
+                    using var reader = await command.ExecuteReaderAsync(cancellationToken);
+                    while (await reader.ReadAsync(cancellationToken))
+                    {
+                        missingEventTickers.Add(reader.GetString(0));
+                    }
+                }
+                finally
+                {
+                    if (!connectionWasOpen)
+                    {
+                        await connection.CloseAsync();
+                    }
+                }
+
+                if (missingEventTickers.Count > 0)
+                {
+                    _logger.LogInformation("Found {Count} missing events in market_snapshots, enqueueing individual syncs", missingEventTickers.Count);
+
+                    // Batch publish for better throughput
+                    var messages = missingEventTickers.Select(ticker => new SynchronizeEventDetail(ticker));
+                    await _publishEndpoint.PublishBatch(messages, cancellationToken);
+                }
+            }
+            else {
+                // Table is empty and no cursor provided, lets refresh from scratch
+                 await _publishEndpoint.Publish(new SynchronizeEvents(cursor), cancellationToken);
+            }
         }
         catch (Exception ex)
         {

@@ -152,3 +152,5 @@ CREATE INDEX IX_Markets_EventTicker ON Markets(EventTicker);
 -- 4. JSON columns (CustomStrike, MveSelectedLegs, PriceRanges) require MySQL 5.7.8+
 -- 5. Test this script on a development database first before running in production
 -- 6. Consider creating a backup before running this migration
+
+

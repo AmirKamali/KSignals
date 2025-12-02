@@ -16,3 +16,5 @@ CREATE INDEX `IX_TagsCategories_IsDeleted` ON `TagsCategories` (`IsDeleted`);
 
 -- Optional: Add index on LastUpdate for sorting/filtering by update time
 CREATE INDEX `IX_TagsCategories_LastUpdate` ON `TagsCategories` (`LastUpdate`);
+
+

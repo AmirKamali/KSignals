@@ -351,3 +351,5 @@ DEALLOCATE PREPARE stmt;
 -- 4. Create a backup before running in production
 -- 5. Review deprecated column drops before uncommenting
 -- 6. Some fields are added as nullable initially to allow gradual migration
+
+
