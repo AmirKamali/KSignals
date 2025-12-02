@@ -587,6 +587,7 @@ public class SynchronizationService
 
             if (response?.Event == null)
             {
+                _logger.LogWarning("No event data received for {EventTicker}, skipping", command.EventTicker);
                 return;
             }
 
@@ -604,15 +605,29 @@ public class SynchronizationService
             await _dbContext.MarketEvents.AddAsync(newEvent, cancellationToken);
             await _dbContext.SaveChangesAsync(cancellationToken);
         }
+        catch (ApiException apiEx) when (apiEx.Message.Contains("not found") || 
+                                          apiEx.Message.Contains("Required property") ||
+                                          apiEx.Message.Contains("404"))
+        {
+            // Event doesn't exist or API returned unexpected response format - skip gracefully
+            _logger.LogWarning("Event {EventTicker} not found or invalid response from Kalshi API, skipping: {Message}", 
+                command.EventTicker, apiEx.Message);
+        }
+        catch (ApiException apiEx) when (apiEx.Message.Contains("too_many_requests"))
+        {
+            // Rate limited - log and don't crash, let the message be retried
+            _logger.LogWarning("Rate limited while fetching event {EventTicker}", command.EventTicker);
+            throw; // Rethrow to trigger retry
+        }
         catch (ApiException apiEx)
         {
             _logger.LogError(apiEx, "Kalshi API error fetching event {EventTicker}", command.EventTicker);
-            throw;
+            // Don't rethrow - allow batch to continue processing other messages
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error synchronizing event detail for {EventTicker}", command.EventTicker);
-            throw;
+            // Don't rethrow - allow batch to continue processing other messages
         }
     }
 
