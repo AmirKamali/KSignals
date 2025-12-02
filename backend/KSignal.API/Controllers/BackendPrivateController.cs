@@ -163,6 +163,43 @@ public class BackendPrivateController : ControllerBase
         }
     }
 
+    [HttpPost("sync-event/{eventTicker}")]
+    [ProducesResponseType(StatusCodes.Status202Accepted)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status500InternalServerError)]
+    public async Task<IActionResult> SynchronizeEventDetail(string eventTicker)
+    {
+        try
+        {
+            if (string.IsNullOrWhiteSpace(eventTicker))
+            {
+                return BadRequest(new { error = "Event ticker is required" });
+            }
+
+            await _synchronizationService.EnqueueEventDetailSyncAsync(eventTicker, HttpContext.RequestAborted);
+            return Accepted(new
+            {
+                started = true,
+                event_ticker = eventTicker,
+                message = $"Event detail synchronization queued for: {eventTicker}"
+            });
+        }
+        catch (RabbitMqUnavailableException ex)
+        {
+            _logger.LogWarning(ex, "RabbitMQ unavailable while trying to enqueue event detail synchronization");
+            return StatusCode(StatusCodes.Status503ServiceUnavailable, new { error = "RabbitMQ unavailable", message = ex.Message });
+        }
+        catch (ArgumentException ex)
+        {
+            return BadRequest(new { error = ex.Message });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to enqueue event detail synchronization for {EventTicker}", eventTicker);
+            return StatusCode(StatusCodes.Status500InternalServerError, new { error = "Failed to enqueue event detail synchronization", message = ex.Message });
+        }
+    }
+
     [HttpPost("sync-orderbook")]
     [ProducesResponseType(StatusCodes.Status202Accepted)]
     [ProducesResponseType(StatusCodes.Status500InternalServerError)]

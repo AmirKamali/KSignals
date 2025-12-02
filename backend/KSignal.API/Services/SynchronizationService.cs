@@ -526,6 +526,90 @@ public class SynchronizationService
         }
     }
 
+    public async Task EnqueueEventDetailSyncAsync(string eventTicker, CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            if (string.IsNullOrWhiteSpace(eventTicker))
+            {
+                throw new ArgumentException("Event ticker is required", nameof(eventTicker));
+            }
+            await _publishEndpoint.Publish(new SynchronizeEventDetail(eventTicker), cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Unexpected error while trying to enqueue event detail synchronization for {EventTicker}. Exception type: {ExceptionType}", eventTicker, ex.GetType().Name);
+            throw;
+        }
+    }
+
+    public async Task SynchronizeEventDetailAsync(SynchronizeEventDetail command, CancellationToken cancellationToken)
+    {
+        try
+        {
+            _logger.LogInformation("Fetching event detail for {EventTicker}", command.EventTicker);
+
+            var response = await _kalshiClient.Events.GetEventAsync(
+                command.EventTicker,
+                withNestedMarkets: false,
+                cancellationToken: cancellationToken);
+
+            if (response?.Event == null)
+            {
+                _logger.LogWarning("No event data received for {EventTicker}", command.EventTicker);
+                return;
+            }
+
+            var eventData = response.Event;
+            var now = DateTime.UtcNow;
+
+            // Check if event already exists
+            var existingEvent = await _dbContext.MarketEvents
+                .FirstOrDefaultAsync(e => e.EventTicker == eventData.EventTicker, cancellationToken);
+
+            if (existingEvent != null)
+            {
+                // Update existing record
+                existingEvent.SeriesTicker = eventData.SeriesTicker;
+                existingEvent.SubTitle = eventData.SubTitle;
+                existingEvent.Title = eventData.Title;
+                existingEvent.CollateralReturnType = eventData.CollateralReturnType;
+                existingEvent.MutuallyExclusive = eventData.MutuallyExclusive;
+                existingEvent.Category = eventData.Category;
+                existingEvent.StrikeDate = eventData.StrikeDate;
+                existingEvent.StrikePeriod = eventData.StrikePeriod;
+                existingEvent.AvailableOnBrokers = eventData.AvailableOnBrokers;
+                existingEvent.ProductMetadata = eventData.ProductMetadata != null
+                    ? JsonConvert.SerializeObject(eventData.ProductMetadata)
+                    : null;
+                existingEvent.LastUpdate = now;
+                existingEvent.IsDeleted = false;
+
+                _logger.LogInformation("Updated existing event {EventTicker}", command.EventTicker);
+            }
+            else
+            {
+                // Insert new record
+                var newEvent = MapEventDataToMarketEvent(eventData, now);
+                await _dbContext.MarketEvents.AddAsync(newEvent, cancellationToken);
+
+                _logger.LogInformation("Inserted new event {EventTicker}", command.EventTicker);
+            }
+
+            await _dbContext.SaveChangesAsync(cancellationToken);
+        }
+        catch (ApiException apiEx)
+        {
+            _logger.LogError(apiEx, "Kalshi API error fetching event {EventTicker}", command.EventTicker);
+            throw;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error synchronizing event detail for {EventTicker}", command.EventTicker);
+            throw;
+        }
+    }
+
     public async Task SynchronizeEventsAsync(SynchronizeEvents command, CancellationToken cancellationToken)
     {
         try
