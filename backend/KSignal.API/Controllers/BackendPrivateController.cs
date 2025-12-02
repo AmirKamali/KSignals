@@ -44,12 +44,14 @@ public class BackendPrivateController : ControllerBase
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status500InternalServerError)]
     public async Task<IActionResult> SynchronizeMarketData(
-        [FromQuery] string? cursor = null,
+        [FromQuery] long? min_created_ts = null,
+        [FromQuery] long? max_created_ts = null,
+        [FromQuery] string? status = null,
         [FromQuery] string? market_ticker_id = null)
     {
         try
         {
-            await _synchronizationService.EnqueueMarketSyncAsync(cursor, market_ticker_id, HttpContext.RequestAborted);
+            await _synchronizationService.EnqueueMarketSyncAsync(min_created_ts, max_created_ts, status, market_ticker_id, HttpContext.RequestAborted);
             
             if (!string.IsNullOrWhiteSpace(market_ticker_id))
             {
@@ -64,8 +66,10 @@ public class BackendPrivateController : ControllerBase
             return Accepted(new
             {
                 started = true,
-                cursor = cursor ?? "<start>",
-                message = "Market synchronization queued"
+                min_created_ts = min_created_ts,
+                max_created_ts = max_created_ts,
+                status = status,
+                message = "Market synchronization queued. Pagination will be handled automatically."
             });
         }
         catch (RabbitMqUnavailableException ex)

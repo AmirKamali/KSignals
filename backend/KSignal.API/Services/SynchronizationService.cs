@@ -30,40 +30,85 @@ public class SynchronizationService
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
 
-    public async Task EnqueueMarketSyncAsync(string? cursor, string? marketTickerId = null, CancellationToken cancellationToken = default)
+    public async Task EnqueueMarketSyncAsync(
+        long? minCreatedTs = null,
+        long? maxCreatedTs = null,
+        string? status = null,
+        string? marketTickerId = null,
+        CancellationToken cancellationToken = default)
     {
         try
         {
             if (!string.IsNullOrWhiteSpace(marketTickerId))
             {
-                await _publishEndpoint.Publish(new SynchronizeMarketData(null, cursor, marketTickerId), cancellationToken);
+                await _publishEndpoint.Publish(new SynchronizeMarketData(MarketTickerId: marketTickerId), cancellationToken);
                 return;
             }
-            
-            // Load all unique categories from TagsCategories and enqueue each
-            var categories = await _dbContext.TagsCategories
-                .AsNoTracking()
-                .Where(tc => !tc.IsDeleted)
-                .Select(tc => tc.Category)
-                .Distinct()
-                .ToListAsync(cancellationToken);
-
-            if (categories.Count == 0)
+            // If any filter is provided, enqueue a single sync message with those filters
+            if (minCreatedTs.HasValue || maxCreatedTs.HasValue || !string.IsNullOrWhiteSpace(status))
             {
-                _logger.LogWarning("No categories found in TagsCategories table. Please sync tags/categories first.");
+                await _publishEndpoint.Publish(new SynchronizeMarketData(minCreatedTs, maxCreatedTs, status), cancellationToken);
                 return;
             }
 
-            _logger.LogInformation("Enqueuing market sync for {Count} categories", categories.Count);
 
-            foreach (var category in categories)
+            // If both min and max are null, we need to perdorm 2 operations: 1- Get latest data 2- Update existing markets
+            DateTime? maxCreatedTimeInDb = await _dbContext.MarketSnapshots
+                    .AsNoTracking()
+                    .MaxAsync(s => (DateTime?)s.CreatedTime, cancellationToken);
+
+            // 1- Get latest data
+            if (!minCreatedTs.HasValue && !maxCreatedTs.HasValue)
             {
-                await _publishEndpoint.Publish(new SynchronizeMarketData(category, null), cancellationToken);
+                if (maxCreatedTimeInDb.HasValue)
+                {
+                    minCreatedTs = new DateTimeOffset(maxCreatedTimeInDb.Value, TimeSpan.Zero).ToUnixTimeSeconds();
+                    _logger.LogInformation("Using max CreatedTime from DB as min_created_ts: {MaxCreatedTime} ({MinCreatedTs})",
+                        maxCreatedTimeInDb.Value, minCreatedTs);
+                }
+
+                _logger.LogInformation("Enqueuing market sync with MinCreatedTs={MinCreatedTs}, MaxCreatedTs={MaxCreatedTs}, Status={Status}",
+                minCreatedTs, maxCreatedTs, status);
+
+                await _publishEndpoint.Publish(new SynchronizeMarketData(MinCreatedTs: minCreatedTs, MaxCreatedTs: null, Status: status), cancellationToken);
+            }
+
+
+            // If maxCreatedTimeInDb has value, also enqueue sync to update existing markets
+            if (maxCreatedTimeInDb.HasValue)
+            {
+                var minCreatedTimeInDb = await _dbContext.MarketSnapshots
+                    .AsNoTracking()
+                    .MinAsync(s => (DateTime?)s.CreatedTime, cancellationToken);
+
+                if (minCreatedTimeInDb.HasValue)
+                {
+                    var minTs = new DateTimeOffset(minCreatedTimeInDb.Value, TimeSpan.Zero).ToUnixTimeSeconds();
+                    var maxTs = new DateTimeOffset(maxCreatedTimeInDb.Value, TimeSpan.Zero).ToUnixTimeSeconds();
+
+                    var totalDays = (maxCreatedTimeInDb.Value - minCreatedTimeInDb.Value).TotalDays;
+                    var numberOfChunks = totalDays < 20 ? 3 : 20;
+
+                    var chunkDuration = (maxTs - minTs) / numberOfChunks;
+
+                    _logger.LogInformation(
+                        "Enqueuing {ChunkCount} sync messages for existing markets update (TotalDays={TotalDays}, MinTs={MinTs}, MaxTs={MaxTs})",
+                        numberOfChunks, totalDays, minTs, maxTs);
+
+                    for (var i = 0; i < numberOfChunks; i++)
+                    {
+                        var chunkMinTs = minTs + (i * chunkDuration);
+                        var chunkMaxTs = (i == numberOfChunks - 1) ? maxTs : minTs + ((i + 1) * chunkDuration);
+
+                        await _publishEndpoint.Publish(
+                            new SynchronizeMarketData(chunkMinTs, chunkMaxTs, status),
+                            cancellationToken);
+                    }
+                }
             }
         }
         catch (Exception ex)
         {
-            // Re-throw other exceptions as-is
             _logger.LogError(ex, "Unexpected error while trying to enqueue synchronization. Exception type: {ExceptionType}", ex.GetType().Name);
             throw;
         }
@@ -78,39 +123,40 @@ public class SynchronizationService
             return;
         }
 
-        // Category is required for bulk sync
-        if (string.IsNullOrWhiteSpace(command.Category))
-        {
-            _logger.LogWarning("Category is required for market synchronization");
-            return;
-        }
+        // Sync markets with filters
+        var request = BuildRequest(command.MinCreatedTs, command.MaxCreatedTs, command.Status, command.Cursor);
+        var response = await _kalshiClient.Markets.GetMarketsAsync(limit: 1000, cursor: command.Cursor,
+        minCreatedTs: command.MinCreatedTs,
+         maxCreatedTs: command.MaxCreatedTs,
 
-        // Sync markets for a specific category
-        var request = BuildRequest(command.Category, command.Cursor);
-        var response = await _kalshiClient.Markets.AsynchronousClient.GetAsync<GetMarketsResponse>(
-            "/markets",
-            request,
-            _kalshiClient.Markets.Configuration,
-            cancellationToken);
+         status: command.Status);
 
-        var payload = response?.Data ?? new GetMarketsResponse();
+
         var fetchedAt = DateTime.UtcNow;
 
-        var mapped = payload.Markets
+        var mapped = response.Markets?
             .Where(m => m != null)
             .Select(m =>
             {
                 return KalshiService.MapMarket(m, fetchedAt);
             })
-            .ToList();
+            .ToList() ?? new List<MarketSnapshot>();
 
         await InsertMarketSnapshotsAsync(mapped, cancellationToken);
 
-        // If cursor exists, enqueue next page with same category
-        if (!string.IsNullOrWhiteSpace(payload.Cursor))
+        // If cursor exists, enqueue next page with same parameters + cursor
+        if (!string.IsNullOrWhiteSpace(response.Cursor))
         {
-            _logger.LogDebug("Enqueuing next page for category {Category} with cursor", command.Category);
-            await _publishEndpoint.Publish(new SynchronizeMarketData(command.Category, payload.Cursor), cancellationToken);
+            _logger.LogDebug("Enqueuing next page with cursor (MinCreatedTs={MinCreatedTs}, MaxCreatedTs={MaxCreatedTs}, Status={Status})",
+                command.MinCreatedTs, command.MaxCreatedTs, command.Status);
+            await _publishEndpoint.Publish(
+                new SynchronizeMarketData(command.MinCreatedTs, command.MaxCreatedTs, command.Status, response.Cursor),
+                cancellationToken);
+        }
+        else
+        {
+            _logger.LogInformation("Completed market sync (MinCreatedTs={MinCreatedTs}, MaxCreatedTs={MaxCreatedTs}, Status={Status})",
+                command.MinCreatedTs, command.MaxCreatedTs, command.Status);
         }
     }
 
@@ -144,7 +190,7 @@ public class SynchronizationService
         }
     }
 
-    private static RequestOptions BuildRequest(string category, string? cursor)
+    private static RequestOptions BuildRequest(long? minCreatedTs, long? maxCreatedTs, string? status, string? cursor)
     {
         var requestOptions = new RequestOptions
         {
@@ -152,9 +198,22 @@ public class SynchronizationService
         };
 
         requestOptions.QueryParameters.Add(ClientUtils.ParameterToMultiMap("", "limit", 250));
-        requestOptions.QueryParameters.Add(ClientUtils.ParameterToMultiMap("", "status", "open"));
         requestOptions.QueryParameters.Add(ClientUtils.ParameterToMultiMap("", "with_nested_markets", true));
-        requestOptions.QueryParameters.Add(ClientUtils.ParameterToMultiMap("", "category", category));
+
+        if (minCreatedTs.HasValue)
+        {
+            requestOptions.QueryParameters.Add(ClientUtils.ParameterToMultiMap("", "min_created_ts", minCreatedTs.Value));
+        }
+
+        if (maxCreatedTs.HasValue)
+        {
+            requestOptions.QueryParameters.Add(ClientUtils.ParameterToMultiMap("", "max_created_ts", maxCreatedTs.Value));
+        }
+
+        if (!string.IsNullOrWhiteSpace(status))
+        {
+            requestOptions.QueryParameters.Add(ClientUtils.ParameterToMultiMap("", "status", status));
+        }
 
         if (!string.IsNullOrWhiteSpace(cursor))
         {
@@ -182,9 +241,9 @@ public class SynchronizationService
         try
         {
             _logger.LogInformation("Fetching tags and categories from Kalshi API");
-            
+
             var response = await _kalshiClient.Search.GetTagsForSeriesCategoriesAsync(cancellationToken: cancellationToken);
-            
+
             if (response?.TagsByCategories == null || response.TagsByCategories.Count == 0)
             {
                 _logger.LogWarning("No tags/categories data received from Kalshi API");
@@ -192,7 +251,7 @@ public class SynchronizationService
             }
 
             var now = DateTime.UtcNow;
-            
+
             // Build a set of incoming (Category, Tag) pairs for quick lookup
             var incomingKeys = new HashSet<(string Category, string Tag)>();
             var incomingRecords = new List<TagsCategory>();
@@ -231,7 +290,7 @@ public class SynchronizationService
 
             var existingDict = existingRecords
                 .ToDictionary(e => (e.Category, e.Tag), e => e);
-            
+
             // Get max ID for generating new IDs (ClickHouse doesn't support auto-increment)
             var nextId = existingRecords.Count > 0 ? existingRecords.Max(e => e.Id) + 1 : 1;
 
@@ -244,7 +303,7 @@ public class SynchronizationService
             foreach (var incoming in incomingRecords)
             {
                 var key = (incoming.Category, incoming.Tag);
-                
+
                 if (existingDict.TryGetValue(key, out var existing))
                 {
                     // Record exists - update it
@@ -275,7 +334,7 @@ public class SynchronizationService
             foreach (var existing in existingRecords)
             {
                 var key = (existing.Category, existing.Tag);
-                
+
                 if (!incomingKeys.Contains(key) && !existing.IsDeleted)
                 {
                     existing.IsDeleted = true;
@@ -285,7 +344,7 @@ public class SynchronizationService
             }
 
             await _dbContext.SaveChangesAsync(cancellationToken);
-            
+
             _logger.LogInformation(
                 "Successfully synchronized tags/categories: {Inserted} inserted, {Updated} updated, {Restored} restored, {Deleted} marked as deleted",
                 insertedCount, updatedCount, restoredCount, deletedCount);
@@ -327,11 +386,11 @@ public class SynchronizationService
         try
         {
             _logger.LogInformation("Fetching series list from Kalshi API");
-            
+
             var response = await _kalshiClient.Markets.GetSeriesListAsync(
                 includeProductMetadata: true,
                 cancellationToken: cancellationToken);
-            
+
             if (response?.Series == null || response.Series.Count == 0)
             {
                 _logger.LogWarning("No series data received from Kalshi API");
@@ -339,7 +398,7 @@ public class SynchronizationService
             }
 
             var now = DateTime.UtcNow;
-            
+
             // Build a set of incoming ticker keys for quick lookup
             var incomingTickers = new HashSet<string>();
             var incomingRecords = new List<MarketSeries>();
@@ -381,7 +440,7 @@ public class SynchronizationService
                     {
                         restoredCount++;
                     }
-                    
+
                     // Update all fields
                     existing.Frequency = incoming.Frequency;
                     existing.Title = incoming.Title;
@@ -396,7 +455,7 @@ public class SynchronizationService
                     existing.AdditionalProhibitions = incoming.AdditionalProhibitions;
                     existing.LastUpdate = now;
                     existing.IsDeleted = false;
-                    
+
                     updatedCount++;
                 }
                 else
@@ -419,7 +478,7 @@ public class SynchronizationService
             }
 
             await _dbContext.SaveChangesAsync(cancellationToken);
-            
+
             _logger.LogInformation(
                 "Successfully synchronized series: {Inserted} inserted, {Updated} updated, {Restored} restored, {Deleted} marked as deleted",
                 insertedCount, updatedCount, restoredCount, deletedCount);
@@ -440,16 +499,16 @@ public class SynchronizationService
             Title = series.Title ?? string.Empty,
             Category = series.Category ?? string.Empty,
             Tags = series.Tags != null ? JsonConvert.SerializeObject(series.Tags) : null,
-            SettlementSources = series.SettlementSources != null 
-                ? JsonConvert.SerializeObject(series.SettlementSources.Select(s => new { name = s.Name, url = s.Url })) 
+            SettlementSources = series.SettlementSources != null
+                ? JsonConvert.SerializeObject(series.SettlementSources.Select(s => new { name = s.Name, url = s.Url }))
                 : null,
             ContractUrl = series.ContractUrl,
             ContractTermsUrl = series.ContractTermsUrl,
             ProductMetadata = series.ProductMetadata != null ? JsonConvert.SerializeObject(series.ProductMetadata) : null,
             FeeType = series.FeeType.ToString().ToLowerInvariant(),
             FeeMultiplier = series.FeeMultiplier,
-            AdditionalProhibitions = series.AdditionalProhibitions != null 
-                ? JsonConvert.SerializeObject(series.AdditionalProhibitions) 
+            AdditionalProhibitions = series.AdditionalProhibitions != null
+                ? JsonConvert.SerializeObject(series.AdditionalProhibitions)
                 : null,
             LastUpdate = timestamp,
             IsDeleted = false
@@ -472,13 +531,13 @@ public class SynchronizationService
     public async Task SynchronizeEventsAsync(SynchronizeEvents command, CancellationToken cancellationToken)
     {
         try
-        {   
+        {
             var response = await _kalshiClient.Events.GetEventsAsync(
                 limit: 200,
                 cursor: command.Cursor,
                 withNestedMarkets: false,
                 cancellationToken: cancellationToken);
-            
+
             if (response?.Events == null || response.Events.Count == 0)
             {
                 return;
@@ -511,8 +570,8 @@ public class SynchronizationService
                     existing.StrikeDate = eventData.StrikeDate;
                     existing.StrikePeriod = eventData.StrikePeriod;
                     existing.AvailableOnBrokers = eventData.AvailableOnBrokers;
-                    existing.ProductMetadata = eventData.ProductMetadata != null 
-                        ? JsonConvert.SerializeObject(eventData.ProductMetadata) 
+                    existing.ProductMetadata = eventData.ProductMetadata != null
+                        ? JsonConvert.SerializeObject(eventData.ProductMetadata)
                         : null;
                     existing.LastUpdate = now;
                     existing.IsDeleted = false;
@@ -558,8 +617,8 @@ public class SynchronizationService
             StrikeDate = eventData.StrikeDate,
             StrikePeriod = eventData.StrikePeriod,
             AvailableOnBrokers = eventData.AvailableOnBrokers,
-            ProductMetadata = eventData.ProductMetadata != null 
-                ? JsonConvert.SerializeObject(eventData.ProductMetadata) 
+            ProductMetadata = eventData.ProductMetadata != null
+                ? JsonConvert.SerializeObject(eventData.ProductMetadata)
                 : null,
             LastUpdate = timestamp,
             IsDeleted = false
@@ -610,7 +669,7 @@ public class SynchronizationService
                 try
                 {
                     _logger.LogDebug("Fetching orderbook for market {TickerId}", market.TickerId);
-                    
+
                     var response = await _kalshiClient.Markets.GetMarketOrderbookAsync(
                         market.TickerId,
                         depth: 0, // Get all levels
@@ -623,13 +682,13 @@ public class SynchronizationService
                     }
 
                     var orderbook = response.Orderbook;
-                    
+
                     // Handle null arrays from API (empty orderbook)
                     var yesLevels = orderbook.Yes ?? new List<List<decimal>>();
                     var noLevels = orderbook.No ?? new List<List<decimal>>();
                     var yesDollars = orderbook.YesDollars ?? new List<List<string>>();
                     var noDollars = orderbook.NoDollars ?? new List<List<string>>();
-                    
+
                     // Get the previous snapshot to compute events
                     var previousSnapshot = await _dbContext.OrderbookSnapshots
                         .Where(s => s.MarketId == market.TickerId)
@@ -663,13 +722,13 @@ public class SynchronizationService
                     // Compute orderbook events by comparing with previous snapshot
                     // For first snapshot, generate "add" events for all levels
                     var events = ComputeOrderbookEvents(
-                        market.TickerId, 
+                        market.TickerId,
                         previousSnapshot, // null for first snapshot
                         yesLevels,
                         noLevels,
                         now);
                     eventsToInsert.AddRange(events);
-                    
+
                     // Note: We don't update LastUpdate on market_highpriority here because
                     // ClickHouse ReplacingMergeTree uses LastUpdate as the version column
                     // and doesn't allow direct updates. The sync time can be tracked via
@@ -690,7 +749,7 @@ public class SynchronizationService
             {
                 await _dbContext.OrderbookEvents.AddRangeAsync(eventsToInsert, cancellationToken);
             }
-            
+
             await _dbContext.SaveChangesAsync(cancellationToken);
 
             _logger.LogInformation("Orderbook sync complete: {Snapshots} snapshots, {Events} events created",
@@ -727,7 +786,7 @@ public class SynchronizationService
         var events = new List<OrderbookEvent>();
 
         // Parse previous levels from JSON (empty if first snapshot)
-        var prevYes = previousSnapshot != null && !string.IsNullOrEmpty(previousSnapshot.YesLevels) 
+        var prevYes = previousSnapshot != null && !string.IsNullOrEmpty(previousSnapshot.YesLevels)
             ? JsonConvert.DeserializeObject<List<List<decimal>>>(previousSnapshot.YesLevels) ?? new List<List<decimal>>()
             : new List<List<decimal>>();
         var prevNo = previousSnapshot != null && !string.IsNullOrEmpty(previousSnapshot.NoLevels)
@@ -770,7 +829,7 @@ public class SynchronizationService
                 });
             }
         }
-        
+
         // Compare YES side - detect REMOVE events
         foreach (var (price, prevSize) in prevYesDict)
         {
@@ -819,7 +878,7 @@ public class SynchronizationService
                 });
             }
         }
-        
+
         // Compare NO side - detect REMOVE events
         foreach (var (price, prevSize) in prevNoDict)
         {
@@ -925,14 +984,14 @@ public class SynchronizationService
                     {
                         // Continue from last synced candlestick
                         startTs = lastCandlestick.EndPeriodTs;
-                        _logger.LogDebug("Fetching candlesticks for market {TickerId} from last sync: {LastSync}", 
+                        _logger.LogDebug("Fetching candlesticks for market {TickerId} from last sync: {LastSync}",
                             market.TickerId, lastCandlestick.EndPeriodTime);
                     }
                     else
                     {
                         // Start from market creation time
                         startTs = new DateTimeOffset(snapshot.CreatedTime, TimeSpan.Zero).ToUnixTimeSeconds();
-                        _logger.LogDebug("Fetching candlesticks for market {TickerId} from creation: {CreatedTime}", 
+                        _logger.LogDebug("Fetching candlesticks for market {TickerId} from creation: {CreatedTime}",
                             market.TickerId, snapshot.CreatedTime);
                     }
 

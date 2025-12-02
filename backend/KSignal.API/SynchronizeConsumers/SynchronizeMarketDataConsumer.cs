@@ -20,22 +20,11 @@ public class SynchronizeMarketDataConsumer : IConsumer<SynchronizeMarketData>
 
     public async Task Consume(ConsumeContext<SynchronizeMarketData> context)
     {
-        if (!string.IsNullOrWhiteSpace(context.Message.MarketTickerId))
+        try
         {
-            _logger.LogInformation("Starting single market synchronization for ticker={TickerId}", context.Message.MarketTickerId);
+            await _synchronizationService.SynchronizeMarketDataAsync(context.Message, context.CancellationToken);
         }
-        else if (!string.IsNullOrWhiteSpace(context.Message.Category))
-        {
-            _logger.LogInformation("Starting market synchronization for category={Category} cursor={Cursor}", 
-                context.Message.Category, context.Message.Cursor ?? "<start>");
-        }
-        else
-        {
-            _logger.LogWarning("Market synchronization message missing both MarketTickerId and Category");
-        }
-        try {
-        await _synchronizationService.SynchronizeMarketDataAsync(context.Message, context.CancellationToken);
-        }catch(Exception ex)
+        catch (Exception ex)
         {
             _logger.LogError(ex, "Error during market data synchronization");
         }
