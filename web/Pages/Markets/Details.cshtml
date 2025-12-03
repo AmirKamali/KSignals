@@ -61,15 +61,15 @@
                     </div>
                     <div class="summaryLine">
                         <span class="label">Last trade</span>
-                        <span class="value">@(market.LastPrice > 0 ? market.LastPrice : yesPrice).ToString("0.#")&cent;</span>
+                        <span class="value">@((market.LastPrice > 0 ? market.LastPrice : yesPrice).ToString("0.#"))&cent;</span>
                     </div>
                     <div class="summaryLine">
                         <span class="label">Open interest</span>
-                        <span class="value">@market.OpenInterest.ToString("N0")</span>
+                        <span class="value">@(market.OpenInterest.ToString("N0"))</span>
                     </div>
                     <div class="summaryLine">
                         <span class="label">24h volume</span>
-                        <span class="value">@(market.Volume24h > 0 ? market.Volume24h : market.Volume).ToString("N0")</span>
+                        <span class="value">@((market.Volume24h > 0 ? market.Volume24h : market.Volume).ToString("N0"))</span>
                     </div>
                 </div>
             </header>
@@ -89,10 +89,10 @@
                             </span>
                         }
                     </div>
-                    <div class="priceValue">@yesPrice.ToString("0.#")&cent;</div>
+                    <div class="priceValue">@(yesPrice.ToString("0.#"))&cent;</div>
                     <div class="bookRow">
-                        <span>Bid @market.YesBid.ToString("0.#")&cent;</span>
-                        <span>Ask @market.YesAsk.ToString("0.#")&cent;</span>
+                        <span>Bid @(market.YesBid.ToString("0.#"))&cent;</span>
+                        <span>Ask @(market.YesAsk.ToString("0.#"))&cent;</span>
                     </div>
                 </div>
 
@@ -110,10 +110,10 @@
                             </span>
                         }
                     </div>
-                    <div class="priceValue">@noPrice.ToString("0.#")&cent;</div>
+                    <div class="priceValue">@(noPrice.ToString("0.#"))&cent;</div>
                     <div class="bookRow">
-                        <span>Bid @market.NoBid.ToString("0.#")&cent;</span>
-                        <span>Ask @market.NoAsk.ToString("0.#")&cent;</span>
+                        <span>Bid @(market.NoBid.ToString("0.#"))&cent;</span>
+                        <span>Ask @(market.NoAsk.ToString("0.#"))&cent;</span>
                     </div>
                 </div>
 
@@ -122,13 +122,13 @@
             <section class="detailsGrid">
                 <div class="statCard">
                     <h3>Liquidity</h3>
-                    <p class="statValue">@market.Liquidity.ToString("N0")</p>
-                    <p class="statSub">Open interest @market.OpenInterest.ToString("N0")</p>
+                    <p class="statValue">@(market.Liquidity.ToString("N0"))</p>
+                    <p class="statSub">Open interest @(market.OpenInterest.ToString("N0"))</p>
                 </div>
                 <div class="statCard">
                     <h3>24h Volume</h3>
-                    <p class="statValue">@(market.Volume24h > 0 ? market.Volume24h : market.Volume).ToString("N0")</p>
-                    <p class="statSub">Total volume @market.Volume.ToString("N0")</p>
+                    <p class="statValue">@((market.Volume24h > 0 ? market.Volume24h : market.Volume).ToString("N0"))</p>
+                    <p class="statSub">Total volume @(market.Volume.ToString("N0"))</p>
                 </div>
                 <div class="statCard">
                     <h3>Status</h3>
