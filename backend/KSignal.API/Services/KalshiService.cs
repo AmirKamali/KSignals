@@ -48,12 +48,12 @@ public class KalshiService
         var nowUtc = DateTime.UtcNow;
         var maxCloseTime = GetMaxCloseTimeFromDateType(closeDateType, nowUtc);
 
-        // Start from MarketEvents, join with MarketSeries and MarketSnapshots
+        // Start from MarketEvents, join with MarketSeries and MarketSnapshotsLatest
         var baseQuery = from evt in _db.MarketEvents.AsNoTracking()
                         join series in _db.MarketSeries.AsNoTracking()
                             on evt.SeriesTicker equals series.Ticker into seriesJoin
                         from ser in seriesJoin.DefaultIfEmpty()
-                        join snap in _db.MarketSnapshots.AsNoTracking()
+                        join snap in _db.MarketSnapshotsLatest.AsNoTracking()
                             on evt.EventTicker equals snap.EventTicker into snapJoin
                         from s in snapJoin
                         where !evt.IsDeleted
@@ -90,8 +90,6 @@ public class KalshiService
 
         // Group by ticker and keep only latest snapshot per ticker
         var clientEvents = results
-            .GroupBy(x => x.Snapshot.Ticker)
-            .Select(g => g.OrderByDescending(x => x.Snapshot.GenerateDate).First())
             .Select(x => new ClientEvent
             {
                 EventTicker = x.Event.EventTicker,
