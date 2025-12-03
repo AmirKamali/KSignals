@@ -175,6 +175,59 @@ public class EventsController : ControllerBase
 
 
     /// <summary>
+    /// Get event details with nested markets
+    /// </summary>
+    /// <param name="eventTicker">The event ticker identifier</param>
+    /// <param name="cancellationToken">Cancellation token</param>
+    /// <returns>Event details with nested markets</returns>
+    /// <response code="200">Event details retrieved successfully</response>
+    /// <response code="404">Event not found</response>
+    /// <response code="500">Internal server error</response>
+    [HttpGet("/api/eventDetails")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status500InternalServerError)]
+    public async Task<IActionResult> GetEventDetails(
+        [FromQuery] string eventTicker,
+        CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(eventTicker))
+        {
+            return BadRequest(new { error = "Event ticker is required" });
+        }
+
+        try
+        {
+            var eventResponse = await _kalshiService.GetEventDetailsAsync(eventTicker);
+
+            if (eventResponse?.Event == null)
+            {
+                return NotFound(new { error = "Event not found" });
+            }
+
+            var clientResponse = MarketResponseMapper.MapEventDetails(eventResponse);
+            return Ok(clientResponse);
+        }
+        catch (ApiException apiEx)
+        {
+            _logger.LogError(apiEx, "Kalshi API error during event details fetch for {EventTicker}", eventTicker);
+            return StatusCode(StatusCodes.Status502BadGateway, new
+            {
+                error = "Kalshi API error",
+                message = apiEx.Message,
+                statusCode = apiEx.ErrorCode,
+                details = apiEx.ErrorContent
+            });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to fetch event details for {EventTicker}", eventTicker);
+            return StatusCode(StatusCodes.Status500InternalServerError,
+                new { error = "Failed to fetch event details", message = ex.Message });
+        }
+    }
+
+    /// <summary>
     /// Creates a consistent API error response for Kalshi API exceptions.
     /// </summary>
     /// <param name="apiEx">The Kalshi API exception</param>

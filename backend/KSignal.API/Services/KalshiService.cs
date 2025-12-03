@@ -170,7 +170,119 @@ public class KalshiService
         };
     }
 
-    public async Task<GetEventResponse?> GetMarketDetailsAsync(string eventTickerId)
+    public async Task<ClientEvent?> GetMarketByTickerAsync(string ticker, CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(ticker))
+        {
+            throw new ArgumentException("Ticker is required", nameof(ticker));
+        }
+
+        try
+        {
+            // Fetch fresh market data from Kalshi API
+            _logger.LogInformation("Fetching market {Ticker} from Kalshi API", ticker);
+            var response = await _kalshiClient.Markets.GetMarketAsync(ticker, cancellationToken: cancellationToken);
+
+            if (response?.Market == null)
+            {
+                _logger.LogWarning("Market {Ticker} was not returned from Kalshi API", ticker);
+                return null;
+            }
+
+            var market = response.Market;
+            var fetchedAtUtc = DateTime.UtcNow;
+
+            // Save the market snapshot to database
+            var newSnapshot = MapMarket(market, fetchedAtUtc);
+            await _db.MarketSnapshots.AddAsync(newSnapshot, cancellationToken);
+            await _db.SaveChangesAsync(cancellationToken);
+
+            _logger.LogInformation("Saved market snapshot for {Ticker} to database", ticker);
+
+            // Query the full data from database (event + series + snapshot)
+            var result = await (from evt in _db.MarketEvents.AsNoTracking()
+                                join series in _db.MarketSeries.AsNoTracking()
+                                    on evt.SeriesTicker equals series.Ticker into seriesJoin
+                                from ser in seriesJoin.DefaultIfEmpty()
+                                join snap in _db.MarketSnapshotsLatest.AsNoTracking()
+                                    on evt.EventTicker equals snap.EventTicker into snapJoin
+                                from s in snapJoin
+                                where !evt.IsDeleted && s.Ticker == ticker
+                                select new { Event = evt, Series = ser, Snapshot = s })
+                                .FirstOrDefaultAsync(cancellationToken);
+
+            if (result == null)
+            {
+                _logger.LogWarning("Market {Ticker} not found in database after saving", ticker);
+                return null;
+            }
+
+            var clientEvent = new ClientEvent
+            {
+                EventTicker = result.Event.EventTicker,
+                SeriesTicker = result.Event.SeriesTicker,
+                Title = result.Event.Title,
+                SubTitle = result.Event.SubTitle,
+                Category = result.Event.Category,
+
+                Ticker = result.Snapshot.Ticker,
+                MarketType = result.Snapshot.MarketType,
+                YesSubTitle = result.Snapshot.YesSubTitle,
+                NoSubTitle = result.Snapshot.NoSubTitle,
+
+                CreatedTime = result.Snapshot.CreatedTime,
+                OpenTime = result.Snapshot.OpenTime,
+                CloseTime = result.Snapshot.CloseTime,
+                ExpectedExpirationTime = result.Snapshot.ExpectedExpirationTime,
+                LatestExpirationTime = result.Snapshot.LatestExpirationTime,
+                Status = result.Snapshot.Status,
+
+                YesBid = result.Snapshot.YesBid,
+                YesBidDollars = result.Snapshot.YesBidDollars,
+                YesAsk = result.Snapshot.YesAsk,
+                YesAskDollars = result.Snapshot.YesAskDollars,
+                NoBid = result.Snapshot.NoBid,
+                NoBidDollars = result.Snapshot.NoBidDollars,
+                NoAsk = result.Snapshot.NoAsk,
+                NoAskDollars = result.Snapshot.NoAskDollars,
+                LastPrice = result.Snapshot.LastPrice,
+                LastPriceDollars = result.Snapshot.LastPriceDollars,
+                PreviousYesBid = result.Snapshot.PreviousYesBid,
+                PreviousYesBidDollars = result.Snapshot.PreviousYesBidDollars,
+                PreviousYesAsk = result.Snapshot.PreviousYesAsk,
+                PreviousYesAskDollars = result.Snapshot.PreviousYesAskDollars,
+                PreviousPrice = result.Snapshot.PreviousPrice,
+                PreviousPriceDollars = result.Snapshot.PreviousPriceDollars,
+                SettlementValue = result.Snapshot.SettlementValue,
+                SettlementValueDollars = result.Snapshot.SettlementValueDollars,
+
+                Volume = result.Snapshot.Volume,
+                Volume24h = result.Snapshot.Volume24h,
+                OpenInterest = result.Snapshot.OpenInterest,
+                NotionalValue = result.Snapshot.NotionalValue,
+                NotionalValueDollars = result.Snapshot.NotionalValueDollars,
+
+                Liquidity = result.Snapshot.Liquidity,
+                LiquidityDollars = result.Snapshot.LiquidityDollars,
+
+                GenerateDate = result.Snapshot.GenerateDate
+            };
+
+            return clientEvent;
+        }
+        catch (ApiException apiEx)
+        {
+            _logger.LogError(apiEx, "Kalshi API error fetching market {Ticker}", ticker);
+            throw;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to fetch market by ticker {Ticker}", ticker);
+            throw;
+        }
+    }
+
+    public async Task<GetEventResponse?> GetEventDetailsAsync(string eventTickerId)
     {
         if (string.IsNullOrWhiteSpace(eventTickerId))
         {
@@ -201,7 +313,7 @@ public class KalshiService
         }
         catch (ApiException apiEx)
         {
-            _logger.LogError(apiEx, "Kalshi API error fetching market {TickerId}", tickerId);
+            _logger.LogError(apiEx, "Kalshi API error fetching market {EventTickerId}", eventTickerId);
             throw;
         }
     }

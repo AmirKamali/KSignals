@@ -2,8 +2,10 @@
 @using KSignals.DTO
 @model web_asp.Pages.Markets.DetailsModel
 @{
-    var market = Model.Market;
-    ViewData["Title"] = market != null ? $"{market.Title} details" : "Market Details";
+    var eventDetails = Model.EventDetails;
+    var eventData = eventDetails?.Event;
+    var market = eventDetails?.Markets?.FirstOrDefault();
+    ViewData["Title"] = eventData != null ? $"{eventData.Title} details" : "Event Details";
 
     var yesPrice = market != null ? (market.LastPrice > 0 ? market.LastPrice : market.YesBid) : 0m;
     var noPrice = market != null ? (market.NoBid > 0 ? market.NoBid : Math.Max(0m, 100m - yesPrice)) : 0m;
@@ -22,28 +24,28 @@
             Back to markets
         </a>
 
-        @if (market == null)
+        @if (eventData == null || market == null)
         {
             <div class="emptyState">
-                <h1>Market not found</h1>
-                <p>Try selecting a different market from the list.</p>
+                <h1>Event not found</h1>
+                <p>Try selecting a different event from the list.</p>
             </div>
         }
         else
         {
             <header class="detailsHeader">
                 <div>
-                    <h1 class="detailsTitle">@TitleFormatter.FormatTitle(market.Title)</h1>
-                    @if (!string.IsNullOrWhiteSpace(market.SubTitle))
+                    <h1 class="detailsTitle">@TitleFormatter.FormatTitle(eventData.Title)</h1>
+                    @if (!string.IsNullOrWhiteSpace(eventData.SubTitle))
                     {
-                        <p class="detailsSubtitle">@market.SubTitle</p>
+                        <p class="detailsSubtitle">@eventData.SubTitle</p>
                     }
                     <div class="pillRow">
                         <span class="statusPill success">@market.Status?.ToUpperInvariant()</span>
                         <span class="statusPill muted">@FormatCloseTime(market.CloseTime)</span>
-                        @if (!string.IsNullOrWhiteSpace(market.Category))
+                        @if (!string.IsNullOrWhiteSpace(eventData.Category))
                         {
-                            <span class="statusPill outline">@market.Category</span>
+                            <span class="statusPill outline">@eventData.Category</span>
                         }
                         <a class="statusPill outline" target="_blank" rel="noopener noreferrer" href="https://kalshi.com/?search=@market.Ticker">
                             Open on Kalshi

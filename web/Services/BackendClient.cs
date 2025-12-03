@@ -420,6 +420,44 @@ public class BackendClient
         return null;
     }
 
+    public async Task<ClientEventDetailsResponse?> GetEventDetailsAsync(string eventTicker)
+    {
+        if (string.IsNullOrWhiteSpace(eventTicker))
+        {
+            throw new ArgumentException("eventTicker is required", nameof(eventTicker));
+        }
+
+        try
+        {
+            var url = QueryHelpers.AddQueryString(
+                $"{_options.BaseUrl.TrimEnd('/')}/api/eventDetails",
+                new Dictionary<string, string?> { ["eventTicker"] = eventTicker });
+
+            using var response = await _httpClient.GetAsync(url);
+            if (!response.IsSuccessStatusCode)
+            {
+                _logger.LogWarning("Event details request failed with status {StatusCode} for event {EventTicker}",
+                    response.StatusCode, eventTicker);
+                return null;
+            }
+
+            await using var stream = await response.Content.ReadAsStreamAsync();
+            var eventDetails = await JsonSerializer.DeserializeAsync<ClientEventDetailsResponse>(stream, _jsonOptions);
+
+            if (eventDetails == null)
+            {
+                _logger.LogWarning("Event details response was null for event {EventTicker}", eventTicker);
+            }
+
+            return eventDetails;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to fetch event details for event {EventTicker}", eventTicker);
+            return null;
+        }
+    }
+
     public async Task<BackendMarketsResponse> GetBackendMarketsAsync(MarketQuery query)
     {
         try

@@ -14,17 +14,17 @@ public class DetailsModel : PageModel
         _backendClient = backendClient;
     }
 
-    public ClientEvent? Market { get; private set; }
+    public ClientEventDetailsResponse? EventDetails { get; private set; }
 
-    public async Task<IActionResult> OnGetAsync(string? tickerId)
+    public async Task<IActionResult> OnGetAsync(string? EventTicker)
     {
-        if (string.IsNullOrWhiteSpace(tickerId))
+        if (string.IsNullOrWhiteSpace(EventTicker))
         {
             return NotFound();
         }
 
-        Market = await _backendClient.GetMarketDetailsAsync(tickerId);
-        if (Market == null)
+        EventDetails = await _backendClient.GetEventDetailsAsync(EventTicker);
+        if (EventDetails == null)
         {
             return NotFound();
         }

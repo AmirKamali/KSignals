@@ -191,7 +191,7 @@
                             var noTrend = GetTrendInfo(noPrice, previousNo);
                             <tr>
                                 <td class="titleCell">
-                                    <a class="titleLink" href="/marketDetails?tickerId=@market.Ticker">
+                                    <a class="titleLink" href="/marketDetails?EventTicker=@market.EventTicker">
                                         <div class="marketTitle">
                                             @if (!string.IsNullOrWhiteSpace(Model.Query) && !string.IsNullOrWhiteSpace(market.SubTitle))
                                             {
