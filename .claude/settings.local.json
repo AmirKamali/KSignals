@@ -23,7 +23,8 @@
       "Bash(cat:*)",
       "Bash(./kill_backend.sh)",
       "Bash(echo:*)",
-      "Bash(docker build:*)"
+      "Bash(docker build:*)",
+      "Bash(clickhouse-client --host=kalshisignals.com --port=9000 --user=qv6t0lSQNqaaKPEpxazLcZjoS --password=xXnBtibbHu5be6U1k1X9IBxie --database=kalshi_signals --query=\"DESCRIBE TABLE market_snapshots_latest FORMAT Vertical\")"
     ],
     "deny": [],
     "ask": []
