@@ -1,4 +1,4 @@
-
+DROP TABLE IF EXISTS kalshi_signals.market_snapshots_latest;
 CREATE TABLE IF NOT EXISTS kalshi_signals.market_snapshots_latest(
 -- Primary identifier (auto-generated UUID)
     -- WHY: Ensures globally unique identifier for each snapshot
@@ -289,7 +289,7 @@ CREATE TABLE IF NOT EXISTS kalshi_signals.market_snapshots_latest(
     `GenerateDate` DateTime,
 )
 ENGINE = ReplacingMergeTree(GenerateDate)
-ORDER BY (Ticker);  -- or (Ticker, EventTicker) if you want that pair unique
+ORDER BY (EventTicker);  -- or (Ticker, EventTicker) if you want that pair unique
 
 
 
