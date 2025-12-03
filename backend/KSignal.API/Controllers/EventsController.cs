@@ -1,3 +1,4 @@
+using System.Text.RegularExpressions;
 using Kalshi.Api;
 using Kalshi.Api.Client;
 using Kalshi.Api.Model;
@@ -81,23 +82,54 @@ public class EventsController : ControllerBase
         }
     }
 
-    [HttpGet("/api/markets")]
+    /// <summary>
+    /// Get events with market data
+    /// </summary>
+    /// <remarks>
+    /// Retrieves events joined with latest market snapshot data.
+    /// Supports text search across event title, subtitle, yesSubTitle, and noSubTitle.
+    /// </remarks>
+    /// <param name="category">Filter by category</param>
+    /// <param name="tag">Filter by tag</param>
+    /// <param name="query">Search text to filter by title, subtitle, yesSubTitle, or noSubTitle</param>
+    /// <param name="detailed">Include detailed response</param>
+    /// <param name="cancellationToken">Cancellation token</param>
+    /// <returns>List of client events</returns>
+    /// <response code="400">Invalid query parameter</response>
+    [HttpGet("/api/events")]
     [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status500InternalServerError)]
-    public async Task<IActionResult> GetMarkets([FromQuery] string? category = null, [FromQuery] string? tag = null, [FromQuery] bool detailed = false, CancellationToken cancellationToken = default)
+    public async Task<IActionResult> GetEvents(
+        [FromQuery] string? category = null, 
+        [FromQuery] string? tag = null, 
+        [FromQuery] string? query = null,
+        [FromQuery] bool detailed = false, 
+        CancellationToken cancellationToken = default)
     {
+        // Validate query parameter for invalid characters
+        if (!string.IsNullOrWhiteSpace(query))
+        {
+            var validationResult = ValidateSearchQuery(query);
+            if (!validationResult.IsValid)
+            {
+                return BadRequest(new { error = "Invalid query parameter", message = validationResult.ErrorMessage });
+            }
+        }
+
         try
         {
-            var marketsResult = await _kalshiService.GetMarketsAsync(
+            var eventsResult = await _kalshiService.GetEventsAsync(
                 category: category,
                 tag: tag,
+                query: query,
                 cancellationToken: cancellationToken);
-            var shaped = MarketResponseMapper.Shape(marketsResult.Markets, detailed).ToList();
+            var shaped = MarketResponseMapper.Shape(eventsResult.Markets, detailed).ToList();
             return Ok(new { count = shaped.Count, markets = shaped });
         }
         catch (ApiException apiEx)
         {
-            _logger.LogError(apiEx, "Kalshi API error during markets fetch");
+            _logger.LogError(apiEx, "Kalshi API error during events fetch");
             return StatusCode(StatusCodes.Status502BadGateway, new
             {
                 error = "Kalshi API error",
@@ -108,9 +140,37 @@ public class EventsController : ControllerBase
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Failed to fetch markets");
-            return StatusCode(StatusCodes.Status500InternalServerError, new { error = "Failed to fetch markets", message = ex.Message });
+            _logger.LogError(ex, "Failed to fetch events");
+            return StatusCode(StatusCodes.Status500InternalServerError, new { error = "Failed to fetch events", message = ex.Message });
         }
+    }
+
+    /// <summary>
+    /// Validates search query for invalid characters
+    /// </summary>
+    private static (bool IsValid, string? ErrorMessage) ValidateSearchQuery(string query)
+    {
+        // Check length
+        if (query.Length > 200)
+        {
+            return (false, "Query must be 200 characters or less");
+        }
+
+        // Check for SQL injection patterns and invalid characters
+        // Allow alphanumeric, spaces, and common punctuation
+        var invalidCharsPattern = new Regex(@"[<>{}|\[\]\\^`]|--|;|'|""|\/\*|\*\/", RegexOptions.Compiled);
+        if (invalidCharsPattern.IsMatch(query))
+        {
+            return (false, "Query contains invalid characters");
+        }
+
+        // Check for control characters
+        if (query.Any(c => char.IsControl(c) && c != ' '))
+        {
+            return (false, "Query contains invalid control characters");
+        }
+
+        return (true, null);
     }
 
 

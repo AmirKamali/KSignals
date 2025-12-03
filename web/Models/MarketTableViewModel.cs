@@ -1,10 +1,11 @@
 using System.Collections.Generic;
+using KSignals.DTO;
 
 namespace web_asp.Models;
 
 public class MarketTableViewModel
 {
-    public IReadOnlyList<Market> Markets { get; set; } = Array.Empty<Market>();
+    public IReadOnlyList<ClientEvent> Markets { get; set; } = Array.Empty<ClientEvent>();
     public Dictionary<string, List<string>> TagsByCategories { get; set; } = new();
     public string ActiveCategory { get; set; } = "All";
     public string? ActiveTag { get; set; }

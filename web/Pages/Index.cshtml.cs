@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Mvc.RazorPages;
 using web_asp.Models;
 using web_asp.Services;
+using KSignals.DTO;
 
 namespace web_asp.Pages;
 
@@ -8,7 +9,7 @@ public class IndexModel : PageModel
 {
     private readonly BackendClient _backendClient;
 
-    public IReadOnlyList<Market> TopMarkets { get; private set; } = Array.Empty<Market>();
+    public IReadOnlyList<ClientEvent> TopMarkets { get; private set; } = Array.Empty<ClientEvent>();
     public MarketTableViewModel TableModel { get; private set; } = new();
 
     public IndexModel(BackendClient backendClient)

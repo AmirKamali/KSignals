@@ -18,3 +18,4 @@ CREATE INDEX `IX_TagsCategories_IsDeleted` ON `TagsCategories` (`IsDeleted`);
 CREATE INDEX `IX_TagsCategories_LastUpdate` ON `TagsCategories` (`LastUpdate`);
 
 
+

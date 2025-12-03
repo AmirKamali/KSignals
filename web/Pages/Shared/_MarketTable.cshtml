@@ -1,4 +1,5 @@
 @using Microsoft.AspNetCore.WebUtilities
+@using KSignals.DTO
 @model web_asp.Models.MarketTableViewModel
 @{
     var categories = new List<string> { "All" };
@@ -182,18 +183,19 @@
                         {
                             index++;
                             var closeLabel = FormatCloseTime(market.CloseTime);
-                            var noPrice = market.NoPrice ?? Math.Max(0, 100 - market.YesPrice);
-                            var previousYes = market.PreviousYesPrice;
-                            var previousNo = market.PreviousNoPrice ?? (previousYes.HasValue ? 100 - previousYes.Value : (decimal?)null);
-                            var yesTrend = GetTrendInfo(market.YesPrice, previousYes);
+                            var yesPrice = market.LastPrice > 0 ? market.LastPrice : market.YesBid;
+                            var noPrice = market.NoBid > 0 ? market.NoBid : Math.Max(0, 100 - yesPrice);
+                            var previousYes = market.PreviousYesBid > 0 ? (decimal?)market.PreviousYesBid : null;
+                            var previousNo = previousYes.HasValue ? 100 - previousYes.Value : (decimal?)null;
+                            var yesTrend = GetTrendInfo(yesPrice, previousYes);
                             var noTrend = GetTrendInfo(noPrice, previousNo);
                             <tr>
                                 <td class="titleCell">
                                     <a class="titleLink" href="/marketDetails?tickerId=@market.Ticker">
                                         <div class="marketTitle">
-                                            @if (!string.IsNullOrWhiteSpace(Model.Query) && !string.IsNullOrWhiteSpace(market.Subtitle))
+                                            @if (!string.IsNullOrWhiteSpace(Model.Query) && !string.IsNullOrWhiteSpace(market.SubTitle))
                                             {
-                                                @TitleFormatter.FormatTitle($"{market.Title} - {market.Subtitle}")
+                                                @TitleFormatter.FormatTitle($"{market.Title} - {market.SubTitle}")
                                             }
                                             else
                                             {
@@ -206,7 +208,7 @@
                                 <td>@market.Volume.ToString("N0")</td>
                                 <td>
                                     <div class="priceCell">
-                                        <span class="price">@market.YesPrice.ToString("0.#")&cent;</span>
+                                        <span class="price">@yesPrice.ToString("0.#")&cent;</span>
                                         @if (yesTrend.HasValue && yesTrend.Value.diff != 0)
                                         {
                                             var directionClass = yesTrend.Value.direction == "up" ? "trendUp" : "trendDown";
@@ -257,13 +259,12 @@
 </section>
 
 @functions {
-    private static string FormatCloseTime(string? closeTime)
+    private static string FormatCloseTime(DateTime closeTime)
     {
-        if (string.IsNullOrWhiteSpace(closeTime)) return "Close time unavailable";
-        if (!DateTime.TryParse(closeTime, out var close)) return "Close time unavailable";
+        if (closeTime == default) return "Close time unavailable";
 
         var now = DateTime.UtcNow;
-        var diff = close - now;
+        var diff = closeTime - now;
         var absMinutes = Math.Max(1, (int)Math.Round(Math.Abs(diff.TotalMinutes)));
         var value = absMinutes;
         var unit = "minutes";

@@ -4,6 +4,7 @@ using Kalshi.Api.Client;
 using Kalshi.Api.Model;
 using KSignal.API.Data;
 using KSignal.API.Models;
+using KSignals.DTO;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
@@ -30,7 +31,7 @@ public class KalshiService
         }
     }
 
-    public async Task<MarketPageResult> GetMarketsAsync(
+    public async Task<ClientEventPageResult> GetEventsAsync(
         string? category = null,
         string? tag = null,
         string? query = null,
@@ -42,115 +43,133 @@ public class KalshiService
         int pageSize = 50,
         CancellationToken cancellationToken = default)
     {
-        // Default to 30-day window when caller does not provide a filter
         closeDateType ??= "next_30_days";
         var searchTerm = string.IsNullOrWhiteSpace(query) ? null : query.Trim();
-
-        var hasCategoryOrTag = !string.IsNullOrWhiteSpace(category) || !string.IsNullOrWhiteSpace(tag);
-        HashSet<string>? seriesIds = null;
-
-        if (hasCategoryOrTag)
-        {
-            // Read market_series to find series matching the filters and aggregate seriesIds
-            seriesIds = new HashSet<string>(_db.MarketSeries
-                .AsNoTracking()
-                .Where(ms =>
-                    (string.IsNullOrWhiteSpace(category) || ms.Category == category) &&
-                    (string.IsNullOrWhiteSpace(tag) || (ms.Tags != null && ms.Tags.Contains(tag))))
-                .Select(ms => ms.Ticker)
-                .Distinct()
-                .ToList());
-
-            if (seriesIds.Count == 0)
-            {
-                _logger.LogWarning("No series found for category={Category}, tag={Tag}", category, tag);
-                return new MarketPageResult
-                {
-                    Markets = new List<MarketSnapshot>(),
-                    TotalCount = 0,
-                    TotalPages = 0,
-                    CurrentPage = 1,
-                    PageSize = Math.Max(1, pageSize)
-                };
-            }
-        }
-
         var nowUtc = DateTime.UtcNow;
         var maxCloseTime = GetMaxCloseTimeFromDateType(closeDateType, nowUtc);
 
-        // ClickHouse doesn't support correlated subqueries in JOINs, so we use a two-step approach:
-        // Step 1: Get the max GenerateDate for each ticker using GROUP BY
-        var baseFilter = _db.MarketSnapshots
-            .AsNoTracking()
-            .Where(p => p.CloseTime > nowUtc && p.Status == status);
+        // Start from MarketEvents, join with MarketSeries and MarketSnapshots
+        var baseQuery = from evt in _db.MarketEvents.AsNoTracking()
+                        join series in _db.MarketSeries.AsNoTracking()
+                            on evt.SeriesTicker equals series.Ticker into seriesJoin
+                        from ser in seriesJoin.DefaultIfEmpty()
+                        join snap in _db.MarketSnapshots.AsNoTracking()
+                            on evt.EventTicker equals snap.EventTicker into snapJoin
+                        from s in snapJoin
+                        where !evt.IsDeleted
+                           && s.CloseTime > nowUtc
+                           && s.Status == status
+                        select new { Event = evt, Series = ser, Snapshot = s };
 
+        // Apply category/tag filter via MarketSeries
+        if (!string.IsNullOrWhiteSpace(category))
+            baseQuery = baseQuery.Where(x => x.Series != null && x.Series.Category == category);
+        
+        if (!string.IsNullOrWhiteSpace(tag))
+            baseQuery = baseQuery.Where(x => x.Series != null && x.Series.Tags != null && x.Series.Tags.Contains(tag));
+
+        // Apply close time filter
         if (maxCloseTime.HasValue)
-        {
-            baseFilter = baseFilter.Where(p => p.CloseTime <= maxCloseTime.Value);
-        }
+            baseQuery = baseQuery.Where(x => x.Snapshot == null || x.Snapshot.CloseTime <= maxCloseTime.Value);
 
-        // Get latest GenerateDate per ticker
-        var latestPerTicker = await baseFilter
-            .GroupBy(p => p.Ticker)
-            .Select(g => new { Ticker = g.Key, MaxDate = g.Max(p => p.GenerateDate) })
-            .ToListAsync(cancellationToken);
-
-        var latestDateDict = latestPerTicker.ToDictionary(x => x.Ticker, x => x.MaxDate);
-        var tickerSet = latestDateDict.Keys.ToHashSet();
-
-        // Step 2: Build query for markets with those tickers
-        var marketsQuery = baseFilter.Where(p => tickerSet.Contains(p.Ticker));
-
-        if (seriesIds != null)
-        {
-            marketsQuery = marketsQuery.Where(p => seriesIds.Contains(p.EventTicker));
-        }
-
+        // Apply search filter
         if (searchTerm != null)
         {
             var likePattern = $"%{searchTerm}%";
-            marketsQuery = marketsQuery.Where(p =>
-                (p.YesSubTitle != null && EF.Functions.Like(p.YesSubTitle, likePattern)) ||
-                (p.NoSubTitle != null && EF.Functions.Like(p.NoSubTitle, likePattern)) ||
-                (p.EventTicker != null && EF.Functions.Like(p.EventTicker, likePattern)) ||
-                (p.Ticker != null && EF.Functions.Like(p.Ticker, likePattern)));
+            baseQuery = baseQuery.Where(x =>
+                EF.Functions.Like(x.Event.Title, likePattern) ||
+                EF.Functions.Like(x.Event.SubTitle, likePattern) ||
+                EF.Functions.Like(x.Snapshot.YesSubTitle, likePattern) ||
+                EF.Functions.Like(x.Snapshot.NoSubTitle, likePattern) ||
+                EF.Functions.Like(x.Event.EventTicker, likePattern) ||
+                EF.Functions.Like(x.Snapshot.Ticker, likePattern));
         }
 
-        // Fetch all matching records
-        var allMatchingMarkets = await marketsQuery.ToListAsync(cancellationToken);
+        // Execute query and get all results
+        var results = await baseQuery.ToListAsync(cancellationToken);
 
-        // Client-side: Filter to keep only the latest GenerateDate per ticker
-        var filteredMarkets = allMatchingMarkets
-            .Where(m => latestDateDict.TryGetValue(m.Ticker, out var maxDate) && m.GenerateDate == maxDate)
+        // Group by ticker and keep only latest snapshot per ticker
+        var clientEvents = results
+            .GroupBy(x => x.Snapshot.Ticker)
+            .Select(g => g.OrderByDescending(x => x.Snapshot.GenerateDate).First())
+            .Select(x => new ClientEvent
+            {
+                EventTicker = x.Event.EventTicker,
+                SeriesTicker = x.Event.SeriesTicker,
+                Title = x.Event.Title,
+                SubTitle = x.Event.SubTitle,
+                Category = x.Event.Category,
+                
+                Ticker = x.Snapshot.Ticker,
+                MarketType = x.Snapshot.MarketType,
+                YesSubTitle = x.Snapshot.YesSubTitle,
+                NoSubTitle = x.Snapshot.NoSubTitle,
+                
+                CreatedTime = x.Snapshot.CreatedTime,
+                OpenTime = x.Snapshot.OpenTime,
+                CloseTime = x.Snapshot.CloseTime,
+                ExpectedExpirationTime = x.Snapshot.ExpectedExpirationTime,
+                LatestExpirationTime = x.Snapshot.LatestExpirationTime,
+                Status = x.Snapshot.Status,
+                
+                YesBid = x.Snapshot.YesBid,
+                YesBidDollars = x.Snapshot.YesBidDollars,
+                YesAsk = x.Snapshot.YesAsk,
+                YesAskDollars = x.Snapshot.YesAskDollars,
+                NoBid = x.Snapshot.NoBid,
+                NoBidDollars = x.Snapshot.NoBidDollars,
+                NoAsk = x.Snapshot.NoAsk,
+                NoAskDollars = x.Snapshot.NoAskDollars,
+                LastPrice = x.Snapshot.LastPrice,
+                LastPriceDollars = x.Snapshot.LastPriceDollars,
+                PreviousYesBid = x.Snapshot.PreviousYesBid,
+                PreviousYesBidDollars = x.Snapshot.PreviousYesBidDollars,
+                PreviousYesAsk = x.Snapshot.PreviousYesAsk,
+                PreviousYesAskDollars = x.Snapshot.PreviousYesAskDollars,
+                PreviousPrice = x.Snapshot.PreviousPrice,
+                PreviousPriceDollars = x.Snapshot.PreviousPriceDollars,
+                SettlementValue = x.Snapshot.SettlementValue,
+                SettlementValueDollars = x.Snapshot.SettlementValueDollars,
+                
+                Volume = x.Snapshot.Volume,
+                Volume24h = x.Snapshot.Volume24h,
+                OpenInterest = x.Snapshot.OpenInterest,
+                NotionalValue = x.Snapshot.NotionalValue,
+                NotionalValueDollars = x.Snapshot.NotionalValueDollars,
+                
+                Liquidity = x.Snapshot.Liquidity,
+                LiquidityDollars = x.Snapshot.LiquidityDollars,
+                
+                GenerateDate = x.Snapshot.GenerateDate
+            })
             .ToList();
 
-        // Apply sorting client-side (after the latest-per-ticker filter)
-        IEnumerable<MarketSnapshot> sortedMarkets = filteredMarkets;
-        if (sortBy == MarketSort.Volume)
-        {
-            sortedMarkets = direction == SortDirection.Asc
-                ? filteredMarkets.OrderBy(m => m.Volume24h)
-                : filteredMarkets.OrderByDescending(m => m.Volume24h);
-        }
+        // Apply sorting
+        IEnumerable<ClientEvent> sortedEvents = sortBy == MarketSort.Volume
+            ? (direction == SortDirection.Asc 
+                ? clientEvents.OrderBy(e => e.Volume24h) 
+                : clientEvents.OrderByDescending(e => e.Volume24h))
+            : clientEvents;
 
+        // Pagination
         var safePageSize = Math.Max(1, pageSize);
-        var totalCount = filteredMarkets.Count;
+        var totalCount = clientEvents.Count;
         var totalPages = (int)Math.Ceiling(totalCount / (double)safePageSize);
         var safePage = totalPages > 0 ? Math.Min(Math.Max(1, page), totalPages) : 1;
-        var skip = (safePage - 1) * safePageSize;
 
-        var markets = sortedMarkets
-            .Skip(skip)
+        var pagedEvents = sortedEvents
+            .Skip((safePage - 1) * safePageSize)
             .Take(safePageSize)
             .ToList();
-        return new MarketPageResult
-            {
-                Markets = markets,
-                TotalCount = totalCount,
-                TotalPages = totalPages,
-                CurrentPage = safePage,
-                PageSize = safePageSize
-            };
+
+        return new ClientEventPageResult
+        {
+            Markets = pagedEvents,
+            TotalCount = totalCount,
+            TotalPages = totalPages,
+            CurrentPage = safePage,
+            PageSize = safePageSize
+        };
     }
 
     public async Task<MarketSnapshot?> GetMarketDetailsAsync(string tickerId)

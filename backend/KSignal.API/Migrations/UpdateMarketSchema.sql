@@ -154,3 +154,4 @@ CREATE INDEX IX_Markets_EventTicker ON Markets(EventTicker);
 -- 6. Consider creating a backup before running this migration
 
 
+

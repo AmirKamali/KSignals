@@ -1,12 +1,15 @@
 @page "/marketDetails"
+@using KSignals.DTO
 @model web_asp.Pages.Markets.DetailsModel
 @{
     var market = Model.Market;
     ViewData["Title"] = market != null ? $"{market.Title} details" : "Market Details";
 
-    var noPrice = market?.NoPrice ?? (market != null ? Math.Max(0m, 100m - market.YesPrice) : 0m);
-    var previousNo = market?.PreviousNoPrice ?? (market?.PreviousYesPrice.HasValue == true ? 100m - market.PreviousYesPrice.Value : (decimal?)null);
-    var yesTrend = market != null ? GetTrendInfo(market.YesPrice, market.PreviousYesPrice) : null;
+    var yesPrice = market != null ? (market.LastPrice > 0 ? market.LastPrice : market.YesBid) : 0m;
+    var noPrice = market != null ? (market.NoBid > 0 ? market.NoBid : Math.Max(0m, 100m - yesPrice)) : 0m;
+    var previousYes = market != null && market.PreviousYesBid > 0 ? (decimal?)market.PreviousYesBid : null;
+    var previousNo = previousYes.HasValue ? 100m - previousYes.Value : (decimal?)null;
+    var yesTrend = market != null ? GetTrendInfo(yesPrice, previousYes) : null;
     var noTrend = market != null ? GetTrendInfo(noPrice, previousNo) : null;
 }
 
@@ -31,9 +34,9 @@
             <header class="detailsHeader">
                 <div>
                     <h1 class="detailsTitle">@TitleFormatter.FormatTitle(market.Title)</h1>
-                    @if (!string.IsNullOrWhiteSpace(market.Subtitle))
+                    @if (!string.IsNullOrWhiteSpace(market.SubTitle))
                     {
-                        <p class="detailsSubtitle">@market.Subtitle</p>
+                        <p class="detailsSubtitle">@market.SubTitle</p>
                     }
                     <div class="pillRow">
                         <span class="statusPill success">@market.Status?.ToUpperInvariant()</span>
@@ -41,13 +44,6 @@
                         @if (!string.IsNullOrWhiteSpace(market.Category))
                         {
                             <span class="statusPill outline">@market.Category</span>
-                        }
-                        @if (market.Tags?.Count > 0)
-                        {
-                            foreach (var tag in market.Tags)
-                            {
-                                <span class="statusPill outline">@tag</span>
-                            }
                         }
                         <a class="statusPill outline" target="_blank" rel="noopener noreferrer" href="https://kalshi.com/?search=@market.Ticker">
                             Open on Kalshi
@@ -63,7 +59,7 @@
                     </div>
                     <div class="summaryLine">
                         <span class="label">Last trade</span>
-                        <span class="value">@((market.LastPrice ?? market.YesPrice).ToString("0.#"))&cent;</span>
+                        <span class="value">@(market.LastPrice > 0 ? market.LastPrice : yesPrice).ToString("0.#")&cent;</span>
                     </div>
                     <div class="summaryLine">
                         <span class="label">Open interest</span>
@@ -71,7 +67,7 @@
                     </div>
                     <div class="summaryLine">
                         <span class="label">24h volume</span>
-                        <span class="value">@((market.Volume24h ?? market.Volume).ToString("N0"))</span>
+                        <span class="value">@(market.Volume24h > 0 ? market.Volume24h : market.Volume).ToString("N0")</span>
                     </div>
                 </div>
             </header>
@@ -91,10 +87,10 @@
                             </span>
                         }
                     </div>
-                    <div class="priceValue">@market.YesPrice.ToString("0.#")&cent;</div>
+                    <div class="priceValue">@yesPrice.ToString("0.#")&cent;</div>
                     <div class="bookRow">
-                        <span>Bid @market.YesBid?.ToString("0.#")&cent;</span>
-                        <span>Ask @market.YesAsk?.ToString("0.#")&cent;</span>
+                        <span>Bid @market.YesBid.ToString("0.#")&cent;</span>
+                        <span>Ask @market.YesAsk.ToString("0.#")&cent;</span>
                     </div>
                 </div>
 
@@ -114,8 +110,8 @@
                     </div>
                     <div class="priceValue">@noPrice.ToString("0.#")&cent;</div>
                     <div class="bookRow">
-                        <span>Bid @market.NoBid?.ToString("0.#")&cent;</span>
-                        <span>Ask @market.NoAsk?.ToString("0.#")&cent;</span>
+                        <span>Bid @market.NoBid.ToString("0.#")&cent;</span>
+                        <span>Ask @market.NoAsk.ToString("0.#")&cent;</span>
                     </div>
                 </div>
 
@@ -129,7 +125,7 @@
                 </div>
                 <div class="statCard">
                     <h3>24h Volume</h3>
-                    <p class="statValue">@((market.Volume24h ?? market.Volume).ToString("N0"))</p>
+                    <p class="statValue">@(market.Volume24h > 0 ? market.Volume24h : market.Volume).ToString("N0")</p>
                     <p class="statSub">Total volume @market.Volume.ToString("N0")</p>
                 </div>
                 <div class="statCard">
@@ -153,7 +149,7 @@
                         </div>
                         <div>
                             <dt>Expiration</dt>
-                            <dd>@FormatDate(market.ExpirationTime)</dd>
+                            <dd>@FormatDate(market.ExpectedExpirationTime)</dd>
                         </div>
                         <div>
                             <dt>Latest expiration</dt>
@@ -175,13 +171,13 @@
                         <tbody>
                             <tr>
                                 <td>Yes</td>
-                                <td>@(market.YesBid.HasValue ? $"{market.YesBid.Value:0.#}¢" : "—")</td>
-                                <td>@(market.YesAsk.HasValue ? $"{market.YesAsk.Value:0.#}¢" : "—")</td>
+                                <td>@(market.YesBid > 0 ? $"{market.YesBid:0.#}¢" : "—")</td>
+                                <td>@(market.YesAsk > 0 ? $"{market.YesAsk:0.#}¢" : "—")</td>
                             </tr>
                             <tr>
                                 <td>No</td>
-                                <td>@(market.NoBid.HasValue ? $"{market.NoBid.Value:0.#}¢" : "—")</td>
-                                <td>@(market.NoAsk.HasValue ? $"{market.NoAsk.Value:0.#}¢" : "—")</td>
+                                <td>@(market.NoBid > 0 ? $"{market.NoBid:0.#}¢" : "—")</td>
+                                <td>@(market.NoAsk > 0 ? $"{market.NoAsk:0.#}¢" : "—")</td>
                             </tr>
                         </tbody>
                     </table>
@@ -192,13 +188,12 @@
 </main>
 
 @functions {
-    private static string FormatCloseTime(string? closeTime)
+    private static string FormatCloseTime(DateTime closeTime)
     {
-        if (string.IsNullOrWhiteSpace(closeTime)) return "Close time unavailable";
-        if (!DateTime.TryParse(closeTime, out var close)) return "Close time unavailable";
+        if (closeTime == default) return "Close time unavailable";
 
         var now = DateTime.UtcNow;
-        var diff = close - now;
+        var diff = closeTime - now;
         var absMinutes = Math.Max(1, (int)Math.Round(Math.Abs(diff.TotalMinutes)));
         var value = absMinutes;
         var unit = "minutes";
@@ -246,13 +241,15 @@
         return abs.ToString("0.00");
     }
 
-    private static string FormatDate(string? raw)
+    private static string FormatDate(DateTime? dateTime)
     {
-        if (string.IsNullOrWhiteSpace(raw)) return "—";
-        if (DateTime.TryParse(raw, out var parsed))
+        if (!dateTime.HasValue || dateTime.Value == default) return "—";
+        return dateTime.Value.ToUniversalTime().ToString("MMM d, yyyy h:mm tt 'UTC'");
+    }
+
+    private static string FormatDate(DateTime dateTime)
         {
-            return parsed.ToUniversalTime().ToString("MMM d, yyyy h:mm tt 'UTC'");
-        }
-        return "—";
+        if (dateTime == default) return "—";
+        return dateTime.ToUniversalTime().ToString("MMM d, yyyy h:mm tt 'UTC'");
     }
 }

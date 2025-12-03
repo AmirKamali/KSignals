@@ -1,4 +1,5 @@
-@model web_asp.Models.Market
+@using KSignals.DTO
+@model ClientEvent
 <a class="card" href="/marketDetails?tickerId=@Model.Ticker">
     <div class="card-header">
         <span class="category">Event</span>
@@ -15,7 +16,7 @@
     <div class="stats">
         <div class="stat">
             <span class="label">Yes Price</span>
-            <span class="value">@Model.YesPrice.ToString("0.#")&cent;</span>
+            <span class="value">@Model.YesBid.ToString("0.#")&cent;</span>
         </div>
         <div class="stat">
             <span class="label">Volume</span>
@@ -31,6 +32,6 @@
     </div>
 
     <div class="progressContainer">
-        <div class="progressBar" style="width: @Model.YesPrice.ToString("0.#")%"></div>
+        <div class="progressBar" style="width: @Model.YesBid.ToString("0.#")%"></div>
     </div>
 </a>

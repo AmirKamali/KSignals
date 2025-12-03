@@ -1,7 +1,7 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
-using web_asp.Models;
 using web_asp.Services;
+using KSignals.DTO;
 
 namespace web_asp.Pages.Markets;
 
@@ -14,7 +14,7 @@ public class DetailsModel : PageModel
         _backendClient = backendClient;
     }
 
-    public MarketDetails? Market { get; private set; }
+    public ClientEvent? Market { get; private set; }
 
     public async Task<IActionResult> OnGetAsync(string? tickerId)
     {

@@ -21,11 +21,11 @@ public class BackendClient
         _options = options.Value;
     }
 
-    public async Task<(bool Success, string? ErrorMessage, KSignals.DTO.SignInResponse? Response)> SetUsernameAsync(string firebaseId, string username)
+    public async Task<(bool Success, string? ErrorMessage, SignInResponse? Response)> SetUsernameAsync(string firebaseId, string username)
     {
         try
         {
-            var request = new KSignals.DTO.SetUsernameRequest
+            var request = new SetUsernameRequest
             {
                 FirebaseId = firebaseId,
                 Username = username
@@ -50,7 +50,7 @@ public class BackendClient
                 return (false, "Failed to set username", null);
             }
 
-            var signInResponse = JsonSerializer.Deserialize<KSignals.DTO.SignInResponse>(responseBody, _jsonOptions);
+            var signInResponse = JsonSerializer.Deserialize<SignInResponse>(responseBody, _jsonOptions);
             return (true, null, signInResponse);
         }
         catch (Exception ex)
@@ -60,7 +60,7 @@ public class BackendClient
         }
     }
 
-    public async Task<(bool Success, string? ErrorMessage, KSignals.DTO.SignInResponse? Response)> LoginAsync(
+    public async Task<(bool Success, string? ErrorMessage, SignInResponse? Response)> LoginAsync(
         string firebaseId,
         string? username,
         string? firstName,
@@ -75,7 +75,7 @@ public class BackendClient
                 return (false, "Firebase ID is required.", null);
             }
 
-            var request = new KSignals.DTO.SignInRequest
+            var request = new SignInRequest
             {
                 FirebaseId = firebaseId,
                 Username = username,
@@ -125,7 +125,7 @@ public class BackendClient
 
             try
             {
-                var signInResponse = JsonSerializer.Deserialize<KSignals.DTO.SignInResponse>(responseBody, _jsonOptions);
+                var signInResponse = JsonSerializer.Deserialize<SignInResponse>(responseBody, _jsonOptions);
                 if (signInResponse == null || string.IsNullOrWhiteSpace(signInResponse.Token))
                 {
                     _logger.LogWarning("LoginAsync: Response missing token. Response body: {Body}", responseBody);
@@ -154,7 +154,7 @@ public class BackendClient
         }
     }
 
-    public async Task<(bool Success, string? ErrorMessage, KSignals.DTO.SignInResponse? Response)> UpdateNameAsync(
+    public async Task<(bool Success, string? ErrorMessage, SignInResponse? Response)> UpdateNameAsync(
         string jwt,
         string firstName,
         string lastName)
@@ -226,7 +226,7 @@ public class BackendClient
 
             try
             {
-                var signInResponse = JsonSerializer.Deserialize<KSignals.DTO.SignInResponse>(responseBody, _jsonOptions);
+                var signInResponse = JsonSerializer.Deserialize<SignInResponse>(responseBody, _jsonOptions);
                 if (signInResponse == null)
                 {
                     _logger.LogWarning("UpdateNameAsync: Deserialized response is null. Response body: {Body}", responseBody);
@@ -340,7 +340,7 @@ public class BackendClient
         }
     }
 
-    public async Task<IReadOnlyList<Market>> GetHighVolumeMarketsAsync(int limit = 100)
+    public async Task<IReadOnlyList<ClientEvent>> GetHighVolumeMarketsAsync(int limit = 100)
     {
         var response = await GetBackendMarketsAsync(new MarketQuery { PageSize = limit });
         var ordered = response.Markets.OrderByDescending(m => m.Volume).Take(limit).ToList();
@@ -382,7 +382,7 @@ public class BackendClient
         return DefaultTags();
     }
 
-    public async Task<MarketDetails?> GetMarketDetailsAsync(string tickerId)
+    public async Task<ClientEvent?> GetMarketDetailsAsync(string tickerId)
     {
         if (string.IsNullOrWhiteSpace(tickerId))
         {
@@ -407,7 +407,7 @@ public class BackendClient
 
             if (root.TryGetProperty("market", out var marketNode))
             {
-                return NormalizeMarketDetails(marketNode);
+                return JsonSerializer.Deserialize<ClientEvent>(marketNode.GetRawText(), _jsonOptions);
             }
 
             _logger.LogWarning("Market details response missing 'market' payload for ticker {TickerId}", tickerId);
@@ -425,7 +425,7 @@ public class BackendClient
         try
         {
             var url = QueryHelpers.AddQueryString(
-                $"{_options.BaseUrl.TrimEnd('/')}/api/markets",
+                $"{_options.BaseUrl.TrimEnd('/')}/api/events",
                 BuildQuery(query));
 
             using var response = await _httpClient.GetAsync(url);
@@ -438,12 +438,16 @@ public class BackendClient
             using var doc = await JsonDocument.ParseAsync(stream);
             var root = doc.RootElement;
 
-            var markets = new List<Market>();
+            var markets = new List<ClientEvent>();
             if (root.TryGetProperty("markets", out var marketsNode) && marketsNode.ValueKind == JsonValueKind.Array)
             {
                 foreach (var entry in marketsNode.EnumerateArray())
                 {
-                    markets.Add(NormalizeMarket(entry));
+                    var market = JsonSerializer.Deserialize<ClientEvent>(entry.GetRawText(), _jsonOptions);
+                    if (market != null)
+                    {
+                        markets.Add(market);
+                    }
                 }
             }
 
@@ -522,107 +526,6 @@ public class BackendClient
         { "Other", new List<string>() }
     };
 
-    private static Market NormalizeMarket(JsonElement raw)
-    {
-        var ticker = GetString(raw, "tickerId", "ticker") ?? string.Empty;
-        var seriesTicker = GetString(raw, "seriesTicker", "eventTicker", "event_ticker") ?? ticker;
-
-        var lastPrice = GetDecimal(raw, "lastPrice");
-        var noBid = GetDecimal(raw, "noBid", "no_price", "noPrice");
-        var noAsk = GetDecimal(raw, "noAsk", "no_ask");
-        var noPrice = noBid ?? noAsk;
-        var yesBid = GetDecimal(raw, "yesBid", "yes_price", "yesPrice");
-
-        var yesPrice = lastPrice ?? yesBid ?? (noPrice.HasValue ? Math.Max(0m, 100m - noPrice.Value) : 0m);
-        var previousYesPrice = GetDecimal(raw, "previousPrice", "previousYesBid", "previous_yes_price", "previous_yes_bid");
-        var previousNoPrice = GetDecimal(raw, "previousNoBid", "previous_no_price", "previous_no_bid") ??
-                              (previousYesPrice.HasValue ? 100m - previousYesPrice.Value : null);
-
-        var liquidity = GetDecimal(raw, "liquidity") ?? 0m;
-        var volume = GetDecimal(raw, "volume") ?? 0m;
-        var closeTime = GetString(raw, "closeTime", "close_time");
-
-        return new Market
-        {
-            Ticker = ticker,
-            EventTicker = seriesTicker ?? string.Empty,
-            Title = GetString(raw, "title") ?? string.Empty,
-            Subtitle = GetString(raw, "subtitle"),
-            YesPrice = yesPrice,
-            NoPrice = noPrice ?? (yesPrice > 0 ? Math.Max(0m, 100m - yesPrice) : null),
-            PreviousYesPrice = previousYesPrice,
-            PreviousNoPrice = previousNoPrice,
-            Volume = volume,
-            OpenInterest = liquidity,
-            Liquidity = liquidity,
-            Status = GetString(raw, "status") ?? string.Empty,
-            Category = GetString(raw, "category") ?? seriesTicker,
-            CloseTime = closeTime
-        };
-    }
-
-    private static MarketDetails NormalizeMarketDetails(JsonElement raw)
-    {
-        var market = NormalizeMarket(raw);
-
-        var tags = new List<string>();
-        if (raw.TryGetProperty("tags", out var tagsNode) && tagsNode.ValueKind == JsonValueKind.Array)
-        {
-            tags.AddRange(tagsNode.EnumerateArray()
-                .Where(t => t.ValueKind == JsonValueKind.String)
-                .Select(t => t.GetString() ?? string.Empty)
-                .Where(t => !string.IsNullOrWhiteSpace(t)));
-        }
-
-        return new MarketDetails
-        {
-            Ticker = market.Ticker,
-            EventTicker = market.EventTicker,
-            Title = market.Title,
-            Subtitle = market.Subtitle,
-            YesPrice = market.YesPrice,
-            NoPrice = market.NoPrice,
-            PreviousYesPrice = market.PreviousYesPrice,
-            PreviousNoPrice = market.PreviousNoPrice,
-            Volume = market.Volume,
-            OpenInterest = market.OpenInterest,
-            Liquidity = market.Liquidity,
-            Status = market.Status,
-            CloseTime = market.CloseTime,
-            YesBid = GetDecimal(raw, "yesBid", "yes_bid", "yesPrice"),
-            YesAsk = GetDecimal(raw, "yesAsk", "yes_ask"),
-            NoBid = GetDecimal(raw, "noBid", "no_bid", "noPrice"),
-            NoAsk = GetDecimal(raw, "noAsk", "no_ask"),
-            LastPrice = GetDecimal(raw, "lastPrice", "last_price"),
-            Volume24h = GetDecimal(raw, "volume24h", "volume_24h", "24h_volume"),
-            OpenTime = GetString(raw, "openTime", "open_time"),
-            ExpirationTime = GetString(raw, "expirationTime", "expiration_time"),
-            LatestExpirationTime = GetString(raw, "latestExpirationTime", "latest_expiration_time"),
-            Category = GetString(raw, "category", "Category"),
-            Tags = tags
-        };
-    }
-
-    private static decimal? GetDecimal(JsonElement element, params string[] names)
-    {
-        foreach (var name in names)
-        {
-            if (!element.TryGetProperty(name, out var value)) continue;
-
-            if (value.ValueKind == JsonValueKind.Number && value.TryGetDecimal(out var number))
-            {
-                return number;
-            }
-
-            if (value.ValueKind == JsonValueKind.String &&
-                decimal.TryParse(value.GetString(), out var parsed))
-            {
-                return parsed;
-            }
-        }
-        return null;
-    }
-
     private static int GetInt(JsonElement element, params string[] names)
         => GetInt(element, 0, names);
 
@@ -661,119 +564,133 @@ public class BackendClient
         return null;
     }
 
-    private static IReadOnlyList<Market> SampleMarkets() => new List<Market>
+    private static IReadOnlyList<ClientEvent> SampleMarkets() => new List<ClientEvent>
     {
         new()
         {
             Ticker = "RATECUT-JUN25",
             EventTicker = "FOMC",
+            SeriesTicker = "FED",
             Title = "Will the Fed cut rates by June 2025?",
-            Subtitle = "Market signal: probability tightening then easing",
-            YesPrice = 42,
-            NoPrice = 58,
-            PreviousYesPrice = 39,
+            SubTitle = "Market signal: probability tightening then easing",
+            Category = "Economics",
+            YesBid = 42,
+            NoBid = 58,
+            LastPrice = 42,
+            PreviousYesBid = 39,
             Volume = 182300,
             OpenInterest = 120000,
             Liquidity = 120000,
             Status = "open",
-            Category = "Economics",
-            CloseTime = DateTime.UtcNow.AddDays(30).ToString("o")
+            CloseTime = DateTime.UtcNow.AddDays(30)
         },
         new()
         {
             Ticker = "ELECTION-TURNOUT",
             EventTicker = "ELECTIONS",
+            SeriesTicker = "ELECTIONS",
             Title = "National election turnout above 60%",
-            Subtitle = "Tracking early vote momentum",
-            YesPrice = 61,
-            NoPrice = 39,
-            PreviousYesPrice = 63,
+            SubTitle = "Tracking early vote momentum",
+            Category = "Politics",
+            YesBid = 61,
+            NoBid = 39,
+            LastPrice = 61,
+            PreviousYesBid = 63,
             Volume = 205500,
             OpenInterest = 153200,
             Liquidity = 153200,
             Status = "open",
-            Category = "Politics",
-            CloseTime = DateTime.UtcNow.AddDays(60).ToString("o")
+            CloseTime = DateTime.UtcNow.AddDays(60)
         },
         new()
         {
             Ticker = "CPI-PRINT-JULY",
             EventTicker = "ECON",
+            SeriesTicker = "CPI",
             Title = "July CPI YoY above 3.0%",
-            Subtitle = "Inflation watchlist",
-            YesPrice = 34,
-            NoPrice = 66,
-            PreviousYesPrice = 30,
+            SubTitle = "Inflation watchlist",
+            Category = "Economics",
+            YesBid = 34,
+            NoBid = 66,
+            LastPrice = 34,
+            PreviousYesBid = 30,
             Volume = 120400,
             OpenInterest = 95400,
             Liquidity = 95400,
             Status = "open",
-            Category = "Economics",
-            CloseTime = DateTime.UtcNow.AddDays(20).ToString("o")
+            CloseTime = DateTime.UtcNow.AddDays(20)
         },
         new()
         {
             Ticker = "AI-CHIP-EXPORTS",
             EventTicker = "TECH",
+            SeriesTicker = "TECH",
             Title = "Will AI chip export rules tighten?",
-            Subtitle = "Policy risk premium",
-            YesPrice = 28,
-            NoPrice = 72,
-            PreviousYesPrice = 25,
+            SubTitle = "Policy risk premium",
+            Category = "Technology",
+            YesBid = 28,
+            NoBid = 72,
+            LastPrice = 28,
+            PreviousYesBid = 25,
             Volume = 84500,
             OpenInterest = 61200,
             Liquidity = 61200,
             Status = "open",
-            Category = "Technology",
-            CloseTime = DateTime.UtcNow.AddDays(15).ToString("o")
+            CloseTime = DateTime.UtcNow.AddDays(15)
         },
         new()
         {
             Ticker = "GDP-Q3-ABOVE3",
             EventTicker = "ECON",
+            SeriesTicker = "GDP",
             Title = "Will Q3 GDP growth exceed 3.0%?",
-            Subtitle = "Macro expansion odds",
-            YesPrice = 47,
-            NoPrice = 53,
-            PreviousYesPrice = 45,
+            SubTitle = "Macro expansion odds",
+            Category = "Economics",
+            YesBid = 47,
+            NoBid = 53,
+            LastPrice = 47,
+            PreviousYesBid = 45,
             Volume = 91000,
             OpenInterest = 70000,
             Liquidity = 70000,
             Status = "open",
-            Category = "Economics",
-            CloseTime = DateTime.UtcNow.AddDays(80).ToString("o")
+            CloseTime = DateTime.UtcNow.AddDays(80)
         },
         new()
         {
             Ticker = "SENATE-MAJORITY",
             EventTicker = "POL",
+            SeriesTicker = "POLITICS",
             Title = "Will Party A hold the Senate majority?",
-            Subtitle = "Seat map pressure",
-            YesPrice = 55,
-            NoPrice = 45,
-            PreviousYesPrice = 52,
+            SubTitle = "Seat map pressure",
+            Category = "Politics",
+            YesBid = 55,
+            NoBid = 45,
+            LastPrice = 55,
+            PreviousYesBid = 52,
             Volume = 132000,
             OpenInterest = 88000,
             Liquidity = 88000,
             Status = "open",
-            Category = "Politics",
-            CloseTime = DateTime.UtcNow.AddDays(120).ToString("o")
+            CloseTime = DateTime.UtcNow.AddDays(120)
         },
         new()
         {
             Ticker = "JOBLESS-CLAIMS",
             EventTicker = "LABOR",
+            SeriesTicker = "LABOR",
             Title = "Weekly jobless claims above 250k?",
-            Subtitle = "Volatility watchlist",
-            YesPrice = 23,
-            NoPrice = 77,
-            PreviousYesPrice = 24,
+            SubTitle = "Volatility watchlist",
+            Category = "Economics",
+            YesBid = 23,
+            NoBid = 77,
+            LastPrice = 23,
+            PreviousYesBid = 24,
             Volume = 56000,
             OpenInterest = 41000,
             Liquidity = 41000,
             Status = "open",
-            Category = "Economics",
-            CloseTime = DateTime.UtcNow.AddDays(7).ToString("o")
+            CloseTime = DateTime.UtcNow.AddDays(7)
         }
     };
 }
