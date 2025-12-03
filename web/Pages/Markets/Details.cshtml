@@ -137,6 +137,95 @@
                 </div>
             </section>
 
+            @if (eventDetails?.Markets != null && eventDetails.Markets.Count > 0)
+            {
+                <section class="marketsSection">
+                    <h2 class="sectionTitle">Markets in this Event</h2>
+                    <div class="marketsGrid">
+                        @foreach (var mkt in eventDetails.Markets)
+                        {
+                            var mktYesPrice = mkt.LastPrice > 0 ? mkt.LastPrice : mkt.YesBid;
+                            var mktNoPrice = mkt.NoBid > 0 ? mkt.NoBid : Math.Max(0, 100 - mktYesPrice);
+                            var mktPreviousYes = mkt.PreviousYesBid > 0 ? (decimal?)mkt.PreviousYesBid : null;
+                            var mktYesTrend = GetTrendInfo(mktYesPrice, mktPreviousYes);
+
+                            <div class="marketCard">
+                                <div class="marketCardHeader">
+                                    <div class="marketCardTitle">
+                                        @if (!string.IsNullOrWhiteSpace(mkt.YesSubTitle) || !string.IsNullOrWhiteSpace(mkt.NoSubTitle))
+                                        {
+                                            <span class="yesLabel">@mkt.YesSubTitle</span>
+                                            @if (!string.IsNullOrWhiteSpace(mkt.NoSubTitle))
+                                            {
+                                                <span class="separator">vs</span>
+                                                <span class="noLabel">@mkt.NoSubTitle</span>
+                                            }
+                                        }
+                                        else if (!string.IsNullOrWhiteSpace(mkt.SubTitle))
+                                        {
+                                            <span>@mkt.SubTitle</span>
+                                        }
+                                        else
+                                        {
+                                            <span>@mkt.Ticker</span>
+                                        }
+                                    </div>
+                                    <span class="statusBadge @(mkt.Status?.ToLowerInvariant())">@mkt.Status</span>
+                                </div>
+
+                                <div class="marketCardStats">
+                                    <div class="statGroup">
+                                        <div class="statItem">
+                                            <span class="statLabel">Yes Price</span>
+                                            <div class="statValueGroup">
+                                                <span class="statValue yes">@(mktYesPrice.ToString("0.#"))¢</span>
+                                                @if (mktYesTrend.HasValue && mktYesTrend.Value.diff != 0)
+                                                {
+                                                    var directionClass = mktYesTrend.Value.direction == "up" ? "trendUp" : "trendDown";
+                                                    <span class="trendBadge @directionClass">
+                                                        <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="currentColor" style="transform:@(mktYesTrend.Value.direction == "down" ? "rotate(180deg)" : "none");">
+                                                            <path d="M12 16l-6-6h12z"></path>
+                                                        </svg>
+                                                        @FormatDelta(mktYesTrend.Value.diff)¢
+                                                    </span>
+                                                }
+                                            </div>
+                                        </div>
+                                        <div class="statItem">
+                                            <span class="statLabel">No Price</span>
+                                            <span class="statValue no">@(mktNoPrice.ToString("0.#"))¢</span>
+                                        </div>
+                                    </div>
+
+                                    <div class="statGroup">
+                                        <div class="statItem">
+                                            <span class="statLabel">Volume</span>
+                                            <span class="statValue">@(mkt.Volume.ToString("N0"))</span>
+                                        </div>
+                                        <div class="statItem">
+                                            <span class="statLabel">Open Interest</span>
+                                            <span class="statValue">@(mkt.OpenInterest.ToString("N0"))</span>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="marketCardFooter">
+                                    <div class="bidAsk">
+                                        <span class="bidAskLabel">Bid/Ask:</span>
+                                        <span class="bidAskValues">
+                                            @(mkt.YesBid.ToString("0.#"))¢ / @(mkt.YesAsk.ToString("0.#"))¢
+                                        </span>
+                                    </div>
+                                    <div class="closeTime">
+                                        @FormatCloseTime(mkt.CloseTime)
+                                    </div>
+                                </div>
+                            </div>
+                        }
+                    </div>
+                </section>
+            }
+
             <section class="detailPanels">
                 <div class="panel timelineCard">
                     <h3>Timeline</h3>

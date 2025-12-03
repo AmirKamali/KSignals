@@ -1066,6 +1066,229 @@ main {
   box-shadow: 0 6px 22px rgba(15, 23, 42, 0.06);
 }
 
+/* Markets Section */
+.marketsSection {
+  margin: 2rem 0;
+  width: 100vw;
+  position: relative;
+  left: 50%;
+  right: 50%;
+  margin-left: -50vw;
+  margin-right: -50vw;
+  padding: 2rem 1.5rem;
+  background: linear-gradient(180deg, var(--background) 0%, rgba(245, 247, 251, 0.5) 100%);
+}
+
+.sectionTitle {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin-bottom: 1.25rem;
+  max-width: 1200px;
+  margin-left: auto;
+  margin-right: auto;
+  padding: 0 1.5rem;
+}
+
+.marketsGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: 1.25rem;
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 1.5rem;
+}
+
+.marketCard {
+  background: var(--surface);
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--border);
+  padding: 1.25rem;
+  transition: all var(--transition-fast);
+  box-shadow: 0 6px 22px rgba(15, 23, 42, 0.06);
+}
+
+.marketCard:hover {
+  border-color: var(--primary);
+  box-shadow: 0 10px 32px rgba(37, 99, 235, 0.12);
+  transform: translateY(-2px);
+}
+
+.marketCardHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 1rem;
+  gap: 0.75rem;
+}
+
+.marketCardTitle {
+  flex: 1;
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  line-height: 1.4;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.yesLabel {
+  color: var(--success);
+  font-weight: 600;
+}
+
+.noLabel {
+  color: var(--danger);
+  font-weight: 600;
+}
+
+.separator {
+  color: var(--text-muted);
+  font-weight: 400;
+  font-size: 0.9rem;
+}
+
+.statusBadge {
+  padding: 0.25rem 0.65rem;
+  border-radius: var(--radius-sm);
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  white-space: nowrap;
+  background: var(--surface-hover);
+  color: var(--text-secondary);
+  border: 1px solid var(--border);
+}
+
+.statusBadge.active {
+  background: rgba(16, 185, 129, 0.1);
+  color: var(--success);
+  border-color: var(--success);
+}
+
+.statusBadge.closed {
+  background: rgba(100, 116, 139, 0.1);
+  color: var(--text-muted);
+  border-color: var(--border);
+}
+
+.statusBadge.settled {
+  background: rgba(37, 99, 235, 0.1);
+  color: var(--primary);
+  border-color: var(--primary);
+}
+
+.marketCardStats {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.statGroup {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.75rem;
+}
+
+.statItem {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.statLabel {
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  font-weight: 500;
+}
+
+.statValue {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.statValue.yes {
+  color: var(--success);
+}
+
+.statValue.no {
+  color: var(--danger);
+}
+
+.statValueGroup {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.trendBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.2rem;
+  padding: 0.15rem 0.4rem;
+  border-radius: var(--radius-sm);
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.trendBadge.trendUp {
+  background: rgba(16, 185, 129, 0.1);
+  color: var(--success);
+}
+
+.trendBadge.trendDown {
+  background: rgba(220, 38, 38, 0.1);
+  color: var(--danger);
+}
+
+.marketCardFooter {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--border);
+  font-size: 0.875rem;
+}
+
+.bidAsk {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.bidAskLabel {
+  color: var(--text-secondary);
+  font-weight: 500;
+}
+
+.bidAskValues {
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
+.closeTime {
+  color: var(--text-muted);
+  font-size: 0.8rem;
+}
+
+@media (max-width: 768px) {
+  .marketsGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .marketCardStats {
+    gap: 0.75rem;
+  }
+
+  .statGroup {
+    gap: 0.5rem;
+  }
+}
+
 .statCard h3 {
   font-size: 1rem;
   color: var(--text-secondary);
