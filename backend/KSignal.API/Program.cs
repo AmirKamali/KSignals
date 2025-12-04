@@ -171,6 +171,7 @@ builder.Services.AddMassTransit(x =>
 });
 
 builder.Services.AddScoped<KalshiService>();
+builder.Services.AddScoped<ChartService>();
 builder.Services.AddScoped<SynchronizationService>();
 builder.Services.AddScoped<AnalyticsService>();
 builder.Services.AddScoped<CleanupService>();
