@@ -57,10 +57,15 @@ public class ChartService
             }
 
             var seriesTicker = marketEvent.SeriesTicker;
-            _logger.LogInformation("Series ticker for {Ticker}: {SeriesTicker}", ticker, seriesTicker);
+            var category = marketEvent.Category;
+            _logger.LogInformation("Series ticker for {Ticker}: {SeriesTicker}, Category: {Category}",
+                ticker, seriesTicker, category);
 
-            // Check for existing candlestick data in database
-            var periodInterval = 1440; // 1 day
+            // Determine period interval based on category
+            // Sports markets use 1-minute intervals, others use 1-day intervals
+            var periodInterval = string.Equals(category, "sports", StringComparison.OrdinalIgnoreCase) ? 1 : 1440;
+            _logger.LogInformation("Using period interval {Interval} minutes for {Ticker} (category: {Category})",
+                periodInterval, ticker, category);
             var existingData = await _db.MarketCandlesticks
                 .AsNoTracking()
                 .Where(c => c.Ticker == ticker && c.PeriodInterval == periodInterval)
@@ -85,8 +90,12 @@ public class ChartService
                 // Add 1 second to avoid duplicate
                 startTs = latestTs + 1;
 
-                // If the latest data is recent (within last day), we might not need to fetch anything new
-                if (latestTime >= endTime.AddDays(-1))
+                // Check if data is up-to-date based on interval
+                var cacheThreshold = periodInterval == 1
+                    ? endTime.AddMinutes(-5)  // For 1-min intervals, refresh if older than 5 minutes
+                    : endTime.AddDays(-1);    // For 1-day intervals, refresh if older than 1 day
+
+                if (latestTime >= cacheThreshold)
                 {
                     _logger.LogInformation("Existing data is up-to-date for {Ticker}, returning cached data", ticker);
                     return CreateResponseFromExistingData(ticker, existingData);
@@ -94,10 +103,12 @@ public class ChartService
             }
             else
             {
-                // No existing data, fetch last 30 days
-                var startTime = endTime.AddDays(-30);
-                startTs = ((DateTimeOffset)startTime).ToUnixTimeSeconds();
-                _logger.LogInformation("No existing data for {Ticker}, fetching 30 days", ticker);
+                // No existing data, fetch historical data
+                // For sports (1-min), fetch last 24 hours; for others (1-day), fetch last 30 days
+                var lookbackPeriod = periodInterval == 1 ? endTime.AddHours(-24) : endTime.AddDays(-30);
+                startTs = ((DateTimeOffset)lookbackPeriod).ToUnixTimeSeconds();
+                _logger.LogInformation("No existing data for {Ticker}, fetching from {StartTime}",
+                    ticker, lookbackPeriod);
             }
 
             // Fetch new candlestick data from Kalshi API

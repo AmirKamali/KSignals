@@ -59,6 +59,7 @@ public class KalshiService
                         where !evt.IsDeleted
                            && s.CloseTime > nowUtc
                            && s.Status == status
+                           && s.MveCollectionTicker == null // Avoid MVE Markets
                         select new { Event = evt, Series = ser, Snapshot = s };
 
         // Apply category/tag filter via MarketSeries
