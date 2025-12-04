@@ -13,6 +13,10 @@
     var previousNo = previousYes.HasValue ? 100m - previousYes.Value : (decimal?)null;
     var yesTrend = market != null ? GetTrendInfo(yesPrice, previousYes) : null;
     var noTrend = market != null ? GetTrendInfo(noPrice, previousNo) : null;
+
+    // Calculate totals across all markets in the event
+    var totalLiquidity = eventDetails?.Markets?.Sum(m => m.Liquidity) ?? 0m;
+    var totalVolume = eventDetails?.Markets?.Sum(m => m.Volume24h > 0 ? m.Volume24h : m.Volume) ?? 0m;
 }
 
 <main class="detailsPage">
@@ -68,67 +72,22 @@
                         <span class="value">@(market.OpenInterest.ToString("N0"))</span>
                     </div>
                     <div class="summaryLine">
-                        <span class="label">24h volume</span>
-                        <span class="value">@((market.Volume24h > 0 ? market.Volume24h : market.Volume).ToString("N0"))</span>
+                        <span class="label">Total volume</span>
+                        <span class="value">@(totalVolume.ToString("N0"))</span>
                     </div>
                 </div>
             </header>
 
-            <section class="priceGrid">
-                <div class="priceCard yesCard">
-                    <div class="cardHeader">
-                        <span class="pill success">Yes</span>
-                        @if (yesTrend.HasValue && yesTrend.Value.diff != 0)
-                        {
-                            var directionClass = yesTrend.Value.direction == "up" ? "trendUp" : "trendDown";
-                            <span class="deltaBadge @directionClass">
-                                <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="currentColor" style="transform:@(yesTrend.Value.direction == "down" ? "rotate(180deg)" : "none");">
-                                    <path d="M12 16l-6-6h12z"></path>
-                                </svg>
-                                @FormatDelta(yesTrend.Value.diff)&cent;
-                            </span>
-                        }
-                    </div>
-                    <div class="priceValue">@(yesPrice.ToString("0.#"))&cent;</div>
-                    <div class="bookRow">
-                        <span>Bid @(market.YesBid.ToString("0.#"))&cent;</span>
-                        <span>Ask @(market.YesAsk.ToString("0.#"))&cent;</span>
-                    </div>
-                </div>
-
-                <div class="priceCard noCard">
-                    <div class="cardHeader">
-                        <span class="pill danger">No</span>
-                        @if (noTrend.HasValue && noTrend.Value.diff != 0)
-                        {
-                            var directionClass = noTrend.Value.direction == "up" ? "trendUp" : "trendDown";
-                            <span class="deltaBadge @directionClass">
-                                <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="currentColor" style="transform:@(noTrend.Value.direction == "down" ? "rotate(180deg)" : "none");">
-                                    <path d="M12 16l-6-6h12z"></path>
-                                </svg>
-                                @FormatDelta(noTrend.Value.diff)&cent;
-                            </span>
-                        }
-                    </div>
-                    <div class="priceValue">@(noPrice.ToString("0.#"))&cent;</div>
-                    <div class="bookRow">
-                        <span>Bid @(market.NoBid.ToString("0.#"))&cent;</span>
-                        <span>Ask @(market.NoAsk.ToString("0.#"))&cent;</span>
-                    </div>
-                </div>
-
-            </section>
-
             <section class="detailsGrid">
                 <div class="statCard">
-                    <h3>Liquidity</h3>
-                    <p class="statValue">@(market.Liquidity.ToString("N0"))</p>
+                    <h3>Total liquidity</h3>
+                    <p class="statValue">@(totalLiquidity.ToString("N0"))</p>
                     <p class="statSub">Open interest @(market.OpenInterest.ToString("N0"))</p>
                 </div>
                 <div class="statCard">
-                    <h3>24h Volume</h3>
-                    <p class="statValue">@((market.Volume24h > 0 ? market.Volume24h : market.Volume).ToString("N0"))</p>
-                    <p class="statSub">Total volume @(market.Volume.ToString("N0"))</p>
+                    <h3>Total volume</h3>
+                    <p class="statValue">@(totalVolume.ToString("N0"))</p>
+                    <p class="statSub">All markets combined</p>
                 </div>
                 <div class="statCard">
                     <h3>Status</h3>
