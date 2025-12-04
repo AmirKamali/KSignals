@@ -48,12 +48,13 @@ public class KalshiService
         var nowUtc = DateTime.UtcNow;
         var maxCloseTime = GetMaxCloseTimeFromDateType(closeDateType, nowUtc);
 
-        // Start from MarketEvents, join with MarketSeries and MarketSnapshotsLatest
+        // Start from MarketEvents, join with MarketSeries and MarketSnapshotsLatestView
+        // Using the view ensures we always get deduplicated data (latest snapshot per ticker)
         var baseQuery = from evt in _db.MarketEvents.AsNoTracking()
                         join series in _db.MarketSeries.AsNoTracking()
                             on evt.SeriesTicker equals series.Ticker into seriesJoin
                         from ser in seriesJoin.DefaultIfEmpty()
-                        join snap in _db.MarketSnapshotsLatest.AsNoTracking()
+                        join snap in _db.MarketSnapshotsLatestView.AsNoTracking()
                             on evt.EventTicker equals snap.EventTicker into snapJoin
                         from s in snapJoin
                         where !evt.IsDeleted
@@ -201,11 +202,12 @@ public class KalshiService
             _logger.LogInformation("Saved market snapshot for {Ticker} to database", ticker);
 
             // Query the full data from database (event + series + snapshot)
+            // Using the view ensures we always get deduplicated data (latest snapshot per ticker)
             var result = await (from evt in _db.MarketEvents.AsNoTracking()
                                 join series in _db.MarketSeries.AsNoTracking()
                                     on evt.SeriesTicker equals series.Ticker into seriesJoin
                                 from ser in seriesJoin.DefaultIfEmpty()
-                                join snap in _db.MarketSnapshotsLatest.AsNoTracking()
+                                join snap in _db.MarketSnapshotsLatestView.AsNoTracking()
                                     on evt.EventTicker equals snap.EventTicker into snapJoin
                                 from s in snapJoin
                                 where !evt.IsDeleted && s.Ticker == ticker

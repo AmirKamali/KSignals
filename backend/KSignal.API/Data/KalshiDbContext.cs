@@ -11,6 +11,7 @@ namespace KSignal.API.Data;
 
         public DbSet<MarketSnapshot> MarketSnapshots => Set<MarketSnapshot>();
         public DbSet<MarketSnapshotLatest> MarketSnapshotsLatest => Set<MarketSnapshotLatest>();
+        public DbSet<MarketSnapshotLatest> MarketSnapshotsLatestView => Set<MarketSnapshotLatest>("vw_market_snapshots_latest");
         public DbSet<TagsCategory> TagsCategories => Set<TagsCategory>();
         public DbSet<User> Users => Set<User>();
         public DbSet<MarketSeries> MarketSeries => Set<MarketSeries>();
@@ -84,6 +85,16 @@ namespace KSignal.API.Data;
         marketSnapshotLatest.Property(e => e.PriceLevelStructure).IsRequired();
         marketSnapshotLatest.Property(e => e.PriceRanges);
         marketSnapshotLatest.Property(e => e.GenerateDate).IsRequired();
+
+        // Configure the view - same structure as market_snapshots_latest but read from the view
+        // Using shared-type entity for the view
+        modelBuilder.SharedTypeEntity<MarketSnapshotLatest>("vw_market_snapshots_latest", viewBuilder =>
+        {
+            viewBuilder.ToView("vw_market_snapshots_latest");
+            viewBuilder.HasKey(e => e.MarketSnapshotID);
+            viewBuilder.HasIndex(e => e.Ticker);
+            viewBuilder.HasIndex(e => e.EventTicker);
+        });
 
         var marketSnapshot = modelBuilder.Entity<MarketSnapshot>();
         marketSnapshot.ToTable("market_snapshots");

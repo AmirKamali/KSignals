@@ -1,34 +1,7 @@
 {
   "permissions": {
     "allow": [
-      "Bash(curl:*)",
-      "Bash(python3:*)",
-      "Bash(dotnet build:*)",
-      "Bash(lsof:*)",
-      "Bash(npm run build:*)",
-      "Bash(npx tsc:*)",
-      "Bash(dotnet add package:*)",
-      "Bash(docker run:*)",
-      "Bash(docker exec:*)",
-      "Bash(dotnet run:*)",
-      "Bash(kill:*)",
-      "Bash(time curl -s http://localhost:3006/api/events/categories)",
-      "Bash(time curl -s \"http://localhost:3006/api/markets?category=World&date=this_year\")",
-      "Bash(pkill:*)",
-      "Bash(killall:*)",
-      "Bash(xargs kill -9)",
-      "Bash(export BACKEND_API_BASE_URL=\"http://localhost:5271\")",
-      "Bash(chmod:*)",
-      "Bash(./run_dev.sh)",
-      "Bash(cat:*)",
-      "Bash(./kill_backend.sh)",
-      "Bash(echo:*)",
-      "Bash(docker build:*)",
-      "Bash(clickhouse-client --host=kalshisignals.com --port=9000 --user=qv6t0lSQNqaaKPEpxazLcZjoS --password=xXnBtibbHu5be6U1k1X9IBxie --database=kalshi_signals --query=\"DESCRIBE TABLE market_snapshots_latest FORMAT Vertical\")",
-      "Bash(find:*)",
-      "Bash(ls:*)",
-      "Bash(./run_frontend_asp.sh)",
-      "Bash(timeout:*)"
+      "Bash(./test_deduplication.sh:*)"
     ],
     "deny": [],
     "ask": []
