@@ -23,7 +23,19 @@ public class IndexModel : PageModel
         var activeDate = string.IsNullOrWhiteSpace(date) ? "next_30_days" : date!;
         var activeSort = string.IsNullOrWhiteSpace(sort_type) ? "volume" : sort_type!;
         var sortDirection = direction == "asc" ? "asc" : "desc";
-        var currentPage = Math.Max(1, page ?? 1);
+        
+        // Check if page parameter exists in query string and try to parse it
+        // This handles cases where the page parameter might not be bound correctly
+        int? pageValue = page;
+        if (Request.Query.ContainsKey("page"))
+        {
+            var pageQueryValue = Request.Query["page"].ToString();
+            if (!string.IsNullOrWhiteSpace(pageQueryValue) && int.TryParse(pageQueryValue, out var parsedPage))
+            {
+                pageValue = parsedPage;
+            }
+        }
+        var currentPage = Math.Max(1, pageValue ?? 1);
         var size = Math.Max(1, pageSize ?? 20);
 
         // Require authentication for page > 1

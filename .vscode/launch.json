@@ -2,106 +2,56 @@
   "version": "0.2.0",
   "configurations": [
     {
-      "name": "Next.js: debug server-side",
-      "type": "node-terminal",
-      "request": "launch",
-      "command": "npm run dev",
-      "cwd": "${workspaceFolder}/web",
-      "serverReadyAction": {
-        "pattern": "- Local:.+(https?://.+)",
-        "uriFormat": "%s",
-        "action": "debugWithChrome"
-      }
-    },
-    {
-      "name": "Next.js: debug client-side",
-      "type": "chrome",
-      "request": "launch",
-      "url": "http://localhost:3000",
-      "webRoot": "${workspaceFolder}/web",
-      "sourceMaps": true,
-      "sourceMapPathOverrides": {
-        "webpack://_N_E/*": "${webRoot}/*"
-      }
-    },
-    {
-      "name": "Next.js: debug full stack",
-      "type": "node-terminal",
-      "request": "launch",
-      "command": "npm run dev",
-      "cwd": "${workspaceFolder}/web",
-      "serverReadyAction": {
-        "pattern": "- Local:.+(https?://.+)",
-        "uriFormat": "%s",
-        "action": "openExternally"
-      }
-    },
-    {
-      "name": ".NET Core: Attach to Process",
-      "type": "coreclr",
-      "request": "attach",
-      "processId": "${command:pickProcess}",
-      "justMyCode": true
-    },
-    {
-      "name": ".NET Core: Launch KSignal.API",
+      "name": ".NET Core Launch (Frontend - HTTP)",
       "type": "coreclr",
       "request": "launch",
-      "preLaunchTask": "build-ksignal-api",
-      "program": "${workspaceFolder}/backend/KSignal.API/bin/Debug/net8.0/KSignal.API.dll",
+      "preLaunchTask": "build-frontend",
+      "program": "${workspaceFolder}/web/bin/Debug/net10.0/web_asp.dll",
       "args": [],
-      "cwd": "${workspaceFolder}/backend/KSignal.API",
+      "cwd": "${workspaceFolder}/web",
       "stopAtEntry": false,
       "serverReadyAction": {
         "action": "openExternally",
-        "pattern": "\\bNow listening on:\\s+http://([^\\s]+)",
-        "uriFormat": "http://%s/swagger"
+        "pattern": "\\bNow listening on:\\s+(https?://\\S+)",
+        "uriFormat": "%s"
       },
       "env": {
-        "ASPNETCORE_ENVIRONMENT": "Development"
+        "ASPNETCORE_ENVIRONMENT": "Development",
+        "ASPNETCORE_URLS": "http://localhost:3011",
+        "BACKEND_API_BASE_URL": "http://localhost:3006"
       },
       "sourceFileMap": {
         "/Views": "${workspaceFolder}/Views"
       }
     },
     {
-      "name": "Frontend .NET",
+      "name": ".NET Core Launch (Frontend - HTTPS)",
       "type": "coreclr",
       "request": "launch",
-      "preLaunchTask": "build-web-asp",
-      "program": "dotnet",
-      "args": [
-        "run",
-        "--no-build",
-        "--project",
-        "${workspaceFolder}/web/web_asp.csproj"
-      ],
+      "preLaunchTask": "build-frontend",
+      "program": "${workspaceFolder}/web/bin/Debug/net10.0/web_asp.dll",
+      "args": [],
       "cwd": "${workspaceFolder}/web",
       "stopAtEntry": false,
-      "justMyCode": true,
-      "launchBrowser": {
-        "enabled": true,
-        "args": "${auto-detect-url}"
-      },
       "serverReadyAction": {
         "action": "openExternally",
-        "pattern": "\\bNow listening on:\\s+(https?://[^\\s]+)",
+        "pattern": "\\bNow listening on:\\s+(https?://\\S+)",
         "uriFormat": "%s"
       },
       "env": {
         "ASPNETCORE_ENVIRONMENT": "Development",
-        "ASPNETCORE_URLS": "http://127.0.0.1:3011;https://127.0.0.1:7011"
+        "ASPNETCORE_URLS": "https://localhost:7011;http://localhost:3011",
+        "BACKEND_API_BASE_URL": "http://localhost:3006"
+      },
+      "sourceFileMap": {
+        "/Views": "${workspaceFolder}/Views"
       }
-    }
-  ],
-  "compounds": [
+    },
     {
-      "name": "Next.js: debug full stack (compound)",
-      "configurations": [
-        "Next.js: debug server-side",
-        "Next.js: debug client-side"
-      ],
-      "stopAll": true
+      "name": ".NET Core Attach (Frontend)",
+      "type": "coreclr",
+      "request": "attach",
+      "processName": "web_asp"
     }
   ]
 }

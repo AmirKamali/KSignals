@@ -2,126 +2,52 @@
   "version": "2.0.0",
   "tasks": [
     {
-      "label": "npm: dev",
-      "type": "shell",
-      "command": "npm run dev",
-      "options": {
-        "cwd": "${workspaceFolder}/web"
-      },
-      "problemMatcher": [],
-      "isBackground": true,
-      "runOptions": {
-        "runOn": "default"
-      }
-    },
-    {
-      "label": "Generate C# API",
-      "type": "shell",
-      "command": "./generate_dotnet.sh",
-      "options": {
-        "cwd": "${workspaceFolder}"
-      },
-      "problemMatcher": [],
-      "group": {
-        "kind": "build",
-        "isDefault": false
-      }
-    },
-    {
-      "label": "Build C# API",
-      "type": "shell",
-      "command": "dotnet build",
-      "options": {
-        "cwd": "${workspaceFolder}/backend/Kalshi.Api"
-      },
-      "problemMatcher": "$msCompile",
-      "group": {
-        "kind": "build",
-        "isDefault": false
-      }
-    },
-    {
-      "label": "build-dotnet-solution",
-      "type": "shell",
-      "command": "dotnet build backend/KalshiSignals.sln",
-      "options": {
-        "cwd": "${workspaceFolder}"
-      },
-      "problemMatcher": "$msCompile",
-      "group": {
-        "kind": "build",
-        "isDefault": false
-      }
-    },
-    {
-      "label": "Clean C# API",
-      "type": "shell",
-      "command": "dotnet clean",
-      "options": {
-        "cwd": "${workspaceFolder}/backend/Kalshi.Api"
-      },
+      "label": "build-frontend",
+      "command": "dotnet",
+      "type": "process",
+      "args": [
+        "build",
+        "${workspaceFolder}/web/web_asp.csproj",
+        "/property:GenerateFullPaths=true",
+        "/consoleloggerparameters:NoSummary"
+      ],
       "problemMatcher": "$msCompile"
     },
     {
-      "label": "Restore .NET Packages",
-      "type": "shell",
-      "command": "dotnet restore backend/KalshiSignals.sln",
-      "options": {
-        "cwd": "${workspaceFolder}"
-      },
+      "label": "publish-frontend",
+      "command": "dotnet",
+      "type": "process",
+      "args": [
+        "publish",
+        "${workspaceFolder}/web/web_asp.csproj",
+        "/property:GenerateFullPaths=true",
+        "/consoleloggerparameters:NoSummary"
+      ],
       "problemMatcher": "$msCompile"
     },
     {
-      "label": "Run .NET Tests",
-      "type": "shell",
-      "command": "dotnet test backend/KalshiSignals.sln",
-      "options": {
-        "cwd": "${workspaceFolder}"
-      },
-      "problemMatcher": "$msCompile",
-      "group": {
-        "kind": "test",
-        "isDefault": false
-      }
+      "label": "watch-frontend",
+      "command": "dotnet",
+      "type": "process",
+      "args": [
+        "watch",
+        "run",
+        "--project",
+        "${workspaceFolder}/web/web_asp.csproj"
+      ],
+      "problemMatcher": "$msCompile"
     },
     {
-      "label": "build-ksignal-api",
-      "type": "shell",
-      "command": "dotnet build",
-      "options": {
-        "cwd": "${workspaceFolder}/backend/KSignal.API"
-      },
-      "problemMatcher": "$msCompile",
-      "group": {
-        "kind": "build",
-        "isDefault": false
-      }
-    },
-    {
-      "label": "Build KSignal.API",
-      "type": "shell",
-      "command": "dotnet build",
-      "options": {
-        "cwd": "${workspaceFolder}/backend/KSignal.API"
-      },
-      "problemMatcher": "$msCompile",
-      "group": {
-        "kind": "build",
-        "isDefault": false
-      }
-    },
-    {
-      "label": "build-web-asp",
-      "type": "shell",
-      "command": "dotnet build",
-      "options": {
-        "cwd": "${workspaceFolder}/web"
-      },
-      "problemMatcher": "$msCompile",
-      "group": {
-        "kind": "build",
-        "isDefault": false
-      }
+      "label": "clean-frontend",
+      "command": "dotnet",
+      "type": "process",
+      "args": [
+        "clean",
+        "${workspaceFolder}/web/web_asp.csproj",
+        "/property:GenerateFullPaths=true",
+        "/consoleloggerparameters:NoSummary"
+      ],
+      "problemMatcher": "$msCompile"
     }
   ]
 }
