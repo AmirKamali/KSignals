@@ -145,9 +145,7 @@ builder.Services.AddMassTransit(x =>
     x.AddConsumer<KSignal.API.SynchronizeConsumers.SynchronizeEventsConsumer>();
     x.AddConsumer<KSignal.API.SynchronizeConsumers.SynchronizeEventDetailConsumer>(cfg =>
     {
-        cfg.Options<BatchOptions>(options => options
-            .SetMessageLimit(20)
-            .SetTimeLimit(TimeSpan.FromSeconds(5)));
+        cfg.ConcurrentMessageLimit = 3;
     });
     x.AddConsumer<KSignal.API.SynchronizeConsumers.SynchronizeOrderbookConsumer>();
     x.AddConsumer<KSignal.API.SynchronizeConsumers.SynchronizeCandlesticksConsumer>();
