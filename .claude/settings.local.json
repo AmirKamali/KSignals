@@ -1,7 +1,9 @@
 {
   "permissions": {
     "allow": [
-      "Bash(./test_deduplication.sh:*)"
+      "Bash(./test_deduplication.sh:*)",
+      "Bash(dotnet --version:*)",
+      "Bash(cat:*)"
     ],
     "deny": [],
     "ask": []

@@ -51,6 +51,10 @@ echo ""
 export BACKEND_API_BASE_URL="http://localhost:3006"
 export JWT_SECRET="vS2d7BbiCp5AKQBaKnKzhuDTamgh1g+Sw0vFkbQ/qKxRnEqUlenrYH4ZCDk5tUoW"
 
+# Workaround for .NET 10 RC file watcher issues on macOS
+# Use polling instead of native FSEvents to prevent PAL_SEHException crashes
+export DOTNET_USE_POLLING_FILE_WATCHER=1
+
 # Create logs directory if it doesn't exist
 mkdir -p logs
 
