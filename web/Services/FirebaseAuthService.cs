@@ -15,12 +15,14 @@ public class FirebaseAuthService : IFirebaseAuthService
 {
     private readonly FirebaseOptions _options;
     private readonly ILogger<FirebaseAuthService> _logger;
+    private readonly IWebHostEnvironment _environment;
     private readonly object _initLock = new();
 
-    public FirebaseAuthService(IOptions<FirebaseOptions> options, ILogger<FirebaseAuthService> logger)
+    public FirebaseAuthService(IOptions<FirebaseOptions> options, ILogger<FirebaseAuthService> logger, IWebHostEnvironment environment)
     {
         _options = options.Value;
         _logger = logger;
+        _environment = environment;
 
         EnsureInitialized();
     }
@@ -28,6 +30,12 @@ public class FirebaseAuthService : IFirebaseAuthService
     public async Task<FirebaseUserInfo?> VerifyIdTokenAsync(string idToken, CancellationToken cancellationToken = default)
     {
         EnsureInitialized();
+
+        if (FirebaseApp.DefaultInstance == null)
+        {
+            _logger.LogWarning("Cannot verify Firebase token - Firebase is not initialized");
+            return null;
+        }
 
         try
         {
@@ -80,6 +88,12 @@ public class FirebaseAuthService : IFirebaseAuthService
             }
 
             var credential = BuildCredential();
+            if (credential == null)
+            {
+                _logger.LogWarning("Firebase credentials not configured. Firebase authentication will not be available.");
+                return;
+            }
+
             var appOptions = new AppOptions
             {
                 Credential = credential
@@ -95,7 +109,7 @@ public class FirebaseAuthService : IFirebaseAuthService
         }
     }
 
-    private GoogleCredential BuildCredential()
+    private GoogleCredential? BuildCredential()
     {
         // Prefer file-based credentials
         var pathCandidates = new[]
@@ -106,13 +120,24 @@ public class FirebaseAuthService : IFirebaseAuthService
 
         foreach (var path in pathCandidates)
         {
-            if (string.IsNullOrWhiteSpace(path) || !File.Exists(path))
+            if (string.IsNullOrWhiteSpace(path))
             {
                 continue;
             }
 
-            _logger.LogInformation("Initializing Firebase using service account file at {Path}", path);
-            return GoogleCredential.FromFile(path);
+            // Resolve relative paths relative to the content root
+            var fullPath = Path.IsPathRooted(path)
+                ? path
+                : Path.Combine(_environment.ContentRootPath, path);
+
+            if (!File.Exists(fullPath))
+            {
+                _logger.LogDebug("Firebase credentials file not found at {Path}", fullPath);
+                continue;
+            }
+
+            _logger.LogInformation("Initializing Firebase using service account file at {Path}", fullPath);
+            return GoogleCredential.FromFile(fullPath);
         }
 
         // Fall back to inline JSON (useful in containerized deployments)
@@ -126,8 +151,8 @@ public class FirebaseAuthService : IFirebaseAuthService
             return GoogleCredential.FromJson(json);
         }
 
-        _logger.LogWarning("Firebase credentials not configured; attempting to use application default credentials.");
-        return GoogleCredential.GetApplicationDefault();
+        // No credentials configured - return null to indicate Firebase is not available
+        return null;
     }
 
     private static string DecodeIfBase64(string value)

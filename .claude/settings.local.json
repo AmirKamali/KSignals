@@ -4,7 +4,13 @@
       "Bash(./test_deduplication.sh:*)",
       "Bash(dotnet --version:*)",
       "Bash(cat:*)",
-      "Bash(mkdir:*)"
+      "Bash(mkdir:*)",
+      "Bash(dotnet build:*)",
+      "Bash(clickhouse-client:*)",
+      "Bash(curl:*)",
+      "Bash(find:*)",
+      "Bash(docker-compose up:*)",
+      "Bash(docker exec:*)"
     ],
     "deny": [],
     "ask": []
