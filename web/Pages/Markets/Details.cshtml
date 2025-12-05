@@ -107,18 +107,33 @@
                             var mktNoPrice = mkt.NoBid > 0 ? mkt.NoBid : Math.Max(0, 100 - mktYesPrice);
                             var mktPreviousYes = mkt.PreviousYesBid > 0 ? (decimal?)mkt.PreviousYesBid : null;
                             var mktYesTrend = GetTrendInfo(mktYesPrice, mktPreviousYes);
+                            var hasYesSubTitle = !string.IsNullOrWhiteSpace(mkt.YesSubTitle);
+                            var hasNoSubTitle = !string.IsNullOrWhiteSpace(mkt.NoSubTitle);
+                            var hasBothSubTitles = hasYesSubTitle && hasNoSubTitle;
+                            var sameSides = hasBothSubTitles &&
+                                string.Equals(mkt.YesSubTitle?.Trim(), mkt.NoSubTitle?.Trim(), System.StringComparison.OrdinalIgnoreCase);
 
                             <div class="marketCard">
                                 <div class="marketCardContent">
                                     <div class="marketCardHeader">
                                         <div class="marketCardTitle">
-                                            @if (!string.IsNullOrWhiteSpace(mkt.YesSubTitle) || !string.IsNullOrWhiteSpace(mkt.NoSubTitle))
+                                            @if (hasYesSubTitle || hasNoSubTitle)
                                             {
-                                                <span class="yesLabel">@mkt.YesSubTitle</span>
-                                                @if (!string.IsNullOrWhiteSpace(mkt.NoSubTitle))
+                                                @if (sameSides)
                                                 {
-                                                    <span class="separator">vs</span>
-                                                    <span class="noLabel">@mkt.NoSubTitle</span>
+                                                    <span class="yesLabel">@mkt.YesSubTitle</span>
+                                                }
+                                                else
+                                                {
+                                                    @if (hasYesSubTitle)
+                                                    {
+                                                        <span class="yesLabel">@mkt.YesSubTitle</span>
+                                                    }
+                                                    @if (hasNoSubTitle)
+                                                    {
+                                                        <span class="separator">vs</span>
+                                                        <span class="noLabel">@mkt.NoSubTitle</span>
+                                                    }
                                                 }
                                             }
                                             else if (!string.IsNullOrWhiteSpace(mkt.SubTitle))
