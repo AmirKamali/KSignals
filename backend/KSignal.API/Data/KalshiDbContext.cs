@@ -167,12 +167,17 @@ namespace KSignal.API.Data;
         var user = modelBuilder.Entity<User>();
         user.ToTable("Users");
         user.HasKey(e => e.Id);
+        // ClickHouse generates Id via DEFAULT generateSerialID('users')
+        // ClickHouse doesn't support RETURNING clause, so we can't retrieve the generated ID
+        // The Id will remain 0 in the entity after SaveChanges, but that's fine since we use FirebaseId for lookups
+        user.Property(e => e.Id).ValueGeneratedNever();
         user.HasIndex(e => e.FirebaseId).IsUnique();
         user.Property(e => e.FirebaseId).HasMaxLength(255).IsRequired();
         user.Property(e => e.Username).HasMaxLength(255);
         user.Property(e => e.FirstName).HasMaxLength(255);
         user.Property(e => e.LastName).HasMaxLength(255);
         user.Property(e => e.Email).HasMaxLength(255);
+        // IsComnEmailOn is UInt8 in ClickHouse (0/1), EF Core handles bool conversion
         user.Property(e => e.IsComnEmailOn).HasDefaultValue(false);
         user.Property(e => e.CreatedAt).IsRequired();
         user.Property(e => e.UpdatedAt).IsRequired();
