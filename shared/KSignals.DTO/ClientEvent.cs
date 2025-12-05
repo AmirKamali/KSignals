@@ -49,14 +49,14 @@ public class ClientEvent
     public string? SettlementValueDollars { get; set; }
     
     // Volume fields
-    public int Volume { get; set; }
-    public int Volume24h { get; set; }
-    public int OpenInterest { get; set; }
-    public int NotionalValue { get; set; }
+    public long Volume { get; set; }
+    public long Volume24h { get; set; }
+    public long OpenInterest { get; set; }
+    public long NotionalValue { get; set; }
     public string NotionalValueDollars { get; set; } = string.Empty;
-    
+
     // Liquidity fields
-    public int Liquidity { get; set; }
+    public long Liquidity { get; set; }
     public string LiquidityDollars { get; set; } = string.Empty;
     
     // Metadata

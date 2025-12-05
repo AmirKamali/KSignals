@@ -211,15 +211,15 @@ internal static class MarketResponseMapper
             SettlementValue = market.SettlementValue,
             SettlementValueDollars = market.SettlementValueDollars ?? (market.SettlementValue.HasValue ? FormatIntCentsToDollars(market.SettlementValue.Value) : null),
 
-            // Volume fields
-            Volume = market.Volume,
-            Volume24h = market.Volume24h,
-            OpenInterest = market.OpenInterest,
-            NotionalValue = market.NotionalValue,
+            // Volume fields - cast to long to prevent overflow when summing
+            Volume = (long)market.Volume,
+            Volume24h = (long)market.Volume24h,
+            OpenInterest = (long)market.OpenInterest,
+            NotionalValue = (long)market.NotionalValue,
             NotionalValueDollars = market.NotionalValueDollars ?? FormatIntCentsToDollars(market.NotionalValue),
 
-            // Liquidity fields
-            Liquidity = market.Liquidity,
+            // Liquidity fields - cast to long to prevent overflow when summing
+            Liquidity = (long)market.Liquidity,
             LiquidityDollars = market.LiquidityDollars ?? FormatIntCentsToDollars(market.Liquidity),
 
             // Metadata

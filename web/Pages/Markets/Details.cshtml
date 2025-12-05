@@ -15,8 +15,8 @@
     var noTrend = market != null ? GetTrendInfo(noPrice, previousNo) : null;
 
     // Calculate totals across all markets in the event
-    var totalLiquidity = eventDetails?.Markets?.Sum(m => m.Liquidity) ?? 0m;
-    var totalVolume = eventDetails?.Markets?.Sum(m => m.Volume24h > 0 ? m.Volume24h : m.Volume) ?? 0m;
+    var totalLiquidity = eventDetails?.Markets?.Sum(m => m.Liquidity) ?? 0;
+    var totalVolume = eventDetails?.Markets?.Sum(m => m.Volume24h > 0 ? m.Volume24h : m.Volume) ?? 0;
 }
 
 <main class="detailsPage">
