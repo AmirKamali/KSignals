@@ -7,6 +7,7 @@ var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
 builder.Services.AddRazorPages();
+builder.Services.AddControllers();
 
 builder.Services.Configure<FirebaseOptions>(options =>
 {
@@ -179,6 +180,8 @@ app.MapPost("/auth/logout", (HttpContext context, IOptions<FirebaseOptions> fire
 
     return Results.Ok(new { success = true });
 });
+
+app.MapControllers();
 
 app.MapRazorPages()
    .WithStaticAssets();

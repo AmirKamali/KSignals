@@ -335,7 +335,7 @@
                 if (!ticker) return;
 
                 // Fetch chart data from API
-                fetch(`${window.backendBaseUrl}/api/charts?ticker=${encodeURIComponent(ticker)}`)
+                fetch(`/api/chart?ticker=${encodeURIComponent(ticker)}`)
                     .then(response => response.json())
                     .then(data => {
                         const ctx = canvas.getContext('2d');

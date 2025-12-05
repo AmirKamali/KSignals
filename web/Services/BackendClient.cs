@@ -517,6 +517,52 @@ public class BackendClient
         }
     }
 
+    public async Task<string> GetChartDataAsync(string ticker)
+    {
+        if (string.IsNullOrWhiteSpace(ticker))
+        {
+            throw new ArgumentException("ticker is required", nameof(ticker));
+        }
+
+        try
+        {
+            var url = QueryHelpers.AddQueryString(
+                $"{_options.BaseUrl.TrimEnd('/')}/api/charts",
+                new Dictionary<string, string?> { ["ticker"] = ticker });
+
+            _logger.LogDebug("GetChartDataAsync: Calling {Url}", url);
+
+            using var response = await _httpClient.GetAsync(url);
+
+            if (!response.IsSuccessStatusCode)
+            {
+                _logger.LogWarning("Chart data request failed with status {StatusCode} for ticker {Ticker}",
+                    response.StatusCode, ticker);
+
+                if (response.StatusCode == System.Net.HttpStatusCode.NotFound)
+                {
+                    throw new InvalidOperationException($"Chart data not found for ticker {ticker}");
+                }
+
+                throw new HttpRequestException($"Chart data request failed with status {response.StatusCode}");
+            }
+
+            var responseBody = await response.Content.ReadAsStringAsync();
+            _logger.LogDebug("GetChartDataAsync: Successfully retrieved chart data for ticker {Ticker}", ticker);
+
+            return responseBody;
+        }
+        catch (InvalidOperationException)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to fetch chart data for ticker {Ticker}", ticker);
+            throw;
+        }
+    }
+
     private static Dictionary<string, string?> BuildQuery(MarketQuery query)
     {
         var dict = new Dictionary<string, string?>();
