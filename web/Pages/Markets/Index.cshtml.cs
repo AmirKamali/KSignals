@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
 using web_asp.Models;
 using web_asp.Services;
@@ -15,7 +16,7 @@ public class IndexModel : PageModel
         _backendClient = backendClient;
     }
 
-    public async Task OnGetAsync(string? category, string? tag, string? date, string? sort_type, string? direction, int? page, int? pageSize, string? query)
+    public async Task<IActionResult> OnGetAsync(string? category, string? tag, string? date, string? sort_type, string? direction, int? page, int? pageSize, string? query)
     {
         var activeCategory = string.IsNullOrWhiteSpace(category) ? "All" : category!;
         var activeTag = string.IsNullOrWhiteSpace(tag) ? null : tag;
@@ -24,6 +25,18 @@ public class IndexModel : PageModel
         var sortDirection = direction == "asc" ? "asc" : "desc";
         var currentPage = Math.Max(1, page ?? 1);
         var size = Math.Max(1, pageSize ?? 20);
+
+        // Require authentication for page > 1
+        if (currentPage > 1)
+        {
+            var isAuthenticated = IsUserAuthenticated();
+            if (!isAuthenticated)
+            {
+                // Build return URL with all query parameters
+                var returnUrl = Request.Path + Request.QueryString;
+                return RedirectToPage("/Login", new { returnUrl });
+            }
+        }
 
         var queryModel = new MarketQuery
         {
@@ -56,5 +69,25 @@ public class IndexModel : PageModel
             Query = query ?? string.Empty,
             ShowSearch = true
         };
+
+        return Page();
+    }
+
+    private bool IsUserAuthenticated()
+    {
+        // Try to get Firebase ID from cookie
+        if (Request.Cookies.TryGetValue("ksignals_firebase_id", out var firebaseId) &&
+            !string.IsNullOrWhiteSpace(firebaseId))
+        {
+            return true;
+        }
+
+        // Check if JWT token exists (indicates full authentication)
+        if (Request.Cookies.TryGetValue("ksignals_jwt", out var jwt) && !string.IsNullOrWhiteSpace(jwt))
+        {
+            return true;
+        }
+
+        return false;
     }
 }

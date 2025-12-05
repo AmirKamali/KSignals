@@ -103,8 +103,8 @@
                     });
                 }
 
-                // Redirect to home
-                window.location.href = "/";
+                // Redirect to home with signout parameter
+                window.location.href = "/?signout=true";
             });
         }
     }
