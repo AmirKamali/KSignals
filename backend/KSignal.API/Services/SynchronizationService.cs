@@ -16,7 +16,7 @@ public class SynchronizationService
     private readonly KalshiClient _kalshiClient;
     private readonly KalshiDbContext _dbContext;
     private readonly IPublishEndpoint _publishEndpoint;
-    private readonly IRedisCacheService _redisCacheService;
+    private readonly ILockService _lockService;
     private readonly ILogger<SynchronizationService> _logger;
 
     private const string MarketSyncLockKey = "sync:market-snapshots:lock";
@@ -26,13 +26,13 @@ public class SynchronizationService
         KalshiClient kalshiClient,
         KalshiDbContext dbContext,
         IPublishEndpoint publishEndpoint,
-        IRedisCacheService redisCacheService,
+        ILockService lockService,
         ILogger<SynchronizationService> logger)
     {
         _kalshiClient = kalshiClient ?? throw new ArgumentNullException(nameof(kalshiClient));
         _dbContext = dbContext ?? throw new ArgumentNullException(nameof(dbContext));
         _publishEndpoint = publishEndpoint ?? throw new ArgumentNullException(nameof(publishEndpoint));
-        _redisCacheService = redisCacheService ?? throw new ArgumentNullException(nameof(redisCacheService));
+        _lockService = lockService ?? throw new ArgumentNullException(nameof(lockService));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
 
@@ -44,8 +44,9 @@ public class SynchronizationService
         CancellationToken cancellationToken = default)
     {
         // Try to acquire the distributed lock to prevent concurrent sync operations
-        var lockAcquired = await _redisCacheService.AcquireLockAsync(
+        var lockAcquired = await _lockService.AcquireWithCounterAsync(
             MarketSyncLockKey,
+            MarketSyncCounterKey,
             TimeSpan.FromMinutes(30), // Lock expires after 30 minutes as safety fallback
             cancellationToken);
 
@@ -55,8 +56,6 @@ public class SynchronizationService
             throw new InvalidOperationException("Market synchronization is already in progress. Please wait for the current operation to complete.");
         }
 
-        // Initialize job counter to 0
-        await _redisCacheService.SetCounterAsync(MarketSyncCounterKey, 0, cancellationToken);
         _logger.LogInformation("Acquired lock for market synchronization, initialized job counter");
 
         try
@@ -67,7 +66,7 @@ public class SynchronizationService
             {
                 await _publishEndpoint.Publish(new SynchronizeMarketData(MarketTickerId: marketTickerId), cancellationToken);
                 messageCount++;
-                await _redisCacheService.IncrementCounterAsync(MarketSyncCounterKey, cancellationToken);
+                await _lockService.IncrementJobCounterAsync(MarketSyncCounterKey, cancellationToken);
                 _logger.LogInformation("Enqueued single market sync for ticker: {TickerId}", marketTickerId);
                 return;
             }
@@ -77,7 +76,7 @@ public class SynchronizationService
             {
                 await _publishEndpoint.Publish(new SynchronizeMarketData(minCreatedTs, maxCreatedTs, status), cancellationToken);
                 messageCount++;
-                await _redisCacheService.IncrementCounterAsync(MarketSyncCounterKey, cancellationToken);
+                await _lockService.IncrementJobCounterAsync(MarketSyncCounterKey, cancellationToken);
                 _logger.LogInformation("Enqueued filtered market sync with {MessageCount} message(s)", messageCount);
                 return;
             }
@@ -102,7 +101,7 @@ public class SynchronizationService
 
                 await _publishEndpoint.Publish(new SynchronizeMarketData(MinCreatedTs: minCreatedTs, MaxCreatedTs: null, Status: status), cancellationToken);
                 messageCount++;
-                await _redisCacheService.IncrementCounterAsync(MarketSyncCounterKey, cancellationToken);
+                await _lockService.IncrementJobCounterAsync(MarketSyncCounterKey, cancellationToken);
             }
 
             // If maxCreatedTimeInDb has value, also enqueue sync to update existing markets
@@ -135,7 +134,7 @@ public class SynchronizationService
                             new SynchronizeMarketData(chunkMinTs, chunkMaxTs, status),
                             cancellationToken);
                         messageCount++;
-                        await _redisCacheService.IncrementCounterAsync(MarketSyncCounterKey, cancellationToken);
+                        await _lockService.IncrementJobCounterAsync(MarketSyncCounterKey, cancellationToken);
                     }
                 }
             }
@@ -147,8 +146,7 @@ public class SynchronizationService
             _logger.LogError(ex, "Error while enqueuing market synchronization - releasing lock. Exception type: {ExceptionType}", ex.GetType().Name);
 
             // Release the lock and reset counter on failure
-            await _redisCacheService.ReleaseLockAsync(MarketSyncLockKey, cancellationToken);
-            await _redisCacheService.SetCounterAsync(MarketSyncCounterKey, 0, cancellationToken);
+            await _lockService.ReleaseWithCounterAsync(MarketSyncLockKey, MarketSyncCounterKey, cancellationToken);
 
             throw;
         }
@@ -191,7 +189,7 @@ public class SynchronizationService
                 new SynchronizeMarketData(command.MinCreatedTs, command.MaxCreatedTs, command.Status, response.Cursor),
                 cancellationToken);
             // Track the pagination subjob
-            await _redisCacheService.IncrementCounterAsync(MarketSyncCounterKey, cancellationToken);
+            await _lockService.IncrementJobCounterAsync(MarketSyncCounterKey, cancellationToken);
             _logger.LogDebug("Enqueued pagination message for market sync (cursor present)");
         }
         else

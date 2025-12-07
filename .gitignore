@@ -11,3 +11,5 @@ firebase-credentials.json
 .env
 logs/backend.log
 logs/frontend.log
+backend/KSignal.API.Tests/obj
+backend/KSignal.API.Tests/bin

@@ -16,7 +16,9 @@
       "Bash(dotnet add:*)",
       "Bash(dotnet test:*)",
       "Bash(docker ps:*)",
-      "Bash(docker build:*)"
+      "Bash(docker build:*)",
+      "Bash(chmod:*)",
+      "Bash(./test_backend.sh:*)"
     ],
     "deny": [],
     "ask": []

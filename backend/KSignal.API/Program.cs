@@ -181,6 +181,9 @@ builder.Services.AddSingleton<RabbitMqManagementService>();
 // Register Redis cache service as singleton (connection pooling)
 builder.Services.AddSingleton<IRedisCacheService, RedisCacheService>();
 
+// Register Lock service as singleton (depends on Redis)
+builder.Services.AddSingleton<ILockService, LockService>();
+
 // JWT authentication
 var jwtSecret = Environment.GetEnvironmentVariable("JWT_SECRET") ?? "development-placeholder-secret";
 if (jwtSecret == "development-placeholder-secret")
