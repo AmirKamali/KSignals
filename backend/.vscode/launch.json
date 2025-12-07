@@ -6,7 +6,7 @@
       "type": "coreclr",
       "request": "launch",
       "preLaunchTask": "build",
-      "program": "${workspaceFolder}/KSignal.API/bin/Debug/net8.0/KSignal.API.dll",
+      "program": "${workspaceFolder}/KSignal.API/bin/Debug/net10.0/KSignal.API.dll",
       "args": [],
       "cwd": "${workspaceFolder}/KSignal.API",
       "stopAtEntry": false,
