@@ -1,6 +1,10 @@
 services:
   # Backend API
   backend:
+    # Uncomment to build locally with tests (requires passing tests to build)
+    # build:
+    #   context: .
+    #   dockerfile: backend/Dockerfile
     image: ghcr.io/amirkamali/ksignals-backend:latest
     container_name: kalshi-signals-backend
     platform: ${DOCKER_PLATFORM:-linux/amd64}
