@@ -43,7 +43,6 @@ public class SynchronizationService
         long? minCreatedTs = null,
         long? maxCreatedTs = null,
         string? status = null,
-        string? marketTickerId = null,
         CancellationToken cancellationToken = default)
     {
         // Try to acquire the distributed lock to prevent concurrent sync operations
@@ -65,15 +64,6 @@ public class SynchronizationService
         {
             var messageCount = 0;
 
-            if (!string.IsNullOrWhiteSpace(marketTickerId))
-            {
-                await _publishEndpoint.Publish(new SynchronizeMarketData(MarketTickerId: marketTickerId), cancellationToken);
-                messageCount++;
-                await _lockService.IncrementJobCounterAsync(MarketSyncCounterKey, cancellationToken);
-                _logger.LogInformation("Enqueued single market sync for ticker: {TickerId}", marketTickerId);
-                return;
-            }
-
             // If any filter is provided, enqueue a single sync message with those filters
             if (minCreatedTs.HasValue || maxCreatedTs.HasValue || !string.IsNullOrWhiteSpace(status))
             {
@@ -89,7 +79,7 @@ public class SynchronizationService
                     .AsNoTracking()
                     .MaxAsync(s => (DateTime?)s.CreatedTime, cancellationToken);
 
-            // 1- Get latest data
+            // Sync 1- Get latest data
             if (!minCreatedTs.HasValue && !maxCreatedTs.HasValue)
             {
                 if (maxCreatedTimeInDb.HasValue)
@@ -107,7 +97,7 @@ public class SynchronizationService
                 await _lockService.IncrementJobCounterAsync(MarketSyncCounterKey, cancellationToken);
             }
 
-            // If maxCreatedTimeInDb has value, also enqueue sync to update existing markets
+            // Sync 2 - If maxCreatedTimeInDb has value, also enqueue sync to update existing markets
             if (maxCreatedTimeInDb.HasValue)
             {
                 var minCreatedTimeInDb = await _dbContext.MarketSnapshots

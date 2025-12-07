@@ -53,22 +53,11 @@ public class BackendPrivateController : ControllerBase
     public async Task<IActionResult> SynchronizeMarketData(
         [FromQuery] long? min_created_ts = null,
         [FromQuery] long? max_created_ts = null,
-        [FromQuery] string? status = null,
-        [FromQuery] string? market_ticker_id = null)
+        [FromQuery] string? status = null)
     {
         try
         {
-            await _synchronizationService.EnqueueMarketSyncAsync(min_created_ts, max_created_ts, status, market_ticker_id, HttpContext.RequestAborted);
-
-            if (!string.IsNullOrWhiteSpace(market_ticker_id))
-            {
-                return Accepted(new
-                {
-                    started = true,
-                    message = $"Market synchronization queued for ticker: {market_ticker_id}",
-                    market_ticker_id = market_ticker_id
-                });
-            }
+            await _synchronizationService.EnqueueMarketSyncAsync(min_created_ts, max_created_ts, status, HttpContext.RequestAborted);
 
             return Accepted(new
             {
@@ -318,7 +307,7 @@ public class BackendPrivateController : ControllerBase
         try
         {
             var count = await _cleanupService.EnqueueCleanupJobsAsync(HttpContext.RequestAborted);
-            
+
             return Accepted(new
             {
                 started = true,
@@ -352,7 +341,7 @@ public class BackendPrivateController : ControllerBase
         try
         {
             await _cleanupService.CleanupMarketDataAsync(tickerId, HttpContext.RequestAborted);
-            
+
             return Ok(new
             {
                 success = true,
@@ -380,9 +369,9 @@ public class BackendPrivateController : ControllerBase
         try
         {
             _logger.LogWarning("Cancel all jobs requested - purging all RabbitMQ queues");
-            
+
             var result = await _rabbitMqManagementService.PurgeAllQueuesAsync(HttpContext.RequestAborted);
-            
+
             if (result.Success)
             {
                 return Ok(new
@@ -425,10 +414,10 @@ public class BackendPrivateController : ControllerBase
         try
         {
             var stats = await _rabbitMqManagementService.GetQueueStatsAsync(HttpContext.RequestAborted);
-            
+
             var totalMessages = stats.Values.Where(q => q.Exists).Sum(q => q.MessageCount);
             var activeQueues = stats.Values.Count(q => q.Exists);
-            
+
             return Ok(new
             {
                 total_pending_messages = totalMessages,
