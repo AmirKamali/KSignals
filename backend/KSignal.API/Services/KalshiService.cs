@@ -37,7 +37,7 @@ public class KalshiService
         string? query = null,
         string? closeDateType = "next_30_days",
         string? status = "Active",
-        MarketSort sortBy = MarketSort.Volume,
+        MarketSort sortBy = MarketSort.Volume24H,
         SortDirection direction = SortDirection.Desc,
         int page = 1,
         int pageSize = 50,
@@ -145,11 +145,28 @@ public class KalshiService
             .ToList();
 
         // Apply sorting
-        IEnumerable<ClientEvent> sortedEvents = sortBy == MarketSort.Volume
-            ? (direction == SortDirection.Asc
+        IEnumerable<ClientEvent> sortedEvents = sortBy switch
+        {
+            MarketSort.Volume24H => direction == SortDirection.Asc
                 ? clientEvents.OrderBy(e => e.Volume24h)
-                : clientEvents.OrderByDescending(e => e.Volume24h))
-            : clientEvents;
+                : clientEvents.OrderByDescending(e => e.Volume24h),
+            MarketSort.TotalVolume => direction == SortDirection.Asc
+                ? clientEvents.OrderBy(e => e.Volume)
+                : clientEvents.OrderByDescending(e => e.Volume),
+            MarketSort.OpenDate => direction == SortDirection.Asc
+                ? clientEvents.OrderBy(e => e.OpenTime)
+                : clientEvents.OrderByDescending(e => e.OpenTime),
+            MarketSort.ClosingSoon => direction == SortDirection.Asc
+                ? clientEvents.OrderBy(e => e.CloseTime)
+                : clientEvents.OrderByDescending(e => e.CloseTime),
+            MarketSort.YesPrice => direction == SortDirection.Asc
+                ? clientEvents.OrderBy(e => e.YesBid)
+                : clientEvents.OrderByDescending(e => e.YesBid),
+            MarketSort.NoPrice => direction == SortDirection.Asc
+                ? clientEvents.OrderBy(e => e.NoBid)
+                : clientEvents.OrderByDescending(e => e.NoBid),
+            _ => clientEvents
+        };
 
         // Pagination
         var safePageSize = Math.Max(1, pageSize);

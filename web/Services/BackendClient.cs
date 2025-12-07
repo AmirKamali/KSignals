@@ -576,11 +576,11 @@ public class BackendClient
         if (!string.IsNullOrWhiteSpace(query.Query))
             dict["query"] = query.Query;
 
-        dict["sort_type"] = query.Sort;
+        dict["sort_by"] = query.Sort;
         dict["direction"] = query.Direction;
         if (query.Page > 1)
             dict["page"] = query.Page.ToString();
-        dict["pageSize"] = query.PageSize.ToString();
+        dict["page_size"] = query.PageSize.ToString();
 
         return dict;
     }

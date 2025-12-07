@@ -107,8 +107,7 @@ public class SynchronizationService
                 return;
             }
 
-            await _publishEndpoint.Publish(
-                           new SynchronizeMarketData(minCreatedTsValue, null, null));
+            await _publishEndpoint.Publish(new SynchronizeMarketData(minCreatedTsValue, null, null));
             messageCount++;
             await _lockService.IncrementJobCounterAsync(MarketSyncCounterKey, cancellationToken);
             _logger.LogInformation("Successfully enqueued {MessageCount} market sync message(s), lock will be released when all jobs complete", messageCount);

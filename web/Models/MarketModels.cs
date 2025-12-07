@@ -9,7 +9,7 @@ public class BackendMarketsResponse
     public int TotalCount { get; set; }
     public int CurrentPage { get; set; }
     public int PageSize { get; set; }
-    public string Sort { get; set; } = "volume";
+    public string Sort { get; set; } = "Volume24H";
     public string Direction { get; set; } = "desc";
 }
 
@@ -19,7 +19,7 @@ public class MarketQuery
     public string? Tag { get; set; }
     public string? CloseDateType { get; set; } = "next_30_days";
     public string? Query { get; set; }
-    public string Sort { get; set; } = "volume";
+    public string Sort { get; set; } = "Volume24H";
     public string Direction { get; set; } = "desc";
     public int Page { get; set; } = 1;
     public int PageSize { get; set; } = 20;

@@ -21,6 +21,16 @@
         ("next_year", "Next Year")
     };
 
+    var sortOptions = new List<(string Value, string Label)>
+    {
+        ("Volume24H", "Volume 24H"),
+        ("TotalVolume", "Total Volume"),
+        ("OpenDate", "Open Date"),
+        ("ClosingSoon", "Closing Soon"),
+        ("YesPrice", "Yes Price"),
+        ("NoPrice", "No Price")
+    };
+
     var basePath = "/markets";
 
     string BuildLink(Dictionary<string, string?> overrides)
@@ -86,25 +96,48 @@
                 </div>
             }
 
-            <div class="dateFilterContainer">
-                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                </svg>
-                <select
-                    class="dateSelect"
-                    data-href-prefix="@basePath"
-                    data-category="@(Model.ActiveCategory != "All" ? Model.ActiveCategory : string.Empty)"
-                    data-tag="@(Model.ActiveTag ?? string.Empty)"
-                    data-sort="@Model.ActiveSort"
-                    data-direction="@Model.SortDirection"
-                    data-query="@Model.Query"
-                    data-pagesize="@Model.PageSize"
-                >
-                    @foreach (var option in dateOptions)
-                    {
-                        <option value="@option.Value" selected="@(option.Value == Model.ActiveDate ? "selected" : null)">@option.Label</option>
-                    }
-                </select>
+            <div style="display: flex; gap: 1rem; justify-content: center; flex-wrap: wrap;">
+                <div class="dateFilterContainer" style="margin: 0;">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                    </svg>
+                    <select
+                        class="dateSelect"
+                        data-href-prefix="@basePath"
+                        data-category="@(Model.ActiveCategory != "All" ? Model.ActiveCategory : string.Empty)"
+                        data-tag="@(Model.ActiveTag ?? string.Empty)"
+                        data-sort="@Model.ActiveSort"
+                        data-direction="@Model.SortDirection"
+                        data-query="@Model.Query"
+                        data-pagesize="@Model.PageSize"
+                    >
+                        @foreach (var option in dateOptions)
+                        {
+                            <option value="@option.Value" selected="@(option.Value == Model.ActiveDate ? "selected" : null)">@option.Label</option>
+                        }
+                    </select>
+                </div>
+
+                <div class="dateFilterContainer" style="margin: 0;">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4h13M3 8h9m-9 4h9m5-4v12m0 0l-4-4m4 4l4-4" />
+                    </svg>
+                    <select
+                        class="sortSelect dateSelect"
+                        data-href-prefix="@basePath"
+                        data-category="@(Model.ActiveCategory != "All" ? Model.ActiveCategory : string.Empty)"
+                        data-tag="@(Model.ActiveTag ?? string.Empty)"
+                        data-date="@Model.ActiveDate"
+                        data-direction="@Model.SortDirection"
+                        data-query="@Model.Query"
+                        data-pagesize="@Model.PageSize"
+                    >
+                        @foreach (var option in sortOptions)
+                        {
+                            <option value="@option.Value" selected="@(option.Value == Model.ActiveSort ? "selected" : null)">@option.Label</option>
+                        }
+                    </select>
+                </div>
             </div>
         </div>
 

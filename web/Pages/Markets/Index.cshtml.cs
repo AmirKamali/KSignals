@@ -21,7 +21,7 @@ public class IndexModel : PageModel
         var activeCategory = string.IsNullOrWhiteSpace(category) ? "All" : category!;
         var activeTag = string.IsNullOrWhiteSpace(tag) ? null : tag;
         var activeDate = string.IsNullOrWhiteSpace(date) ? "next_30_days" : date!;
-        var activeSort = string.IsNullOrWhiteSpace(sort_type) ? "volume" : sort_type!;
+        var activeSort = string.IsNullOrWhiteSpace(sort_type) ? "Volume24H" : sort_type!;
         var sortDirection = direction == "asc" ? "asc" : "desc";
         
         // Check if page parameter exists in query string and try to parse it

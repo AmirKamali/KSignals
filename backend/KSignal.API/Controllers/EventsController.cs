@@ -101,10 +101,15 @@ public class EventsController : ControllerBase
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status500InternalServerError)]
     public async Task<IActionResult> GetEvents(
-        [FromQuery] string? category = null, 
-        [FromQuery] string? tag = null, 
+        [FromQuery] string? category = null,
+        [FromQuery] string? tag = null,
         [FromQuery] string? query = null,
-        [FromQuery] bool detailed = false, 
+        [FromQuery] string? close_date_type = null,
+        [FromQuery] string? sort_by = null,
+        [FromQuery] string? direction = null,
+        [FromQuery] int page = 1,
+        [FromQuery] int page_size = 50,
+        [FromQuery] bool detailed = false,
         CancellationToken cancellationToken = default)
     {
         // Validate query parameter for invalid characters
@@ -117,15 +122,50 @@ public class EventsController : ControllerBase
             }
         }
 
+        // Parse sort_by parameter
+        var sortBy = MarketSort.Volume24H;
+        if (!string.IsNullOrWhiteSpace(sort_by))
+        {
+            if (Enum.TryParse<MarketSort>(sort_by, ignoreCase: true, out var parsedSort))
+            {
+                sortBy = parsedSort;
+            }
+        }
+
+        // Parse direction parameter
+        var sortDirection = SortDirection.Desc;
+        if (!string.IsNullOrWhiteSpace(direction))
+        {
+            if (Enum.TryParse<SortDirection>(direction, ignoreCase: true, out var parsedDirection))
+            {
+                sortDirection = parsedDirection;
+            }
+        }
+
         try
         {
             var eventsResult = await _kalshiService.GetEventsAsync(
                 category: category,
                 tag: tag,
                 query: query,
+                closeDateType: close_date_type,
+                sortBy: sortBy,
+                direction: sortDirection,
+                page: page,
+                pageSize: page_size,
                 cancellationToken: cancellationToken);
             var shaped = MarketResponseMapper.Shape(eventsResult.Markets, detailed).ToList();
-            return Ok(new { count = shaped.Count, markets = shaped });
+            return Ok(new
+            {
+                count = eventsResult.TotalCount,
+                markets = shaped,
+                totalPages = eventsResult.TotalPages,
+                totalCount = eventsResult.TotalCount,
+                currentPage = eventsResult.CurrentPage,
+                pageSize = eventsResult.PageSize,
+                sort_type = sortBy.ToString(),
+                direction = sortDirection.ToString().ToLowerInvariant()
+            });
         }
         catch (ApiException apiEx)
         {
