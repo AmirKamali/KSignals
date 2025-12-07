@@ -10,6 +10,17 @@ public interface IRedisCacheService
     Task<bool> IsAvailableAsync();
     Task DeleteByPatternAsync(string pattern, CancellationToken cancellationToken = default);
     Task FlushAllAsync(CancellationToken cancellationToken = default);
+
+    // Distributed lock methods
+    Task<bool> AcquireLockAsync(string key, TimeSpan expiration, CancellationToken cancellationToken = default);
+    Task<bool> ReleaseLockAsync(string key, CancellationToken cancellationToken = default);
+    Task<bool> IsLockedAsync(string key, CancellationToken cancellationToken = default);
+
+    // Counter methods for job tracking
+    Task<long> IncrementCounterAsync(string key, CancellationToken cancellationToken = default);
+    Task<long> DecrementCounterAsync(string key, CancellationToken cancellationToken = default);
+    Task<long> GetCounterAsync(string key, CancellationToken cancellationToken = default);
+    Task<bool> SetCounterAsync(string key, long value, CancellationToken cancellationToken = default);
 }
 
 public class RedisCacheService : IRedisCacheService, IDisposable
@@ -90,7 +101,8 @@ public class RedisCacheService : IRedisCacheService, IDisposable
             }
 
             _logger.LogDebug("Cache hit for key: {Key}", key);
-            return JsonSerializer.Deserialize<T>(value!, SerializerOptions);
+            // For .NET 10 the ReadOnlySpan<byte> and string overloads are ambiguous; use explicit byte[] conversion.
+            return JsonSerializer.Deserialize<T>((byte[])value!, SerializerOptions);
         }
         catch (Exception ex)
         {
@@ -177,6 +189,173 @@ public class RedisCacheService : IRedisCacheService, IDisposable
         catch (Exception ex)
         {
             _logger.LogWarning(ex, "Failed to flush Redis database. Error: {Message}", ex.Message);
+        }
+    }
+
+    public async Task<bool> AcquireLockAsync(string key, TimeSpan expiration, CancellationToken cancellationToken = default)
+    {
+        if (!_isAvailable || _db == null)
+        {
+            _logger.LogWarning("Redis not available, cannot acquire lock for key: {Key}", key);
+            return false;
+        }
+
+        try
+        {
+            // Use SET with NX (only set if not exists) and EX (expiration) flags
+            var lockAcquired = await _db.StringSetAsync(key, "locked", expiration, When.NotExists);
+
+            if (lockAcquired)
+            {
+                _logger.LogInformation("Successfully acquired lock for key: {Key} with expiration: {Expiration}", key, expiration);
+            }
+            else
+            {
+                _logger.LogDebug("Failed to acquire lock for key: {Key} (already locked)", key);
+            }
+
+            return lockAcquired;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to acquire lock for key: {Key}. Error: {Message}", key, ex.Message);
+            return false;
+        }
+    }
+
+    public async Task<bool> ReleaseLockAsync(string key, CancellationToken cancellationToken = default)
+    {
+        if (!_isAvailable || _db == null)
+        {
+            _logger.LogWarning("Redis not available, cannot release lock for key: {Key}", key);
+            return false;
+        }
+
+        try
+        {
+            var deleted = await _db.KeyDeleteAsync(key);
+
+            if (deleted)
+            {
+                _logger.LogInformation("Successfully released lock for key: {Key}", key);
+            }
+            else
+            {
+                _logger.LogDebug("Lock key {Key} was not found or already expired", key);
+            }
+
+            return deleted;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to release lock for key: {Key}. Error: {Message}", key, ex.Message);
+            return false;
+        }
+    }
+
+    public async Task<bool> IsLockedAsync(string key, CancellationToken cancellationToken = default)
+    {
+        if (!_isAvailable || _db == null)
+        {
+            return false;
+        }
+
+        try
+        {
+            return await _db.KeyExistsAsync(key);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to check lock status for key: {Key}. Error: {Message}", key, ex.Message);
+            return false;
+        }
+    }
+
+    public async Task<long> IncrementCounterAsync(string key, CancellationToken cancellationToken = default)
+    {
+        if (!_isAvailable || _db == null)
+        {
+            _logger.LogWarning("Redis not available, cannot increment counter for key: {Key}", key);
+            return 0;
+        }
+
+        try
+        {
+            var newValue = await _db.StringIncrementAsync(key);
+            _logger.LogDebug("Incremented counter {Key} to {Value}", key, newValue);
+            return newValue;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to increment counter for key: {Key}. Error: {Message}", key, ex.Message);
+            return 0;
+        }
+    }
+
+    public async Task<long> DecrementCounterAsync(string key, CancellationToken cancellationToken = default)
+    {
+        if (!_isAvailable || _db == null)
+        {
+            _logger.LogWarning("Redis not available, cannot decrement counter for key: {Key}", key);
+            return 0;
+        }
+
+        try
+        {
+            var newValue = await _db.StringDecrementAsync(key);
+            _logger.LogDebug("Decremented counter {Key} to {Value}", key, newValue);
+            return newValue;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to decrement counter for key: {Key}. Error: {Message}", key, ex.Message);
+            return 0;
+        }
+    }
+
+    public async Task<long> GetCounterAsync(string key, CancellationToken cancellationToken = default)
+    {
+        if (!_isAvailable || _db == null)
+        {
+            return 0;
+        }
+
+        try
+        {
+            var value = await _db.StringGetAsync(key);
+            if (!value.HasValue)
+            {
+                return 0;
+            }
+
+            // Explicitly cast to string to avoid ambiguity in .NET 10
+            return long.TryParse((string?)value, out var counter) ? counter : 0;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to get counter for key: {Key}. Error: {Message}", key, ex.Message);
+            return 0;
+        }
+    }
+
+    public async Task<bool> SetCounterAsync(string key, long value, CancellationToken cancellationToken = default)
+    {
+        if (!_isAvailable || _db == null)
+        {
+            _logger.LogWarning("Redis not available, cannot set counter for key: {Key}", key);
+            return false;
+        }
+
+        try
+        {
+            await _db.StringSetAsync(key, value);
+            _logger.LogDebug("Set counter {Key} to {Value}", key, value);
+            return true;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to set counter for key: {Key}. Error: {Message}", key, ex.Message);
+            return false;
         }
     }
 

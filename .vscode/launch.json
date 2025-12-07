@@ -48,6 +48,25 @@
       }
     },
     {
+      "name": "Backend (Debug)",
+      "type": "coreclr",
+      "request": "launch",
+      "preLaunchTask": "build",
+      "program": "${workspaceFolder}/backend/KSignal.API/bin/Debug/net8.0/KSignal.API.dll",
+      "args": [],
+      "cwd": "${workspaceFolder}/backend/KSignal.API",
+      "stopAtEntry": false,
+      "serverReadyAction": {
+        "action": "openExternally",
+        "pattern": "\\bNow listening on:\\s+(https?://\\S+)",
+        "uriFormat": "%s/swagger"
+      },
+      "env": {
+        "ASPNETCORE_ENVIRONMENT": "Development",
+        "ASPNETCORE_URLS": "http://localhost:3006"
+      }
+    },
+    {
       "name": ".NET Core Attach (Frontend)",
       "type": "coreclr",
       "request": "attach",

@@ -10,7 +10,6 @@
   },
   "omnisharp.enableRoslynAnalyzers": true,
   "omnisharp.enableEditorConfigSupport": true,
-  "omnisharp.organizeImportsOnFormat": true,
   "[csharp]": {
     "editor.formatOnSave": true,
     "editor.defaultFormatter": "ms-dotnettools.csharp"
@@ -22,6 +21,7 @@
   "[cshtml]": {
     "editor.formatOnSave": true,
     "editor.defaultFormatter": "ms-dotnettools.csharp"
-  }
+  },
+  "dotnet.formatting.organizeImportsOnFormat": true
 }
 

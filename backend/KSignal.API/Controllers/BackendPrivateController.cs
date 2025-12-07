@@ -16,19 +16,25 @@ public class BackendPrivateController : ControllerBase
     private readonly SynchronizationService _synchronizationService;
     private readonly CleanupService _cleanupService;
     private readonly RabbitMqManagementService _rabbitMqManagementService;
+    private readonly IRedisCacheService _redisCacheService;
     private readonly ILogger<BackendPrivateController> _logger;
 
+    private const string MarketSyncLockKey = "sync:market-snapshots:lock";
+    private const string MarketSyncCounterKey = "sync:market-snapshots:pending";
+
     public BackendPrivateController(
-        KalshiService kalshiService, 
-        SynchronizationService synchronizationService, 
+        KalshiService kalshiService,
+        SynchronizationService synchronizationService,
         CleanupService cleanupService,
         RabbitMqManagementService rabbitMqManagementService,
+        IRedisCacheService redisCacheService,
         ILogger<BackendPrivateController> logger)
     {
         _kalshiService = kalshiService ?? throw new ArgumentNullException(nameof(kalshiService));
         _synchronizationService = synchronizationService ?? throw new ArgumentNullException(nameof(synchronizationService));
         _cleanupService = cleanupService ?? throw new ArgumentNullException(nameof(cleanupService));
         _rabbitMqManagementService = rabbitMqManagementService ?? throw new ArgumentNullException(nameof(rabbitMqManagementService));
+        _redisCacheService = redisCacheService ?? throw new ArgumentNullException(nameof(redisCacheService));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
 
@@ -42,6 +48,7 @@ public class BackendPrivateController : ControllerBase
     [HttpPost("sync-market-snapshots")]
     [ProducesResponseType(StatusCodes.Status202Accepted)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status409Conflict)]
     [ProducesResponseType(StatusCodes.Status500InternalServerError)]
     public async Task<IActionResult> SynchronizeMarketData(
         [FromQuery] long? min_created_ts = null,
@@ -52,7 +59,7 @@ public class BackendPrivateController : ControllerBase
         try
         {
             await _synchronizationService.EnqueueMarketSyncAsync(min_created_ts, max_created_ts, status, market_ticker_id, HttpContext.RequestAborted);
-            
+
             if (!string.IsNullOrWhiteSpace(market_ticker_id))
             {
                 return Accepted(new
@@ -62,7 +69,7 @@ public class BackendPrivateController : ControllerBase
                     market_ticker_id = market_ticker_id
                 });
             }
-            
+
             return Accepted(new
             {
                 started = true,
@@ -70,6 +77,16 @@ public class BackendPrivateController : ControllerBase
                 max_created_ts = max_created_ts,
                 status = status,
                 message = "Market synchronization queued. Pagination will be handled automatically."
+            });
+        }
+        catch (InvalidOperationException ex) when (ex.Message.Contains("already in progress"))
+        {
+            _logger.LogWarning(ex, "Market synchronization already in progress");
+            return Conflict(new
+            {
+                error = "Synchronization already in progress",
+                message = ex.Message,
+                hint = "Use GET /api/private/data-source/sync-market-snapshots/status to check current status"
             });
         }
         catch (RabbitMqUnavailableException ex)
@@ -81,6 +98,41 @@ public class BackendPrivateController : ControllerBase
         {
             _logger.LogError(ex, "Failed to enqueue market synchronization");
             return StatusCode(StatusCodes.Status500InternalServerError, new { error = "Failed to enqueue market synchronization", message = ex.Message });
+        }
+    }
+
+    /// <summary>
+    /// Gets the current status of the market snapshots synchronization.
+    /// Shows whether sync is running and how many jobs are pending.
+    /// </summary>
+    /// <returns>Status information about the current sync operation</returns>
+    [HttpGet("sync-market-snapshots/status")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    public async Task<IActionResult> GetMarketSyncStatus()
+    {
+        try
+        {
+            var isLocked = await _redisCacheService.IsLockedAsync(MarketSyncLockKey);
+            var pendingJobs = await _redisCacheService.GetCounterAsync(MarketSyncCounterKey);
+
+            return Ok(new
+            {
+                is_running = isLocked,
+                pending_jobs = pendingJobs,
+                message = isLocked
+                    ? $"Synchronization is in progress with {pendingJobs} pending job(s)"
+                    : "No synchronization is currently running"
+            });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to get market sync status");
+            return Ok(new
+            {
+                is_running = false,
+                pending_jobs = 0,
+                message = "Unable to determine sync status (Redis may be unavailable)"
+            });
         }
     }
 

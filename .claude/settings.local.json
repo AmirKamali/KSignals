@@ -10,7 +10,8 @@
       "Bash(curl:*)",
       "Bash(find:*)",
       "Bash(docker-compose up:*)",
-      "Bash(docker exec:*)"
+      "Bash(docker exec:*)",
+      "Bash(docker logs:*)"
     ],
     "deny": [],
     "ask": []

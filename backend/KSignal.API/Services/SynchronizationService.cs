@@ -16,17 +16,23 @@ public class SynchronizationService
     private readonly KalshiClient _kalshiClient;
     private readonly KalshiDbContext _dbContext;
     private readonly IPublishEndpoint _publishEndpoint;
+    private readonly IRedisCacheService _redisCacheService;
     private readonly ILogger<SynchronizationService> _logger;
+
+    private const string MarketSyncLockKey = "sync:market-snapshots:lock";
+    private const string MarketSyncCounterKey = "sync:market-snapshots:pending";
 
     public SynchronizationService(
         KalshiClient kalshiClient,
         KalshiDbContext dbContext,
         IPublishEndpoint publishEndpoint,
+        IRedisCacheService redisCacheService,
         ILogger<SynchronizationService> logger)
     {
         _kalshiClient = kalshiClient ?? throw new ArgumentNullException(nameof(kalshiClient));
         _dbContext = dbContext ?? throw new ArgumentNullException(nameof(dbContext));
         _publishEndpoint = publishEndpoint ?? throw new ArgumentNullException(nameof(publishEndpoint));
+        _redisCacheService = redisCacheService ?? throw new ArgumentNullException(nameof(redisCacheService));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
 
@@ -37,22 +43,46 @@ public class SynchronizationService
         string? marketTickerId = null,
         CancellationToken cancellationToken = default)
     {
+        // Try to acquire the distributed lock to prevent concurrent sync operations
+        var lockAcquired = await _redisCacheService.AcquireLockAsync(
+            MarketSyncLockKey,
+            TimeSpan.FromMinutes(30), // Lock expires after 30 minutes as safety fallback
+            cancellationToken);
+
+        if (!lockAcquired)
+        {
+            _logger.LogWarning("Failed to acquire lock for market synchronization - another sync is already in progress");
+            throw new InvalidOperationException("Market synchronization is already in progress. Please wait for the current operation to complete.");
+        }
+
+        // Initialize job counter to 0
+        await _redisCacheService.SetCounterAsync(MarketSyncCounterKey, 0, cancellationToken);
+        _logger.LogInformation("Acquired lock for market synchronization, initialized job counter");
+
         try
         {
+            var messageCount = 0;
+
             if (!string.IsNullOrWhiteSpace(marketTickerId))
             {
                 await _publishEndpoint.Publish(new SynchronizeMarketData(MarketTickerId: marketTickerId), cancellationToken);
+                messageCount++;
+                await _redisCacheService.IncrementCounterAsync(MarketSyncCounterKey, cancellationToken);
+                _logger.LogInformation("Enqueued single market sync for ticker: {TickerId}", marketTickerId);
                 return;
             }
+
             // If any filter is provided, enqueue a single sync message with those filters
             if (minCreatedTs.HasValue || maxCreatedTs.HasValue || !string.IsNullOrWhiteSpace(status))
             {
                 await _publishEndpoint.Publish(new SynchronizeMarketData(minCreatedTs, maxCreatedTs, status), cancellationToken);
+                messageCount++;
+                await _redisCacheService.IncrementCounterAsync(MarketSyncCounterKey, cancellationToken);
+                _logger.LogInformation("Enqueued filtered market sync with {MessageCount} message(s)", messageCount);
                 return;
             }
 
-
-            // If both min and max are null, we need to perdorm 2 operations: 1- Get latest data 2- Update existing markets
+            // If both min and max are null, we need to perform 2 operations: 1- Get latest data 2- Update existing markets
             DateTime? maxCreatedTimeInDb = await _dbContext.MarketSnapshots
                     .AsNoTracking()
                     .MaxAsync(s => (DateTime?)s.CreatedTime, cancellationToken);
@@ -71,8 +101,9 @@ public class SynchronizationService
                 minCreatedTs, maxCreatedTs, status);
 
                 await _publishEndpoint.Publish(new SynchronizeMarketData(MinCreatedTs: minCreatedTs, MaxCreatedTs: null, Status: status), cancellationToken);
+                messageCount++;
+                await _redisCacheService.IncrementCounterAsync(MarketSyncCounterKey, cancellationToken);
             }
-
 
             // If maxCreatedTimeInDb has value, also enqueue sync to update existing markets
             if (maxCreatedTimeInDb.HasValue)
@@ -103,13 +134,22 @@ public class SynchronizationService
                         await _publishEndpoint.Publish(
                             new SynchronizeMarketData(chunkMinTs, chunkMaxTs, status),
                             cancellationToken);
+                        messageCount++;
+                        await _redisCacheService.IncrementCounterAsync(MarketSyncCounterKey, cancellationToken);
                     }
                 }
             }
+
+            _logger.LogInformation("Successfully enqueued {MessageCount} market sync message(s), lock will be released when all jobs complete", messageCount);
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Unexpected error while trying to enqueue synchronization. Exception type: {ExceptionType}", ex.GetType().Name);
+            _logger.LogError(ex, "Error while enqueuing market synchronization - releasing lock. Exception type: {ExceptionType}", ex.GetType().Name);
+
+            // Release the lock and reset counter on failure
+            await _redisCacheService.ReleaseLockAsync(MarketSyncLockKey, cancellationToken);
+            await _redisCacheService.SetCounterAsync(MarketSyncCounterKey, 0, cancellationToken);
+
             throw;
         }
     }
@@ -150,6 +190,9 @@ public class SynchronizationService
             await _publishEndpoint.Publish(
                 new SynchronizeMarketData(command.MinCreatedTs, command.MaxCreatedTs, command.Status, response.Cursor),
                 cancellationToken);
+            // Track the pagination subjob
+            await _redisCacheService.IncrementCounterAsync(MarketSyncCounterKey, cancellationToken);
+            _logger.LogDebug("Enqueued pagination message for market sync (cursor present)");
         }
         else
         {
@@ -497,7 +540,8 @@ public class SynchronizationService
     {
         try
         {
-            if (!String.IsNullOrEmpty(cursor)){
+            if (!String.IsNullOrEmpty(cursor))
+            {
                 // Always enqueue the bulk events sync (paginated)
                 await _publishEndpoint.Publish(new SynchronizeEvents(cursor), cancellationToken);
             }
@@ -506,56 +550,62 @@ public class SynchronizationService
             var hasEvents = await _dbContext.MarketEvents.AnyAsync(cancellationToken);
             if (hasEvents)
             {
-                // Get distinct EventTickers from market_snapshots that don't exist in market_events
-                // Using raw SQL with LEFT ANTI JOIN - optimized for ClickHouse's columnar engine
-                var missingEventTickers = new List<string>();
-                var connection = _dbContext.Database.GetDbConnection();
-                var connectionWasOpen = connection.State == System.Data.ConnectionState.Open;
-                if (!connectionWasOpen)
-                {
-                    await connection.OpenAsync(cancellationToken);
-                }
-                try
-                {
-                    using var command = connection.CreateCommand();
-                    command.CommandText = @"
-                        SELECT DISTINCT ms.EventTicker 
-                        FROM kalshi_signals.market_snapshots ms
-                        LEFT ANTI JOIN kalshi_signals.market_events me ON ms.EventTicker = me.EventTicker
-                        WHERE ms.EventTicker != ''";
-                    
-                    using var reader = await command.ExecuteReaderAsync(cancellationToken);
-                    while (await reader.ReadAsync(cancellationToken))
-                    {
-                        missingEventTickers.Add(reader.GetString(0));
-                    }
-                }
-                finally
-                {
-                    if (!connectionWasOpen)
-                    {
-                        await connection.CloseAsync();
-                    }
-                }
-
-                if (missingEventTickers.Count > 0)
-                {
-                    _logger.LogInformation("Found {Count} missing events in market_snapshots, enqueueing individual syncs", missingEventTickers.Count);
-
-                    // Batch publish for better throughput
-                    var messages = missingEventTickers.Select(ticker => new SynchronizeEventDetail(ticker));
-                    await _publishEndpoint.PublishBatch(messages, cancellationToken);
-                }
+                await GetMissingEventDetailsFromNewMarketsAsync();
             }
-            else {
+            else
+            {
                 // Table is empty and no cursor provided, lets refresh from scratch
-                 await _publishEndpoint.Publish(new SynchronizeEvents(cursor), cancellationToken);
+                await _publishEndpoint.Publish(new SynchronizeEvents(cursor), cancellationToken);
             }
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Unexpected error while trying to enqueue events synchronization. Exception type: {ExceptionType}", ex.GetType().Name);
             throw;
+        }
+    }
+
+    private async Task GetMissingEventDetailsFromNewMarketsAsync()
+    {
+        // Get distinct EventTickers from market_snapshots that don't exist in market_events
+        // Using raw SQL with LEFT ANTI JOIN - optimized for ClickHouse's columnar engine
+        var missingEventTickers = new List<string>();
+        var connection = _dbContext.Database.GetDbConnection();
+        var connectionWasOpen = connection.State == System.Data.ConnectionState.Open;
+        if (!connectionWasOpen)
+        {
+            await connection.OpenAsync();
+        }
+        try
+        {
+            using var command = connection.CreateCommand();
+            command.CommandText = @"
+                        SELECT DISTINCT ms.EventTicker 
+                        FROM kalshi_signals.market_snapshots ms
+                        LEFT ANTI JOIN kalshi_signals.market_events me ON ms.EventTicker = me.EventTicker
+                        WHERE ms.EventTicker != ''";
+
+            using var reader = await command.ExecuteReaderAsync();
+            while (await reader.ReadAsync())
+            {
+                missingEventTickers.Add(reader.GetString(0));
+            }
+        }
+        finally
+        {
+            if (!connectionWasOpen)
+            {
+                await connection.CloseAsync();
+            }
+        }
+
+        if (missingEventTickers.Count > 0)
+        {
+            _logger.LogInformation("Found {Count} missing events in market_snapshots, enqueueing individual syncs", missingEventTickers.Count);
+
+            // Batch publish for better throughput
+            var messages = missingEventTickers.Select(ticker => new SynchronizeEventDetail(ticker));
+            await _publishEndpoint.PublishBatch(messages);
         }
     }
 
@@ -605,12 +655,12 @@ public class SynchronizationService
             await _dbContext.MarketEvents.AddAsync(newEvent, cancellationToken);
             await _dbContext.SaveChangesAsync(cancellationToken);
         }
-        catch (ApiException apiEx) when (apiEx.Message.Contains("not found") || 
+        catch (ApiException apiEx) when (apiEx.Message.Contains("not found") ||
                                           apiEx.Message.Contains("Required property") ||
                                           apiEx.Message.Contains("404"))
         {
             // Event doesn't exist or API returned unexpected response format - skip gracefully
-            _logger.LogWarning("Event {EventTicker} not found or invalid response from Kalshi API, skipping: {Message}", 
+            _logger.LogWarning("Event {EventTicker} not found or invalid response from Kalshi API, skipping: {Message}",
                 command.EventTicker, apiEx.Message);
         }
         catch (ApiException apiEx) when (apiEx.Message.Contains("too_many_requests"))
@@ -667,7 +717,7 @@ public class SynchronizationService
 
             await _dbContext.SaveChangesAsync(cancellationToken);
 
-            // Queue next page if there's more data
+            // Queue next page if there's more data, preserving MinCloseTs
             if (!string.IsNullOrWhiteSpace(response.Cursor))
             {
                 await _publishEndpoint.Publish(new SynchronizeEvents(response.Cursor), cancellationToken);
