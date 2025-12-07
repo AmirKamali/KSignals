@@ -44,7 +44,6 @@ public class SyncLogService : ISyncLogService
         {
             var syncLog = new SyncLog
             {
-                Id = Guid.NewGuid(),
                 EventName = eventName,
                 NumbersEnqueued = numbersEnqueued,
                 LogDate = DateTime.UtcNow
