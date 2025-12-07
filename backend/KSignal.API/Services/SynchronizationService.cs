@@ -75,63 +75,32 @@ public class SynchronizationService
             }
 
             // If both min and max are null, we need to perform 2 operations: 1- Get latest data 2- Update existing markets
-            DateTime? maxCreatedTimeInDb = await _dbContext.MarketSnapshots
+            var maxCreatedTimeInDb = await _dbContext.MarketSnapshots
                     .AsNoTracking()
                     .MaxAsync(s => (DateTime?)s.CreatedTime, cancellationToken);
 
-            // Sync 1- Get latest data
-            if (!minCreatedTs.HasValue && !maxCreatedTs.HasValue)
+            if (!maxCreatedTimeInDb.HasValue)
             {
-                if (maxCreatedTimeInDb.HasValue)
-                {
-                    minCreatedTs = new DateTimeOffset(maxCreatedTimeInDb.Value, TimeSpan.Zero).ToUnixTimeSeconds();
-                    _logger.LogInformation("Using max CreatedTime from DB as min_created_ts: {MaxCreatedTime} ({MinCreatedTs})",
-                        maxCreatedTimeInDb.Value, minCreatedTs);
-                }
-
-                _logger.LogInformation("Enqueuing market sync with MinCreatedTs={MinCreatedTs}, MaxCreatedTs={MaxCreatedTs}, Status={Status}",
-                minCreatedTs, maxCreatedTs, status);
-
-                await _publishEndpoint.Publish(new SynchronizeMarketData(MinCreatedTs: minCreatedTs, MaxCreatedTs: null, Status: status), cancellationToken);
+                // No data in DB, perform full sync from scratch
+                _logger.LogInformation("No existing market snapshot data found, performing full sync from scratch");
+                await _publishEndpoint.Publish(new SynchronizeMarketData(null, null, null), cancellationToken);
                 messageCount++;
                 await _lockService.IncrementJobCounterAsync(MarketSyncCounterKey, cancellationToken);
+                _logger.LogInformation("Enqueued full market sync with {MessageCount} message(s)", messageCount);
+                return;
             }
-
-            // Sync 2 - If maxCreatedTimeInDb has value, also enqueue sync to update existing markets
-            if (maxCreatedTimeInDb.HasValue)
-            {
-                var minCreatedTimeInDb = await _dbContext.MarketSnapshots
+            // Sync1 - Update existing markets (from oldest to newest)
+            // Check status of all open markets inside DB and enqueue updates for those
+            var twoDaysAgo = DateTime.UtcNow.AddDays(-2);
+            var diffrentialUpdateStart = await _dbContext.MarketSnapshotsLatestView
                     .AsNoTracking()
-                    .MinAsync(s => (DateTime?)s.CreatedTime, cancellationToken);
+                    .Where(m => m.Status == "open" && m.CloseTime >= twoDaysAgo)
+                    .MinAsync(p => p.CloseTime);
 
-                if (minCreatedTimeInDb.HasValue)
-                {
-                    var minTs = new DateTimeOffset(minCreatedTimeInDb.Value, TimeSpan.Zero).ToUnixTimeSeconds();
-                    var maxTs = new DateTimeOffset(maxCreatedTimeInDb.Value, TimeSpan.Zero).ToUnixTimeSeconds();
-
-                    var totalDays = (maxCreatedTimeInDb.Value - minCreatedTimeInDb.Value).TotalDays;
-                    var numberOfChunks = totalDays < 20 ? 3 : 20;
-
-                    var chunkDuration = (maxTs - minTs) / numberOfChunks;
-
-                    _logger.LogInformation(
-                        "Enqueuing {ChunkCount} sync messages for existing markets update (TotalDays={TotalDays}, MinTs={MinTs}, MaxTs={MaxTs})",
-                        numberOfChunks, totalDays, minTs, maxTs);
-
-                    for (var i = 0; i < numberOfChunks; i++)
-                    {
-                        var chunkMinTs = minTs + (i * chunkDuration);
-                        var chunkMaxTs = (i == numberOfChunks - 1) ? maxTs : minTs + ((i + 1) * chunkDuration);
-
-                        await _publishEndpoint.Publish(
-                            new SynchronizeMarketData(chunkMinTs, chunkMaxTs, status),
-                            cancellationToken);
-                        messageCount++;
-                        await _lockService.IncrementJobCounterAsync(MarketSyncCounterKey, cancellationToken);
-                    }
-                }
-            }
-
+            await _publishEndpoint.Publish(
+                           new SynchronizeMarketData(diffrentialUpdateStart, null, null));
+            messageCount++;
+            await _lockService.IncrementJobCounterAsync(MarketSyncCounterKey, cancellationToken);
             _logger.LogInformation("Successfully enqueued {MessageCount} market sync message(s), lock will be released when all jobs complete", messageCount);
 
             // Log the sync event
