@@ -24,6 +24,7 @@ public class SynchronizationServiceTests
     private readonly Mock<KalshiDbContext> _mockDbContext;
     private readonly Mock<IPublishEndpoint> _mockPublishEndpoint;
     private readonly Mock<ILockService> _mockLockService;
+    private readonly Mock<ISyncLogService> _mockSyncLogService;
     private readonly Mock<ILogger<SynchronizationService>> _mockLogger;
     private readonly SynchronizationService _service;
 
@@ -40,6 +41,7 @@ public class SynchronizationServiceTests
 
         _mockPublishEndpoint = new Mock<IPublishEndpoint>();
         _mockLockService = new Mock<ILockService>();
+        _mockSyncLogService = new Mock<ISyncLogService>();
         _mockLogger = new Mock<ILogger<SynchronizationService>>();
 
         // Create service instance
@@ -48,6 +50,7 @@ public class SynchronizationServiceTests
             _mockDbContext.Object,
             _mockPublishEndpoint.Object,
             _mockLockService.Object,
+            _mockSyncLogService.Object,
             _mockLogger.Object);
     }
 
@@ -62,6 +65,7 @@ public class SynchronizationServiceTests
             _mockDbContext.Object,
             _mockPublishEndpoint.Object,
             _mockLockService.Object,
+            _mockSyncLogService.Object,
             _mockLogger.Object));
 
         ex.ParamName.Should().Be("kalshiClient");
@@ -76,6 +80,7 @@ public class SynchronizationServiceTests
             null!,
             _mockPublishEndpoint.Object,
             _mockLockService.Object,
+            _mockSyncLogService.Object,
             _mockLogger.Object));
 
         ex.ParamName.Should().Be("dbContext");
@@ -90,6 +95,7 @@ public class SynchronizationServiceTests
             _mockDbContext.Object,
             null!,
             _mockLockService.Object,
+            _mockSyncLogService.Object,
             _mockLogger.Object));
 
         ex.ParamName.Should().Be("publishEndpoint");
@@ -104,9 +110,25 @@ public class SynchronizationServiceTests
             _mockDbContext.Object,
             _mockPublishEndpoint.Object,
             null!,
+            _mockSyncLogService.Object,
             _mockLogger.Object));
 
         ex.ParamName.Should().Be("lockService");
+    }
+
+    [Fact]
+    public void Constructor_WithNullSyncLogService_ThrowsArgumentNullException()
+    {
+        // Arrange, Act & Assert
+        var ex = Assert.Throws<ArgumentNullException>(() => new SynchronizationService(
+            _kalshiClient,
+            _mockDbContext.Object,
+            _mockPublishEndpoint.Object,
+            _mockLockService.Object,
+            null!,
+            _mockLogger.Object));
+
+        ex.ParamName.Should().Be("syncLogService");
     }
 
     [Fact]
@@ -118,6 +140,7 @@ public class SynchronizationServiceTests
             _mockDbContext.Object,
             _mockPublishEndpoint.Object,
             _mockLockService.Object,
+            _mockSyncLogService.Object,
             null!));
 
         ex.ParamName.Should().Be("logger");

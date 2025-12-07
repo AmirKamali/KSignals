@@ -173,6 +173,7 @@ builder.Services.AddScoped<ChartService>();
 builder.Services.AddScoped<SynchronizationService>();
 builder.Services.AddScoped<AnalyticsService>();
 builder.Services.AddScoped<CleanupService>();
+builder.Services.AddScoped<ISyncLogService, SyncLogService>();
 // builder.Services.AddSingleton<RefreshService>(); // Commented out - RefreshService is currently commented out
 
 // Register RabbitMQ management service for queue administration

@@ -21,6 +21,7 @@ public class RabbitMqManagementService
         "synchronize-tags-categories",
         "synchronize-series",
         "synchronize-events",
+        "synchronize-event-detail",
         "synchronize-orderbook",
         "synchronize-candlesticks",
         "process-market-analytics",

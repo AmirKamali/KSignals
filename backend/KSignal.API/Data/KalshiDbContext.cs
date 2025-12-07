@@ -20,6 +20,7 @@ namespace KSignal.API.Data;
         public DbSet<OrderbookEvent> OrderbookEvents => Set<OrderbookEvent>();
         public DbSet<MarketCandlestickData> MarketCandlesticks => Set<MarketCandlestickData>();
         public DbSet<AnalyticsMarketFeature> AnalyticsMarketFeatures => Set<AnalyticsMarketFeature>();
+        public DbSet<SyncLog> SyncLogs => Set<SyncLog>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -360,5 +361,16 @@ namespace KSignal.API.Data;
         analyticsFeature.Property(e => e.FactualProbabilityYes).IsRequired();
         analyticsFeature.Property(e => e.MispriceScore).IsRequired();
         analyticsFeature.Property(e => e.GeneratedAt).IsRequired();
+
+        // SyncLog configuration
+        var syncLog = modelBuilder.Entity<SyncLog>();
+        syncLog.ToTable("sync_logs");
+        syncLog.HasKey(e => e.Id);
+        syncLog.Property(e => e.Id).ValueGeneratedOnAdd();
+        syncLog.Property(e => e.EventName).HasMaxLength(255).IsRequired();
+        syncLog.HasIndex(e => e.EventName).HasDatabaseName("idx_sync_logs_event_name");
+        syncLog.Property(e => e.NumbersEnqueued).IsRequired();
+        syncLog.Property(e => e.LogDate).IsRequired();
+        syncLog.HasIndex(e => e.LogDate).HasDatabaseName("idx_sync_logs_log_date");
     }
 }

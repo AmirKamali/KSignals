@@ -17,6 +17,7 @@ public class SynchronizationService
     private readonly KalshiDbContext _dbContext;
     private readonly IPublishEndpoint _publishEndpoint;
     private readonly ILockService _lockService;
+    private readonly ISyncLogService _syncLogService;
     private readonly ILogger<SynchronizationService> _logger;
 
     private const string MarketSyncLockKey = "sync:market-snapshots:lock";
@@ -27,12 +28,14 @@ public class SynchronizationService
         KalshiDbContext dbContext,
         IPublishEndpoint publishEndpoint,
         ILockService lockService,
+        ISyncLogService syncLogService,
         ILogger<SynchronizationService> logger)
     {
         _kalshiClient = kalshiClient ?? throw new ArgumentNullException(nameof(kalshiClient));
         _dbContext = dbContext ?? throw new ArgumentNullException(nameof(dbContext));
         _publishEndpoint = publishEndpoint ?? throw new ArgumentNullException(nameof(publishEndpoint));
         _lockService = lockService ?? throw new ArgumentNullException(nameof(lockService));
+        _syncLogService = syncLogService ?? throw new ArgumentNullException(nameof(syncLogService));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
 
@@ -140,6 +143,9 @@ public class SynchronizationService
             }
 
             _logger.LogInformation("Successfully enqueued {MessageCount} market sync message(s), lock will be released when all jobs complete", messageCount);
+
+            // Log the sync event
+            await _syncLogService.LogSyncEventAsync("SynchronizeMarketData", messageCount, cancellationToken);
         }
         catch (Exception ex)
         {
@@ -267,6 +273,7 @@ public class SynchronizationService
         try
         {
             await _publishEndpoint.Publish(new SynchronizeTagsCategories(), cancellationToken);
+            await _syncLogService.LogSyncEventAsync("SynchronizeTagsCategories", 1, cancellationToken);
         }
         catch (Exception ex)
         {
@@ -412,6 +419,7 @@ public class SynchronizationService
         try
         {
             await _publishEndpoint.Publish(new SynchronizeSeries(), cancellationToken);
+            await _syncLogService.LogSyncEventAsync("SynchronizeSeries", 1, cancellationToken);
         }
         catch (Exception ex)
         {
@@ -538,10 +546,13 @@ public class SynchronizationService
     {
         try
         {
+            var enqueuedCount = 0;
+
             if (!String.IsNullOrEmpty(cursor))
             {
                 // Always enqueue the bulk events sync (paginated)
                 await _publishEndpoint.Publish(new SynchronizeEvents(cursor), cancellationToken);
+                enqueuedCount++;
             }
 
             // If events table is not empty, find missing events from market snapshots
@@ -549,11 +560,19 @@ public class SynchronizationService
             if (hasEvents)
             {
                 await GetMissingEventDetailsFromNewMarketsAsync();
+                // Note: GetMissingEventDetailsFromNewMarketsAsync enqueues messages internally
+                // We'll log those separately
             }
             else
             {
                 // Table is empty and no cursor provided, lets refresh from scratch
                 await _publishEndpoint.Publish(new SynchronizeEvents(cursor), cancellationToken);
+                enqueuedCount++;
+            }
+
+            if (enqueuedCount > 0)
+            {
+                await _syncLogService.LogSyncEventAsync("SynchronizeEvents", enqueuedCount, cancellationToken);
             }
         }
         catch (Exception ex)
@@ -604,6 +623,9 @@ public class SynchronizationService
             // Batch publish for better throughput
             var messages = missingEventTickers.Select(ticker => new SynchronizeEventDetail(ticker));
             await _publishEndpoint.PublishBatch(messages);
+
+            // Log the sync event
+            await _syncLogService.LogSyncEventAsync("SynchronizeEventDetail", missingEventTickers.Count);
         }
     }
 
@@ -616,6 +638,7 @@ public class SynchronizationService
                 throw new ArgumentException("Event ticker is required", nameof(eventTicker));
             }
             await _publishEndpoint.Publish(new SynchronizeEventDetail(eventTicker), cancellationToken);
+            await _syncLogService.LogSyncEventAsync("SynchronizeEventDetail", 1, cancellationToken);
         }
         catch (Exception ex)
         {
@@ -755,6 +778,7 @@ public class SynchronizationService
         try
         {
             await _publishEndpoint.Publish(new SynchronizeOrderbook(), cancellationToken);
+            await _syncLogService.LogSyncEventAsync("SynchronizeOrderbook", 1, cancellationToken);
         }
         catch (Exception ex)
         {
@@ -1030,6 +1054,7 @@ public class SynchronizationService
         try
         {
             await _publishEndpoint.Publish(new SynchronizeCandlesticks(), cancellationToken);
+            await _syncLogService.LogSyncEventAsync("SynchronizeCandlesticks", 1, cancellationToken);
         }
         catch (Exception ex)
         {
