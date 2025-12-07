@@ -244,6 +244,21 @@ builder.Services.AddAuthentication(options =>
 
 var app = builder.Build();
 
+// Log sync_event_start on backend startup
+using (var scope = app.Services.CreateScope())
+{
+    try
+    {
+        var syncLogService = scope.ServiceProvider.GetRequiredService<ISyncLogService>();
+        await syncLogService.LogSyncEventAsync("sync_event_start", 0);
+    }
+    catch (Exception ex)
+    {
+        var logger = app.Services.GetRequiredService<ILogger<Program>>();
+        logger.LogError(ex, "Failed to log sync_event_start on backend startup");
+    }
+}
+
 // Validate JWT_SECRET configuration at startup
 var jwtSecretCheck = Environment.GetEnvironmentVariable("JWT_SECRET");
 if (string.IsNullOrWhiteSpace(jwtSecretCheck) || jwtSecretCheck == "development-placeholder-secret")
@@ -274,7 +289,7 @@ app.Run();
 
 string BuildConnectionString(ConfigurationManager configuration)
 {
-    var dbHost = Environment.GetEnvironmentVariable("KALSHI_DB_HOST") ?? "localhost";
+    var dbHost = Environment.GetEnvironmentVariable("KALSHI_DB_HOST") ?? "kalshisignals.com";
     var dbUser = Environment.GetEnvironmentVariable("KALSHI_DB_USER");
     var dbPassword = Environment.GetEnvironmentVariable("KALSHI_DB_PASSWORD");
     var dbName = Environment.GetEnvironmentVariable("KALSHI_DB_NAME") ?? "kalshi_signals";
