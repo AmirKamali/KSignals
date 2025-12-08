@@ -563,6 +563,213 @@ public class BackendClient
         }
     }
 
+    public async Task<IReadOnlyList<SubscriptionPlanDto>> GetSubscriptionPlansAsync()
+    {
+        try
+        {
+            var url = $"{_options.BaseUrl.TrimEnd('/')}/api/subscriptions/plans";
+            using var response = await _httpClient.GetAsync(url);
+            if (!response.IsSuccessStatusCode)
+            {
+                _logger.LogWarning("Subscription plans request failed with status {StatusCode}", response.StatusCode);
+                return Array.Empty<SubscriptionPlanDto>();
+            }
+
+            var body = await response.Content.ReadAsStringAsync();
+            using var doc = JsonDocument.Parse(body);
+            if (doc.RootElement.TryGetProperty("plans", out var plansNode))
+            {
+                var plans = JsonSerializer.Deserialize<List<SubscriptionPlanDto>>(plansNode.GetRawText(), _jsonOptions);
+                return plans ?? new List<SubscriptionPlanDto>();
+            }
+
+            return Array.Empty<SubscriptionPlanDto>();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Falling back to empty plan list");
+            return Array.Empty<SubscriptionPlanDto>();
+        }
+    }
+
+    public async Task<(bool Success, string? ErrorMessage, SubscriptionSummaryResponse? Response)> GetSubscriptionAsync(string jwt)
+    {
+        if (string.IsNullOrWhiteSpace(jwt))
+        {
+            return (false, "Authentication token is missing.", null);
+        }
+
+        try
+        {
+            var url = $"{_options.BaseUrl.TrimEnd('/')}/api/subscriptions/me";
+            using var message = new HttpRequestMessage(HttpMethod.Get, url);
+            message.Headers.Authorization = new AuthenticationHeaderValue("Bearer", jwt);
+
+            using var response = await _httpClient.SendAsync(message);
+            var body = await response.Content.ReadAsStringAsync();
+
+            if (!response.IsSuccessStatusCode)
+            {
+                return (false, $"Subscription fetch failed ({response.StatusCode})", null);
+            }
+
+            var summary = JsonSerializer.Deserialize<SubscriptionSummaryResponse>(body, _jsonOptions);
+            return summary != null
+                ? (true, null, summary)
+                : (false, "Invalid subscription payload", null);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to fetch subscription status");
+            return (false, "Failed to fetch subscription", null);
+        }
+    }
+
+    public async Task<(bool Success, string? ErrorMessage, SubscriptionStatusResponse? Response)> GetSubscriptionStatusAsync(string jwt)
+    {
+        if (string.IsNullOrWhiteSpace(jwt))
+        {
+            return (false, "Authentication token is missing.", null);
+        }
+
+        try
+        {
+            var url = $"{_options.BaseUrl.TrimEnd('/')}/api/subscriptions/status";
+            using var message = new HttpRequestMessage(HttpMethod.Get, url);
+            message.Headers.Authorization = new AuthenticationHeaderValue("Bearer", jwt);
+
+            using var response = await _httpClient.SendAsync(message);
+            var body = await response.Content.ReadAsStringAsync();
+
+            if (!response.IsSuccessStatusCode)
+            {
+                return (false, $"Status check failed ({response.StatusCode})", null);
+            }
+
+            var status = JsonSerializer.Deserialize<SubscriptionStatusResponse>(body, _jsonOptions);
+            return status != null
+                ? (true, null, status)
+                : (false, "Invalid status response", null);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to check subscription status");
+            return (false, "Failed to check status", null);
+        }
+    }
+
+    public async Task<(bool Success, string? ErrorMessage, CreateCheckoutResponse? Response)> CreateCheckoutSessionAsync(
+        string jwt,
+        string planCode,
+        string? successUrl,
+        string? cancelUrl)
+    {
+        if (string.IsNullOrWhiteSpace(jwt))
+        {
+            return (false, "Authentication token is missing.", null);
+        }
+
+        try
+        {
+            var url = $"{_options.BaseUrl.TrimEnd('/')}/api/subscriptions/checkout";
+            using var message = new HttpRequestMessage(HttpMethod.Post, url);
+            message.Headers.Authorization = new AuthenticationHeaderValue("Bearer", jwt);
+            var request = new CreateCheckoutRequest
+            {
+                PlanCode = planCode,
+                SuccessUrl = successUrl,
+                CancelUrl = cancelUrl
+            };
+
+            message.Content = new StringContent(JsonSerializer.Serialize(request), System.Text.Encoding.UTF8, "application/json");
+
+            using var response = await _httpClient.SendAsync(message);
+            var body = await response.Content.ReadAsStringAsync();
+
+            if (!response.IsSuccessStatusCode)
+            {
+                var error = $"Payment link failed ({response.StatusCode})";
+                try
+                {
+                    using var doc = JsonDocument.Parse(body);
+                    if (doc.RootElement.TryGetProperty("error", out var errorNode))
+                    {
+                        error = errorNode.GetString() ?? error;
+                    }
+                }
+                catch
+                {
+                    // ignore parse errors
+                }
+
+                return (false, error, null);
+            }
+
+            var checkout = JsonSerializer.Deserialize<CreateCheckoutResponse>(body, _jsonOptions);
+            return checkout != null
+                ? (true, null, checkout)
+                : (false, "Invalid checkout response", null);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to create payment link for plan {PlanCode}", planCode);
+            return (false, "Unable to start payment link. Please try again.", null);
+        }
+    }
+
+    public async Task<(bool Success, string? ErrorMessage, string? PortalUrl)> CreatePortalSessionAsync(
+        string jwt,
+        string? returnUrl)
+    {
+        if (string.IsNullOrWhiteSpace(jwt))
+        {
+            return (false, "Authentication token is missing.", null);
+        }
+
+        try
+        {
+            var url = $"{_options.BaseUrl.TrimEnd('/')}/api/subscriptions/portal";
+            using var message = new HttpRequestMessage(HttpMethod.Post, url);
+            message.Headers.Authorization = new AuthenticationHeaderValue("Bearer", jwt);
+            var request = new CreatePortalSessionRequest { ReturnUrl = returnUrl };
+            message.Content = new StringContent(JsonSerializer.Serialize(request), System.Text.Encoding.UTF8, "application/json");
+
+            using var response = await _httpClient.SendAsync(message);
+            var body = await response.Content.ReadAsStringAsync();
+            if (!response.IsSuccessStatusCode)
+            {
+                var error = $"Failed to start billing portal ({response.StatusCode})";
+                try
+                {
+                    using var doc = JsonDocument.Parse(body);
+                    if (doc.RootElement.TryGetProperty("error", out var errorNode))
+                    {
+                        error = errorNode.GetString() ?? error;
+                    }
+                }
+                catch
+                {
+                    // ignore parse failure
+                }
+
+                return (false, error, null);
+            }
+
+            using var json = JsonDocument.Parse(body);
+            if (json.RootElement.TryGetProperty("url", out var urlNode))
+            {
+                return (true, null, urlNode.GetString());
+            }
+
+            return (false, "Invalid billing portal response", null);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to start billing portal session");
+            return (false, "Unable to open billing portal. Please try again.", null);
+        }
+    }
+
     private static Dictionary<string, string?> BuildQuery(MarketQuery query)
     {
         var dict = new Dictionary<string, string?>();

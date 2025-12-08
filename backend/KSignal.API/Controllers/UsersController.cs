@@ -25,6 +25,62 @@ public class UsersController : ControllerBase
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
 
+    private async Task<(SubscriptionPlan? Plan, DateTime? CurrentPeriodEnd)> LoadSubscriptionAsync(
+        User user,
+        CancellationToken cancellationToken)
+    {
+        SubscriptionPlan? plan = null;
+        if (!string.IsNullOrWhiteSpace(user.ActivePlanId))
+        {
+            plan = await _db.SubscriptionPlans.AsNoTracking()
+                .FirstOrDefaultAsync(p => p.Id == user.ActivePlanId, cancellationToken);
+        }
+
+        DateTime? periodEnd = null;
+        if (!string.IsNullOrWhiteSpace(user.ActiveSubscriptionId))
+        {
+            var subscription = await _db.UserSubscriptions.AsNoTracking()
+                .FirstOrDefaultAsync(s => s.Id == user.ActiveSubscriptionId, cancellationToken);
+            periodEnd = subscription?.CurrentPeriodEnd;
+        }
+
+        return (plan, periodEnd);
+    }
+
+    private SignInResponse BuildSignInResponse(User user, SubscriptionPlan? plan, DateTime? currentPeriodEnd, string token)
+    {
+        return new SignInResponse
+        {
+            Token = token,
+            Username = user.Username ?? user.Email ?? user.FirebaseId,
+            Name = $"{user.FirstName} {user.LastName}".Trim(),
+            Email = user.Email ?? string.Empty,
+            SubscriptionStatus = user.SubscriptionStatus ?? "none",
+            ActivePlanId = plan?.Id ?? user.ActivePlanId,
+            ActivePlanCode = plan?.Code,
+            ActivePlanName = plan?.Name,
+            CurrentPeriodEnd = currentPeriodEnd
+        };
+    }
+
+    private UserProfileResponse BuildProfile(User user, SubscriptionPlan? plan, DateTime? currentPeriodEnd)
+    {
+        return new UserProfileResponse
+        {
+            Username = user.Username ?? string.Empty,
+            FirstName = user.FirstName ?? string.Empty,
+            LastName = user.LastName ?? string.Empty,
+            Email = user.Email ?? string.Empty,
+            CreatedAt = user.CreatedAt,
+            UpdatedAt = user.UpdatedAt,
+            SubscriptionStatus = user.SubscriptionStatus ?? "none",
+            ActivePlanId = plan?.Id ?? user.ActivePlanId,
+            ActivePlanCode = plan?.Code,
+            ActivePlanName = plan?.Name,
+            CurrentPeriodEnd = currentPeriodEnd
+        };
+    }
+
     [Authorize]
     [HttpGet("me")]
     [ProducesResponseType(StatusCodes.Status200OK)]
@@ -45,16 +101,8 @@ public class UsersController : ControllerBase
             return NotFound(new { error = "User not found" });
         }
 
-        var response = new UserProfileResponse
-        {
-            Username = user.Username ?? string.Empty,
-            FirstName = user.FirstName ?? string.Empty,
-            LastName = user.LastName ?? string.Empty,
-            Email = user.Email ?? string.Empty,
-            CreatedAt = user.CreatedAt,
-            UpdatedAt = user.UpdatedAt
-        };
-
+        var (plan, currentPeriodEnd) = await LoadSubscriptionAsync(user, cancellationToken);
+        var response = BuildProfile(user, plan, currentPeriodEnd);
         return Ok(response);
     }
 
@@ -90,13 +138,8 @@ public class UsersController : ControllerBase
         await _db.SaveChangesAsync(cancellationToken);
 
         var token = CreateJwt(user);
-        var response = new SignInResponse
-        {
-            Token = token,
-            Username = user.Username ?? user.Email ?? user.FirebaseId,
-            Name = $"{user.FirstName} {user.LastName}".Trim(),
-            Email = user.Email ?? string.Empty
-        };
+        var (plan, currentPeriodEnd) = await LoadSubscriptionAsync(user, cancellationToken);
+        var response = BuildSignInResponse(user, plan, currentPeriodEnd, token);
 
         return Ok(response);
     }
@@ -196,13 +239,8 @@ public class UsersController : ControllerBase
 
         // Generate new JWT with updated username
         var token = CreateJwt(user);
-        var response = new SignInResponse
-        {
-            Token = token,
-            Username = user.Username,
-            Name = $"{user.FirstName} {user.LastName}".Trim(),
-            Email = user.Email ?? string.Empty
-        };
+        var (plan, currentPeriodEnd) = await LoadSubscriptionAsync(user, cancellationToken);
+        var response = BuildSignInResponse(user, plan, currentPeriodEnd, token);
 
         return Ok(response);
     }
@@ -246,16 +284,13 @@ public class UsersController : ControllerBase
             user.UpdatedAt = now;
         }
 
+        user.SubscriptionStatus ??= "none";
+
         await _db.SaveChangesAsync(cancellationToken);
 
         var token = CreateJwt(user);
-        var response = new SignInResponse
-        {
-            Token = token,
-            Username = user.Username ?? user.Email ?? user.FirebaseId,
-            Name = $"{user.FirstName} {user.LastName}".Trim(),
-            Email = user.Email ?? string.Empty
-        };
+        var (plan, currentPeriodEnd) = await LoadSubscriptionAsync(user, cancellationToken);
+        var response = BuildSignInResponse(user, plan, currentPeriodEnd, token);
 
         return Ok(response);
     }

@@ -1,0 +1,371 @@
+@page
+@model web_asp.Pages.Subscription.SuccessModel
+@{
+    ViewData["Title"] = "Payment Successful";
+}
+
+<main class="subscription-success-page">
+    <div class="container">
+        <div class="success-card">
+            @if (Model.IsProcessing)
+            {
+                <div class="processing-state">
+                    <div class="spinner-large">
+                        <svg class="animate-spin" width="64" height="64" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="2" stroke-linecap="round" opacity="0.25"/>
+                            <path d="M12 2a10 10 0 0 1 10 10" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                        </svg>
+                    </div>
+                    <h1>Processing your subscription...</h1>
+                    <p class="subtitle">Please wait while we activate your account. This usually takes just a few seconds.</p>
+                    <div class="progress-dots">
+                        <span class="dot"></span>
+                        <span class="dot"></span>
+                        <span class="dot"></span>
+                    </div>
+                </div>
+            }
+            else if (Model.IsActivated)
+            {
+                <div class="success-state">
+                    <div class="success-icon">
+                        <svg width="80" height="80" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <circle cx="12" cy="12" r="10" stroke="#10b981" stroke-width="2"/>
+                            <path d="M8 12l2 2 4-4" stroke="#10b981" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                        </svg>
+                    </div>
+                    <h1>Subscription Activated! 🎉</h1>
+                    @if (Model.SubscriptionStatus != null && Model.SubscriptionStatus.Plan != null)
+                    {
+                        <p class="subtitle">
+                            Welcome to <strong>@Model.SubscriptionStatus.Plan.Name</strong>!
+                            You now have access to all premium features.
+                        </p>
+                        <div class="plan-details">
+                            <div class="detail-item">
+                                <span class="label">Plan</span>
+                                <span class="value">@Model.SubscriptionStatus.Plan.Name</span>
+                            </div>
+                            <div class="detail-item">
+                                <span class="label">Status</span>
+                                <span class="value badge success">@Model.SubscriptionStatus.Status</span>
+                            </div>
+                            @if (Model.SubscriptionStatus.CurrentPeriodEnd.HasValue)
+                            {
+                                <div class="detail-item">
+                                    <span class="label">Next billing</span>
+                                    <span class="value">@Model.SubscriptionStatus.CurrentPeriodEnd.Value.ToString("MMM dd, yyyy")</span>
+                                </div>
+                            }
+                        </div>
+                    }
+                    else
+                    {
+                        <p class="subtitle">You now have access to all premium features.</p>
+                    }
+                    <div class="action-buttons">
+                        <a href="/markets" class="btn btn-primary">Explore Markets</a>
+                        <a href="/user/account" class="btn btn-outline">View Account</a>
+                    </div>
+                    <p class="redirect-notice">Redirecting to dashboard in <span id="countdown">3</span> seconds...</p>
+                </div>
+            }
+            else if (Model.HasTimeout)
+            {
+                <div class="timeout-state">
+                    <div class="warning-icon">
+                        <svg width="64" height="64" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <circle cx="12" cy="12" r="10" stroke="#f59e0b" stroke-width="2"/>
+                            <path d="M12 8v4M12 16h.01" stroke="#f59e0b" stroke-width="2" stroke-linecap="round"/>
+                        </svg>
+                    </div>
+                    <h1>Processing Taking Longer Than Expected</h1>
+                    <p class="subtitle">
+                        Your payment was successful, but subscription activation is still processing.
+                        This can take up to a minute.
+                    </p>
+                    <div class="action-buttons">
+                        <button onclick="location.reload()" class="btn btn-primary">Check Again</button>
+                        <a href="/user/account" class="btn btn-outline">View Account</a>
+                    </div>
+                    <p class="help-text">
+                        If the issue persists, please contact support. Your payment was processed successfully.
+                    </p>
+                </div>
+            }
+            else if (!string.IsNullOrWhiteSpace(Model.ErrorMessage))
+            {
+                <div class="error-state">
+                    <div class="error-icon">
+                        <svg width="64" height="64" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <circle cx="12" cy="12" r="10" stroke="#ef4444" stroke-width="2"/>
+                            <path d="M15 9l-6 6M9 9l6 6" stroke="#ef4444" stroke-width="2" stroke-linecap="round"/>
+                        </svg>
+                    </div>
+                    <h1>Unable to Verify Subscription</h1>
+                    <p class="subtitle">@Model.ErrorMessage</p>
+                    <div class="action-buttons">
+                        <a href="/pricing" class="btn btn-primary">Back to Pricing</a>
+                        <a href="/user/account" class="btn btn-outline">View Account</a>
+                    </div>
+                </div>
+            }
+        </div>
+    </div>
+</main>
+
+@section Scripts {
+    <script>
+        // Auto-refresh for processing state
+        @if (Model.IsProcessing)
+        {
+            @:let attempts = 0;
+            @:const maxAttempts = 20;
+            @:const interval = 1000;
+            @:
+            @:async function checkStatus() {
+            @:    attempts++;
+            @:
+            @:    try {
+            @:        const response = await fetch('/subscription/success?handler=CheckStatus', {
+            @:            method: 'GET',
+            @:            headers: {
+            @:                'X-Requested-With': 'XMLHttpRequest'
+            @:            }
+            @:        });
+            @:
+            @:        if (response.ok) {
+            @:            const data = await response.json();
+            @:
+            @:            if (data.isActivated) {
+            @:                // Reload page to show success state
+            @:                window.location.reload();
+            @:                return;
+            @:            }
+            @:        }
+            @:    } catch (error) {
+            @:        console.error('Error checking status:', error);
+            @:    }
+            @:
+            @:    if (attempts @Html.Raw("<") maxAttempts) {
+            @:        setTimeout(checkStatus, interval);
+            @:    } else {
+            @:        // Reload to show timeout state
+            @:        window.location.reload();
+            @:    }
+            @:}
+            @:
+            @:// Start checking after initial page load
+            @:setTimeout(checkStatus, interval);
+        }
+
+        // Auto-redirect countdown for success state
+        @if (Model.IsActivated)
+        {
+            @:let countdown = 3;
+            @:const countdownElement = document.getElementById('countdown');
+            @:
+            @:const timer = setInterval(() => {
+            @:    countdown--;
+            @:    if (countdownElement) {
+            @:        countdownElement.textContent = countdown;
+            @:    }
+            @:
+            @:    if (countdown @Html.Raw("<=") 0) {
+            @:        clearInterval(timer);
+            @:        window.location.href = '/markets';
+            @:    }
+            @:}, 1000);
+        }
+    </script>
+}
+
+<style>
+    .subscription-success-page {
+        min-height: calc(100vh - 200px);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 2rem 1rem;
+    }
+
+    .success-card {
+        background: white;
+        border-radius: 16px;
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+        padding: 3rem 2rem;
+        max-width: 600px;
+        width: 100%;
+        text-align: center;
+    }
+
+    .processing-state, .success-state, .timeout-state, .error-state {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 1.5rem;
+    }
+
+    .spinner-large {
+        color: #3b82f6;
+    }
+
+    .animate-spin {
+        animation: spin 1s linear infinite;
+    }
+
+    @@keyframes spin {
+        from { transform: rotate(0deg); }
+        to { transform: rotate(360deg); }
+    }
+
+    .success-icon, .warning-icon, .error-icon {
+        margin-bottom: 0.5rem;
+    }
+
+    h1 {
+        font-size: 2rem;
+        font-weight: 700;
+        color: #111827;
+        margin: 0;
+    }
+
+    .subtitle {
+        font-size: 1.125rem;
+        color: #6b7280;
+        margin: 0;
+        max-width: 500px;
+    }
+
+    .progress-dots {
+        display: flex;
+        gap: 0.5rem;
+    }
+
+    .progress-dots .dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        background: #3b82f6;
+        animation: pulse 1.4s ease-in-out infinite;
+    }
+
+    .progress-dots .dot:nth-child(2) {
+        animation-delay: 0.2s;
+    }
+
+    .progress-dots .dot:nth-child(3) {
+        animation-delay: 0.4s;
+    }
+
+    @@keyframes pulse {
+        0%, 100% { opacity: 0.4; transform: scale(1); }
+        50% { opacity: 1; transform: scale(1.2); }
+    }
+
+    .plan-details {
+        display: flex;
+        flex-direction: column;
+        gap: 1rem;
+        background: #f9fafb;
+        border-radius: 12px;
+        padding: 1.5rem;
+        width: 100%;
+    }
+
+    .detail-item {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+
+    .detail-item .label {
+        color: #6b7280;
+        font-weight: 500;
+    }
+
+    .detail-item .value {
+        color: #111827;
+        font-weight: 600;
+    }
+
+    .badge {
+        display: inline-block;
+        padding: 0.25rem 0.75rem;
+        border-radius: 9999px;
+        font-size: 0.875rem;
+        font-weight: 600;
+    }
+
+    .badge.success {
+        background: #d1fae5;
+        color: #065f46;
+    }
+
+    .action-buttons {
+        display: flex;
+        gap: 1rem;
+        flex-wrap: wrap;
+        justify-content: center;
+    }
+
+    .btn {
+        padding: 0.75rem 1.5rem;
+        border-radius: 8px;
+        font-weight: 600;
+        text-decoration: none;
+        transition: all 0.2s;
+        border: none;
+        cursor: pointer;
+    }
+
+    .btn-primary {
+        background: #3b82f6;
+        color: white;
+    }
+
+    .btn-primary:hover {
+        background: #2563eb;
+    }
+
+    .btn-outline {
+        background: white;
+        color: #3b82f6;
+        border: 2px solid #3b82f6;
+    }
+
+    .btn-outline:hover {
+        background: #eff6ff;
+    }
+
+    .redirect-notice {
+        color: #6b7280;
+        font-size: 0.875rem;
+        margin-top: 1rem;
+    }
+
+    .help-text {
+        color: #9ca3af;
+        font-size: 0.875rem;
+        margin-top: 1rem;
+    }
+
+    @@media (max-width: 640px) {
+        .success-card {
+            padding: 2rem 1.5rem;
+        }
+
+        h1 {
+            font-size: 1.5rem;
+        }
+
+        .action-buttons {
+            flex-direction: column;
+            width: 100%;
+        }
+
+        .btn {
+            width: 100%;
+        }
+    }
+</style>

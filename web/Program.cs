@@ -81,8 +81,6 @@ app.UseRouting();
 
 app.UseAuthorization();
 
-app.MapStaticAssets();
-
 app.MapPost("/auth/firebase/login", async (
     [FromBody] FirebaseLoginRequest request,
     HttpContext context,
@@ -183,8 +181,7 @@ app.MapPost("/auth/logout", (HttpContext context, IOptions<FirebaseOptions> fire
 
 app.MapControllers();
 
-app.MapRazorPages()
-   .WithStaticAssets();
+app.MapRazorPages();
 
 app.Run();
 

@@ -3,6 +3,7 @@ using Kalshi.Api.Configuration;
 using KSignal.API.Data;
 using Microsoft.EntityFrameworkCore;
 using KSignal.API.Services;
+using KSignal.API.Models;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
 using System.Text;
@@ -174,6 +175,8 @@ builder.Services.AddScoped<SynchronizationService>();
 builder.Services.AddScoped<AnalyticsService>();
 builder.Services.AddScoped<CleanupService>();
 builder.Services.AddScoped<ISyncLogService, SyncLogService>();
+builder.Services.Configure<StripeOptions>(builder.Configuration.GetSection(StripeOptions.SectionName));
+builder.Services.AddScoped<StripeSubscriptionService>();
 // builder.Services.AddSingleton<RefreshService>(); // Commented out - RefreshService is currently commented out
 
 // Register RabbitMQ management service for queue administration

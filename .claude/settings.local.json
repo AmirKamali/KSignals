@@ -18,7 +18,12 @@
       "Bash(docker ps:*)",
       "Bash(docker build:*)",
       "Bash(chmod:*)",
-      "Bash(./test_backend.sh:*)"
+      "Bash(./test_backend.sh:*)",
+      "WebSearch",
+      "Bash(dotnet restore:*)",
+      "WebFetch(domain:github.com)",
+      "Bash(dotnet clean:*)",
+      "WebFetch(domain:docs.stripe.com)"
     ],
     "deny": [],
     "ask": []

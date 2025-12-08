@@ -1,0 +1,194 @@
+@page
+@model PricingModel
+@{
+    ViewData["Title"] = "Pricing";
+
+    var featureMap = new Dictionary<string, string[]>
+    {
+        ["free"] = new[]
+        {
+            "Live market viewer",
+            "Basic historical snapshots",
+            "Email alerts (daily digest)"
+        },
+        ["core-data"] = new[]
+        {
+            "Live and historical order books",
+            "Export-ready CSV and Parquet snapshots",
+            "API and ClickHouse friendly schema",
+            "Automated backfill + retention controls"
+        }
+    };
+
+    var activePlan = Model.CurrentSubscription?.ActivePlan?.Code ?? string.Empty;
+}
+
+<main class="pricing-page">
+    <section class="pricing-hero">
+        <div class="container">
+            <div class="pricing-hero-grid">
+                <div class="hero-copy">
+                    <p class="eyebrow">Subscriptions</p>
+                    <h1>Start free, upgrade to Core Data</h1>
+                    <p class="lede">
+                        Begin with the Free tier and step into Core Data when you need full-resolution feeds and exports.
+                    </p>
+                    <div class="hero-pills">
+                        <span class="pill">Stripe-secured checkout</span>
+                        <span class="pill">Cancel anytime</span>
+                        <span class="pill">Free forever</span>
+                    </div>
+                    @if (!string.IsNullOrWhiteSpace(Model.StatusMessage))
+                    {
+                        <div class="alert success">@Model.StatusMessage</div>
+                    }
+                    @if (!string.IsNullOrWhiteSpace(Model.ErrorMessage))
+                    {
+                        <div class="alert error">@Model.ErrorMessage</div>
+                    }
+                </div>
+                <div class="hero-panel">
+                    <div class="panel-header">
+                        <p>Live coverage</p>
+                        <span class="badge hot">+240 tracked markets</span>
+                    </div>
+                    <div class="panel-body">
+                        <div class="stat">
+                            <p class="label">Latency</p>
+                            <p class="value">~220ms</p>
+                        </div>
+                        <div class="stat">
+                            <p class="label">Data freshness</p>
+                            <p class="value">Live</p>
+                        </div>
+                        <div class="stat">
+                            <p class="label">Signals per day</p>
+                            <p class="value">3.1k</p>
+                        </div>
+                        <div class="stat">
+                            <p class="label">Uptime (90d)</p>
+                            <p class="value">99.95%</p>
+                        </div>
+                    </div>
+                    <div class="panel-footer">
+                        <p>Stripe protected • Simple billing • Instant activation</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section id="plans" class="plan-section">
+        <div class="container">
+            <div class="section-header">
+                <div>
+                    <p class="eyebrow">Plans</p>
+                    <h2>Pick your access level</h2>
+                    <p class="lede">Stay on Free or move to Core Data for production-ready market coverage.</p>
+                </div>
+                @if (Model.CurrentSubscription?.ActivePlan != null)
+                {
+                    <div class="current-chip">
+                        <span>Current</span>
+                        <strong>@Model.CurrentSubscription.ActivePlan.Name</strong>
+                        <small>@Model.CurrentSubscription.Status</small>
+                    </div>
+                }
+            </div>
+
+            <div class="plan-grid">
+                @foreach (var plan in Model.Plans
+                    .Where(p => string.Equals(p.Code, "free", StringComparison.OrdinalIgnoreCase) || string.Equals(p.Code, "core-data", StringComparison.OrdinalIgnoreCase))
+                    .OrderBy(p => string.Equals(p.Code, "free", StringComparison.OrdinalIgnoreCase) ? 0 : 1))
+                {
+                    var isCurrent = string.Equals(activePlan, plan.Code, StringComparison.OrdinalIgnoreCase);
+                    var isFree = plan.Amount <= 0;
+                    var priceLabel = isFree ? "Free" : $"${plan.Amount:0} / {plan.Interval}";
+                    var ctaLabel = isCurrent
+                        ? "Manage billing"
+                        : (isFree ? "Start for free" : (string.IsNullOrWhiteSpace(activePlan) ? "Start Core Data" : "Upgrade to Core Data"));
+                    var features = featureMap.TryGetValue(plan.Code, out var mapped)
+                        ? mapped
+                        : new[] { "Live data", "Alerts", "Priority support" };
+                <div class="plan-card @(isCurrent ? "plan-card-active" : string.Empty)">
+                    <div class="plan-top">
+                        <div class="plan-labels">
+                            <p class="eyebrow">@plan.Code</p>
+                            <h3>@plan.Name</h3>
+                            <p class="plan-description">@plan.Description</p>
+                        </div>
+                        <div class="price-row">
+                            <span class="price">@priceLabel</span>
+                            @if (isCurrent)
+                            {
+                                <span class="badge success">Current plan</span>
+                            }
+                        </div>
+                    </div>
+                    <ul class="feature-list">
+                        @foreach (var feature in features)
+                        {
+                            <li>
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                    <path d="M5 13l4 4L19 7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                                </svg>
+                                <span>@feature</span>
+                            </li>
+                        }
+                    </ul>
+                    <div class="plan-actions">
+                        @if (isCurrent && Model.CurrentSubscription?.StripeCustomerId != null)
+                        {
+                            <form method="post" asp-page-handler="Portal">
+                                <button type="submit" class="btn btn-outline">Manage billing</button>
+                            </form>
+                        }
+                        @if (string.Equals(plan.Code, "core-data", StringComparison.OrdinalIgnoreCase) && !isCurrent)
+                        {
+                            <a href="@Model.CoreDataPaymentLink" class="btn btn-primary">@ctaLabel</a>
+                        }
+                        else if (!string.Equals(plan.Code, "core-data", StringComparison.OrdinalIgnoreCase))
+                        {
+                            <form method="post" asp-page-handler="Checkout">
+                                <input type="hidden" name="planCode" value="@plan.Code" />
+                                <button type="submit" class="btn btn-primary">@ctaLabel</button>
+                            </form>
+                        }
+                    </div>
+                </div>
+                }
+            </div>
+        </div>
+    </section>
+
+    @if (Model.CurrentSubscription?.Events?.Any() == true)
+    {
+        <section class="history-section">
+            <div class="container">
+                <div class="section-header">
+                    <div>
+                        <p class="eyebrow">History</p>
+                        <h2>Subscription activity</h2>
+                        <p class="lede">We keep a trail of upgrades, downgrades, and billing events.</p>
+                    </div>
+                </div>
+                <div class="timeline">
+                    @foreach (var evt in Model.CurrentSubscription.Events.OrderByDescending(e => e.CreatedAt))
+                    {
+                        <div class="timeline-item">
+                            <div class="dot"></div>
+                            <div>
+                                <p class="timeline-title">@evt.EventType</p>
+                                @if (!string.IsNullOrWhiteSpace(evt.Notes))
+                                {
+                                    <p class="timeline-notes">@evt.Notes</p>
+                                }
+                                <p class="timeline-date">@evt.CreatedAt.ToString("MMM dd, yyyy HH:mm")</p>
+                            </div>
+                        </div>
+                    }
+                </div>
+            </div>
+        </section>
+    }
+</main>

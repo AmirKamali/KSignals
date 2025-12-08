@@ -8,4 +8,9 @@ public class UserProfileResponse
     public string Email { get; set; } = string.Empty;
     public DateTime CreatedAt { get; set; }
     public DateTime UpdatedAt { get; set; }
+    public string SubscriptionStatus { get; set; } = "none";
+    public string? ActivePlanId { get; set; }
+    public string? ActivePlanCode { get; set; }
+    public string? ActivePlanName { get; set; }
+    public DateTime? CurrentPeriodEnd { get; set; }
 }

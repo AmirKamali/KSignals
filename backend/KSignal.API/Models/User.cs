@@ -25,6 +25,18 @@ public class User
 
     public bool IsComnEmailOn { get; set; }
 
+    [MaxLength(255)]
+    public string? StripeCustomerId { get; set; }
+
+    [MaxLength(64)]
+    public string? ActiveSubscriptionId { get; set; }
+
+    [MaxLength(64)]
+    public string? ActivePlanId { get; set; }
+
+    [MaxLength(64)]
+    public string SubscriptionStatus { get; set; } = "none";
+
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
 }
