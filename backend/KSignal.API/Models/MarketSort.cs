@@ -6,8 +6,9 @@ public enum MarketSort
     TotalVolume = 1,
     OpenDate = 2,
     ClosingSoon = 3,
-    YesPrice = 4,
-    NoPrice = 5
+    ClosingFarFuture = 4,
+    YesPrice = 5,
+    NoPrice = 6
 }
 
 public enum SortDirection

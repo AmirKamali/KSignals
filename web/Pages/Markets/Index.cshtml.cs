@@ -22,7 +22,18 @@ public class IndexModel : PageModel
         var activeTag = string.IsNullOrWhiteSpace(tag) ? null : tag;
         var activeDate = string.IsNullOrWhiteSpace(date) ? "next_30_days" : date!;
         var activeSort = string.IsNullOrWhiteSpace(sort_type) ? "Volume24H" : sort_type!;
-        var sortDirection = direction == "asc" ? "asc" : "desc";
+
+        // Set default direction based on sort type if not specified
+        string sortDirection;
+        if (!string.IsNullOrWhiteSpace(direction))
+        {
+            sortDirection = direction == "asc" ? "asc" : "desc";
+        }
+        else
+        {
+            // Default direction based on sort type
+            sortDirection = activeSort == "ClosingSoon" ? "asc" : "desc";
+        }
         
         // Check if page parameter exists in query string and try to parse it
         // This handles cases where the page parameter might not be bound correctly

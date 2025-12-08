@@ -159,6 +159,9 @@ public class KalshiService
             MarketSort.ClosingSoon => direction == SortDirection.Asc
                 ? clientEvents.OrderBy(e => e.CloseTime)
                 : clientEvents.OrderByDescending(e => e.CloseTime),
+            MarketSort.ClosingFarFuture => direction == SortDirection.Asc
+                ? clientEvents.OrderBy(e => e.CloseTime)
+                : clientEvents.OrderByDescending(e => e.CloseTime),
             MarketSort.YesPrice => direction == SortDirection.Asc
                 ? clientEvents.OrderBy(e => e.YesBid)
                 : clientEvents.OrderByDescending(e => e.YesBid),
