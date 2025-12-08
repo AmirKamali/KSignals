@@ -226,6 +226,49 @@ a {
   padding: 1rem 0 3rem;
 }
 
+.billing-toggle {
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  margin-bottom: 1.25rem;
+  background: var(--surface);
+}
+
+.billing-toggle .toggle-option {
+  padding: 0.75rem 1.25rem;
+  color: var(--text-secondary);
+  text-decoration: none;
+  font-weight: 700;
+  font-size: 1rem;
+  line-height: 1.2;
+  background: none;
+  border: none;
+  cursor: pointer;
+  transition: background var(--transition-fast), color var(--transition-fast);
+}
+
+.billing-toggle .toggle-option:hover {
+  color: var(--text-primary);
+}
+
+.billing-toggle .toggle-option.active {
+  background: var(--primary);
+  color: #fff;
+  box-shadow: 0 12px 30px rgba(37, 99, 235, 0.2);
+}
+
+.plan-section[data-cadence="monthly"] .price-annual,
+.plan-section[data-cadence="monthly"] .cta-annual {
+  display: none;
+}
+
+.plan-section[data-cadence="annual"] .price-monthly,
+.plan-section[data-cadence="annual"] .cta-monthly {
+  display: none;
+}
+
 .section-header {
   display: flex;
   align-items: center;

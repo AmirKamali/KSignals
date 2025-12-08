@@ -44,6 +44,19 @@ public class SubscriptionsController : ControllerBase
         });
     }
 
+    [HttpGet("tiers")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    public async Task<IActionResult> GetTierPricing(CancellationToken cancellationToken)
+    {
+        var activePlans = await _stripe.GetActivePlansAsync(cancellationToken);
+        var tiers = BuildTiers(activePlans);
+
+        return Ok(new
+        {
+            tiers
+        });
+    }
+
     [Authorize]
     [HttpGet("me")]
     [ProducesResponseType(StatusCodes.Status200OK)]
@@ -213,6 +226,105 @@ public class SubscriptionsController : ControllerBase
         Description = plan.Description,
         IsActive = plan.IsActive
     };
+
+    private List<SubscriptionTierDto> BuildTiers(IEnumerable<SubscriptionPlan> activePlans)
+    {
+        var plansByCode = FallbackPlans()
+            .ToDictionary(p => p.Code, StringComparer.OrdinalIgnoreCase);
+
+        foreach (var plan in activePlans)
+        {
+            plansByCode[plan.Code] = plan;
+        }
+
+        var tiers = new Dictionary<string, SubscriptionTierDto>(StringComparer.OrdinalIgnoreCase);
+
+        foreach (var plan in plansByCode.Values)
+        {
+            var tierCode = NormalizeTierCode(plan.Code);
+            if (!tiers.TryGetValue(tierCode, out var tier))
+            {
+                tier = new SubscriptionTierDto
+                {
+                    Tier = tierCode,
+                    Name = plan.Name
+                };
+                tiers[tierCode] = tier;
+            }
+
+            var mapped = MapPlan(plan);
+            if (IsAnnualPlan(plan))
+            {
+                tier.AnnualPlan = mapped;
+                if (string.IsNullOrWhiteSpace(tier.Name))
+                {
+                    tier.Name = plan.Name;
+                }
+            }
+            else
+            {
+                tier.MonthlyPlan = mapped;
+                tier.Name = plan.Name;
+            }
+        }
+
+        return tiers.Values
+            .OrderBy(t => t.MonthlyPlan?.Amount ?? t.AnnualPlan?.Amount ?? decimal.MaxValue)
+            .ToList();
+    }
+
+    private List<SubscriptionPlan> FallbackPlans() => new()
+    {
+        new SubscriptionPlan
+        {
+            Id = "free",
+            Code = "free",
+            Name = "Free",
+            StripePriceId = string.Empty,
+            Currency = "usd",
+            Interval = "month",
+            Amount = 0,
+            Description = "Try Kalshi Signals with free market coverage.",
+            IsActive = true
+        },
+        new SubscriptionPlan
+        {
+            Id = "core-data",
+            Code = "core-data",
+            Name = "Core Data",
+            StripePriceId = _stripeOptions.CoreDataPriceId ?? string.Empty,
+            Currency = "usd",
+            Interval = "month",
+            Amount = 79,
+            Description = "Streamlined market data feed with history and export support.",
+            IsActive = true
+        },
+        new SubscriptionPlan
+        {
+            Id = "core-data-annual",
+            Code = "core-data-annual",
+            Name = "Core Data",
+            StripePriceId = _stripeOptions.CoreDataAnnualPriceId ?? string.Empty,
+            Currency = "usd",
+            Interval = "year",
+            Amount = 790,
+            Description = "Annual billing for Core Data.",
+            IsActive = true
+        }
+    };
+
+    private static bool IsAnnualPlan(SubscriptionPlan plan)
+    {
+        return plan.Code.EndsWith("-annual", StringComparison.OrdinalIgnoreCase) ||
+               plan.Interval.Equals("year", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static string NormalizeTierCode(string planCode)
+    {
+        return planCode.EndsWith("-annual", StringComparison.OrdinalIgnoreCase)
+            ? planCode[..^"-annual".Length]
+            : planCode;
+    }
 
     private async Task<User?> GetUserAsync(CancellationToken cancellationToken)
     {

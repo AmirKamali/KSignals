@@ -508,6 +508,21 @@ public class StripeSubscriptionService
             });
         }
 
+        if (!string.IsNullOrWhiteSpace(_options.CoreDataAnnualPriceId))
+        {
+            seedPlans.Add(new SubscriptionPlan
+            {
+                Id = "core-data-annual",
+                Code = "core-data-annual",
+                Name = "Core Data",
+                StripePriceId = _options.CoreDataAnnualPriceId,
+                Currency = "usd",
+                Interval = "year",
+                Amount = 790,
+                Description = "Annual billing for Core Data."
+            });
+        }
+
         foreach (var seed in seedPlans)
         {
             var existing = await _db.SubscriptionPlans.FirstOrDefaultAsync(p => p.Id == seed.Id, cancellationToken);

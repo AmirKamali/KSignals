@@ -78,7 +78,7 @@
         </div>
     </section>
 
-    <section id="plans" class="plan-section">
+    <section id="plans" class="plan-section" data-cadence="@Model.SelectedCadence">
         <div class="container">
             <div class="section-header">
                 <div>
@@ -96,29 +96,45 @@
                 }
             </div>
 
+            <div class="billing-toggle" role="group" aria-label="Billing cadence selector">
+                <button type="button" class="toggle-option" data-cadence="monthly">Monthly</button>
+                <button type="button" class="toggle-option" data-cadence="annual">Annual billing</button>
+            </div>
+
             <div class="plan-grid">
-                @foreach (var plan in Model.Plans
-                    .Where(p => string.Equals(p.Code, "free", StringComparison.OrdinalIgnoreCase) || string.Equals(p.Code, "core-data", StringComparison.OrdinalIgnoreCase))
-                    .OrderBy(p => string.Equals(p.Code, "free", StringComparison.OrdinalIgnoreCase) ? 0 : 1))
+                @foreach (var tier in Model.Tiers)
                 {
-                    var isCurrent = string.Equals(activePlan, plan.Code, StringComparison.OrdinalIgnoreCase);
-                    var isFree = plan.Amount <= 0;
-                    var priceLabel = isFree ? "Free" : $"${plan.Amount:0} / {plan.Interval}";
-                    var ctaLabel = isCurrent
-                        ? "Manage billing"
-                        : (isFree ? "Start for free" : (string.IsNullOrWhiteSpace(activePlan) ? "Start Core Data" : "Upgrade to Core Data"));
-                    var features = featureMap.TryGetValue(plan.Code, out var mapped)
+                    var monthlyPlan = tier.MonthlyPlan ?? tier.AnnualPlan;
+                    var annualPlan = tier.AnnualPlan ?? tier.MonthlyPlan;
+                    var selectedPlan = monthlyPlan ?? annualPlan;
+                    if (selectedPlan == null)
+                    {
+                        continue;
+                    }
+
+                    var tierKey = string.IsNullOrWhiteSpace(tier.Tier) ? selectedPlan.Code : tier.Tier;
+                    var isCurrent = string.Equals(activePlan, selectedPlan.Code, StringComparison.OrdinalIgnoreCase);
+                    var isFree = selectedPlan.Amount <= 0;
+                    var monthlyPriceLabel = monthlyPlan == null || monthlyPlan.Amount <= 0
+                        ? "Free"
+                        : $"${monthlyPlan.Amount:0} / {monthlyPlan.Interval}";
+                    var annualPriceLabel = annualPlan == null || annualPlan.Amount <= 0
+                        ? "Free"
+                        : $"${annualPlan.Amount:0} / {annualPlan.Interval}";
+                    var features = featureMap.TryGetValue(tierKey, out var mapped)
                         ? mapped
                         : new[] { "Live data", "Alerts", "Priority support" };
-                <div class="plan-card @(isCurrent ? "plan-card-active" : string.Empty)">
+                    var isCoreTier = string.Equals(tierKey, "core-data", StringComparison.OrdinalIgnoreCase);
+                <div class="plan-card @(isCurrent ? "plan-card-active" : string.Empty)" data-tier="@tierKey">
                     <div class="plan-top">
                         <div class="plan-labels">
-                            <p class="eyebrow">@plan.Code</p>
-                            <h3>@plan.Name</h3>
-                            <p class="plan-description">@plan.Description</p>
+                            <p class="eyebrow">@selectedPlan.Code</p>
+                            <h3>@(string.IsNullOrWhiteSpace(tier.Name) ? selectedPlan.Name : tier.Name)</h3>
+                            <p class="plan-description">@selectedPlan.Description</p>
                         </div>
                         <div class="price-row">
-                            <span class="price">@priceLabel</span>
+                            <span class="price price-monthly">@monthlyPriceLabel</span>
+                            <span class="price price-annual">@annualPriceLabel</span>
                             @if (isCurrent)
                             {
                                 <span class="badge success">Current plan</span>
@@ -143,15 +159,30 @@
                                 <button type="submit" class="btn btn-outline">Manage billing</button>
                             </form>
                         }
-                        @if (string.Equals(plan.Code, "core-data", StringComparison.OrdinalIgnoreCase) && !isCurrent)
+                        @if (isCoreTier && !isCurrent)
                         {
-                            <a href="@Model.CoreDataPaymentLink" class="btn btn-primary">@ctaLabel</a>
+                            <a href="@Model.CoreDataPaymentLink"
+                               class="btn btn-primary cadence-link"
+                               data-monthly-href="@Model.CoreDataPaymentLink"
+                               data-annual-href="@Model.CoreDataAnnualPaymentLink">
+                                <span class="cta-label cta-monthly">Choose monthly</span>
+                                <span class="cta-label cta-annual">Choose annual</span>
+                            </a>
                         }
-                        else if (!string.Equals(plan.Code, "core-data", StringComparison.OrdinalIgnoreCase))
+                        else if (!isCoreTier)
                         {
                             <form method="post" asp-page-handler="Checkout">
-                                <input type="hidden" name="planCode" value="@plan.Code" />
-                                <button type="submit" class="btn btn-primary">@ctaLabel</button>
+                                <input type="hidden"
+                                       name="planCode"
+                                       value="@monthlyPlan?.Code ?? annualPlan?.Code"
+                                       class="cadence-plan-code"
+                                       data-monthly-code="@monthlyPlan?.Code"
+                                       data-annual-code="@annualPlan?.Code" />
+                                <input type="hidden" name="cadence" value="@Model.SelectedCadence" class="cadence-value" />
+                                <button type="submit" class="btn btn-primary">
+                                    <span class="cta-label cta-monthly">@((isFree ? "Start for free" : "Choose monthly"))</span>
+                                    <span class="cta-label cta-annual">@((isFree ? "Start for free" : "Choose annual"))</span>
+                                </button>
                             </form>
                         }
                     </div>
@@ -192,3 +223,48 @@
         </section>
     }
 </main>
+
+@section Scripts {
+    <script>
+        (() => {
+            const section = document.querySelector('.plan-section');
+            const toggleButtons = document.querySelectorAll('.billing-toggle .toggle-option');
+            if (!section || toggleButtons.length === 0) return;
+
+            const setCadence = (cadence) => {
+                const normalized = cadence === 'annual' ? 'annual' : 'monthly';
+                section.dataset.cadence = normalized;
+
+                toggleButtons.forEach(btn => {
+                    const isActive = (btn.dataset.cadence || 'monthly') === normalized;
+                    btn.classList.toggle('active', isActive);
+                });
+
+                document.querySelectorAll('.cadence-plan-code').forEach(input => {
+                    const monthly = input.dataset.monthlyCode;
+                    const annual = input.dataset.annualCode;
+                    input.value = normalized === 'annual' && annual ? annual : monthly || annual || '';
+                });
+
+                document.querySelectorAll('.cadence-value').forEach(input => {
+                    input.value = normalized;
+                });
+
+                document.querySelectorAll('.cadence-link').forEach(link => {
+                    const monthly = link.dataset.monthlyHref;
+                    const annual = link.dataset.annualHref;
+                    link.href = normalized === 'annual' && annual ? annual : monthly || annual || '#';
+                });
+            };
+
+            toggleButtons.forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    setCadence(btn.dataset.cadence || 'monthly');
+                });
+            });
+
+            setCadence(section.dataset.cadence || 'monthly');
+        })();
+    </script>
+}

@@ -592,6 +592,35 @@ public class BackendClient
         }
     }
 
+    public async Task<IReadOnlyList<SubscriptionTierDto>> GetSubscriptionTierPricingAsync()
+    {
+        try
+        {
+            var url = $"{_options.BaseUrl.TrimEnd('/')}/api/subscriptions/tiers";
+            using var response = await _httpClient.GetAsync(url);
+            if (!response.IsSuccessStatusCode)
+            {
+                _logger.LogWarning("Subscription tier request failed with status {StatusCode}", response.StatusCode);
+                return Array.Empty<SubscriptionTierDto>();
+            }
+
+            var body = await response.Content.ReadAsStringAsync();
+            using var doc = JsonDocument.Parse(body);
+            if (doc.RootElement.TryGetProperty("tiers", out var tiersNode))
+            {
+                var tiers = JsonSerializer.Deserialize<List<SubscriptionTierDto>>(tiersNode.GetRawText(), _jsonOptions);
+                return tiers ?? new List<SubscriptionTierDto>();
+            }
+
+            return Array.Empty<SubscriptionTierDto>();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Falling back to empty tier list");
+            return Array.Empty<SubscriptionTierDto>();
+        }
+    }
+
     public async Task<(bool Success, string? ErrorMessage, SubscriptionSummaryResponse? Response)> GetSubscriptionAsync(string jwt)
     {
         if (string.IsNullOrWhiteSpace(jwt))

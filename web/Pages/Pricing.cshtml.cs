@@ -11,12 +11,16 @@ public class PricingModel : PageModel
     private readonly BackendClient _backendClient;
     private readonly ILogger<PricingModel> _logger;
     private readonly string _coreDataPaymentLink;
+    private readonly string _coreDataAnnualPaymentLink;
 
+    public List<SubscriptionTierDto> Tiers { get; private set; } = new();
     public List<SubscriptionPlanDto> Plans { get; private set; } = new();
     public SubscriptionSummaryResponse? CurrentSubscription { get; private set; }
     public string? ErrorMessage { get; private set; }
     public string? StatusMessage { get; private set; }
     public string CoreDataPaymentLink => _coreDataPaymentLink;
+    public string CoreDataAnnualPaymentLink => _coreDataAnnualPaymentLink;
+    public string SelectedCadence { get; private set; } = "monthly";
 
     public PricingModel(BackendClient backendClient, ILogger<PricingModel> logger, IConfiguration configuration)
     {
@@ -26,10 +30,16 @@ public class PricingModel : PageModel
         _coreDataPaymentLink = string.IsNullOrWhiteSpace(configuredLink)
             ? "https://buy.stripe.com/test_5kQ00kbN8fqjeqPdfwafS00"
             : configuredLink;
+
+        var configuredAnnualLink = configuration["payment_link_core_data_annual"];
+        _coreDataAnnualPaymentLink = string.IsNullOrWhiteSpace(configuredAnnualLink)
+            ? _coreDataPaymentLink
+            : configuredAnnualLink;
     }
 
     public async Task OnGetAsync()
     {
+        SelectedCadence = "monthly";
         await LoadDataAsync();
 
         if (Request.Query.TryGetValue("canceled", out _))
@@ -43,8 +53,10 @@ public class PricingModel : PageModel
         }
     }
 
-    public async Task<IActionResult> OnPostCheckoutAsync(string planCode)
+    public async Task<IActionResult> OnPostCheckoutAsync(string planCode, string? cadence)
     {
+        SelectedCadence = NormalizeCadence(cadence);
+
         if (string.IsNullOrWhiteSpace(planCode))
         {
             ErrorMessage = "Choose a plan to continue.";
@@ -103,23 +115,12 @@ public class PricingModel : PageModel
 
     private async Task LoadDataAsync()
     {
-        var fetchedPlans = (await _backendClient.GetSubscriptionPlansAsync()).ToList();
-        var relevantPlans = fetchedPlans
-            .Where(p =>
-                string.Equals(p.Code, "free", StringComparison.OrdinalIgnoreCase) ||
-                string.Equals(p.Code, "core-data", StringComparison.OrdinalIgnoreCase))
-            .ToList();
-
-        var plansByCode = FallbackPlans()
-            .ToDictionary(p => p.Code, StringComparer.OrdinalIgnoreCase);
-
-        foreach (var plan in relevantPlans)
-        {
-            plansByCode[plan.Code] = plan;
-        }
-
-        Plans = plansByCode.Values
-            .OrderBy(p => string.Equals(p.Code, "free", StringComparison.OrdinalIgnoreCase) ? 0 : 1)
+        var fetchedTiers = (await _backendClient.GetSubscriptionTierPricingAsync()).ToList();
+        Tiers = MergeWithFallbackTiers(fetchedTiers);
+        Plans = Tiers
+            .SelectMany(t => new[] { t.MonthlyPlan, t.AnnualPlan })
+            .Where(p => p != null)
+            .Cast<SubscriptionPlanDto>()
             .ToList();
 
         if (Request.Cookies.TryGetValue("ksignals_jwt", out var jwt) && !string.IsNullOrWhiteSpace(jwt))
@@ -136,27 +137,77 @@ public class PricingModel : PageModel
         }
     }
 
-    private static List<SubscriptionPlanDto> FallbackPlans() => new()
+    private static List<SubscriptionTierDto> MergeWithFallbackTiers(List<SubscriptionTierDto> fetchedTiers)
     {
-        new SubscriptionPlanDto
+        var fallbackTiers = FallbackTiers()
+            .ToDictionary(t => t.Tier, StringComparer.OrdinalIgnoreCase);
+
+        foreach (var tier in fetchedTiers)
         {
-            Id = "free",
-            Code = "free",
+            if (!fallbackTiers.TryGetValue(tier.Tier, out var existing))
+            {
+                fallbackTiers[tier.Tier] = tier;
+                continue;
+            }
+
+            existing.Name = string.IsNullOrWhiteSpace(tier.Name) ? existing.Name : tier.Name;
+            existing.MonthlyPlan = tier.MonthlyPlan ?? existing.MonthlyPlan;
+            existing.AnnualPlan = tier.AnnualPlan ?? existing.AnnualPlan;
+        }
+
+        return fallbackTiers.Values
+            .OrderBy(t => t.MonthlyPlan?.Amount ?? t.AnnualPlan?.Amount ?? decimal.MaxValue)
+            .ToList();
+    }
+
+    private static List<SubscriptionTierDto> FallbackTiers() => new()
+    {
+        new SubscriptionTierDto
+        {
+            Tier = "free",
             Name = "Free",
-            Amount = 0,
-            Currency = "usd",
-            Interval = "month",
-            Description = "Try Kalshi Signals with free market coverage."
+            MonthlyPlan = new SubscriptionPlanDto
+            {
+                Id = "free",
+                Code = "free",
+                Name = "Free",
+                Amount = 0,
+                Currency = "usd",
+                Interval = "month",
+                Description = "Try Kalshi Signals with free market coverage."
+            }
         },
-        new SubscriptionPlanDto
+        new SubscriptionTierDto
         {
-            Id = "core-data",
-            Code = "core-data",
+            Tier = "core-data",
             Name = "Core Data",
-            Amount = 79,
-            Currency = "usd",
-            Interval = "month",
-            Description = "Live and historical market data feed with export-ready access."
+            MonthlyPlan = new SubscriptionPlanDto
+            {
+                Id = "core-data",
+                Code = "core-data",
+                Name = "Core Data",
+                Amount = 79,
+                Currency = "usd",
+                Interval = "month",
+                Description = "Live and historical market data feed with export-ready access."
+            },
+            AnnualPlan = new SubscriptionPlanDto
+            {
+                Id = "core-data-annual",
+                Code = "core-data-annual",
+                Name = "Core Data",
+                Amount = 790,
+                Currency = "usd",
+                Interval = "year",
+                Description = "Annual billing for Core Data with export-ready access."
+            }
         }
     };
+
+    private static string NormalizeCadence(string? cadence)
+    {
+        return cadence != null && cadence.Equals("annual", StringComparison.OrdinalIgnoreCase)
+            ? "annual"
+            : "monthly";
+    }
 }

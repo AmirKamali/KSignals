@@ -13,5 +13,6 @@ public class StripeOptions
     public string BillingPortalReturnUrl { get; set; } = string.Empty;
 
     public string CoreDataPriceId { get; set; } = string.Empty;
+    public string? CoreDataAnnualPriceId { get; set; }
     public string? PremiumPriceId { get; set; }
 }
