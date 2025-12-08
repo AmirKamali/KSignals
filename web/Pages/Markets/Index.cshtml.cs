@@ -49,8 +49,9 @@ public class IndexModel : PageModel
         var currentPage = Math.Max(1, pageValue ?? 1);
         var size = Math.Max(1, pageSize ?? 20);
 
-        // Require authentication for page > 1
-        if (currentPage > 1)
+        // Require authentication for page > 1 or non-default sorting
+        var requiresAuth = currentPage > 1 || activeSort != "Volume24H";
+        if (requiresAuth)
         {
             var isAuthenticated = IsUserAuthenticated();
             if (!isAuthenticated)
