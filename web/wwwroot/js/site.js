@@ -8,18 +8,24 @@
         const isSortSelect = target.classList.contains("sortSelect");
         const isDateSelect = target.classList.contains("dateSelect");
 
-        const params = new URLSearchParams({
+        const params = {
             date: isDateSelect ? target.value : (target.dataset.date ?? "next_30_days"),
             category: target.dataset.category ?? "",
             tag: target.dataset.tag ?? "",
             sort_type: isSortSelect ? target.value : (target.dataset.sort ?? "Volume24H"),
-            direction: target.dataset.direction ?? "desc",
             page: "1",
             pageSize: target.dataset.pagesize ?? "20",
             query: target.dataset.query ?? "",
-        });
+        };
 
-        window.location.href = `${target.dataset.hrefPrefix}?${params.toString()}`;
+        // Only include direction if we're NOT changing the sort type
+        // This allows the backend to apply the appropriate default direction for each sort type
+        if (!isSortSelect && target.dataset.direction) {
+            params.direction = target.dataset.direction;
+        }
+
+        const searchParams = new URLSearchParams(params);
+        window.location.href = `${target.dataset.hrefPrefix}?${searchParams.toString()}`;
     });
 })();
 
