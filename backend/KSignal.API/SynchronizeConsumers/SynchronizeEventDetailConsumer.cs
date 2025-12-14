@@ -10,13 +10,16 @@ namespace KSignal.API.SynchronizeConsumers;
 public class SynchronizeEventDetailConsumer : IConsumer<Batch<SynchronizeEventDetail>>
 {
     private readonly IServiceScopeFactory _serviceScopeFactory;
+    private readonly ISyncLogService _syncLogService;
     private readonly ILogger<SynchronizeEventDetailConsumer> _logger;
 
     public SynchronizeEventDetailConsumer(
         IServiceScopeFactory serviceScopeFactory,
+        ISyncLogService syncLogService,
         ILogger<SynchronizeEventDetailConsumer> logger)
     {
         _serviceScopeFactory = serviceScopeFactory ?? throw new ArgumentNullException(nameof(serviceScopeFactory));
+        _syncLogService = syncLogService ?? throw new ArgumentNullException(nameof(syncLogService));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
 
@@ -24,6 +27,7 @@ public class SynchronizeEventDetailConsumer : IConsumer<Batch<SynchronizeEventDe
     {
         var batch = context.Message;
         _logger.LogInformation("Processing batch of {Count} event detail synchronization messages", batch.Length);
+        await _syncLogService.LogSyncEventAsync("SynchronizeEventDetail", batch.Length, context.CancellationToken);
 
         var tasks = new List<Task>();
         foreach (var message in batch)
