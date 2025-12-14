@@ -31,13 +31,6 @@ public class StripeSubscriptionService
 
     public async Task<List<SubscriptionPlan>> GetActivePlansAsync(CancellationToken cancellationToken)
     {
-        await _db.Database.EnsureCreatedAsync(cancellationToken);
-        var changed = await SeedPlansAsync(cancellationToken);
-        if (changed)
-        {
-            await _db.SaveChangesAsync(cancellationToken);
-        }
-
         return await _db.SubscriptionPlans
             .Where(p => p.IsActive)
             .OrderBy(p => p.Amount)

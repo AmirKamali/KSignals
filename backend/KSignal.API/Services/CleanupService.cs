@@ -2,7 +2,6 @@ using KSignal.API.Data;
 using KSignal.API.Messaging;
 using MassTransit;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Logging;
 
 namespace KSignal.API.Services;
 
@@ -13,21 +12,21 @@ public class CleanupService
 {
     private readonly KalshiDbContext _dbContext;
     private readonly IPublishEndpoint _publishEndpoint;
-    private readonly ILogger<CleanupService> _logger;
+    private readonly ISyncLogService _syncLogService;
 
     public CleanupService(
         KalshiDbContext dbContext,
         IPublishEndpoint publishEndpoint,
-        ILogger<CleanupService> logger)
+        ISyncLogService syncLogService)
     {
         _dbContext = dbContext ?? throw new ArgumentNullException(nameof(dbContext));
         _publishEndpoint = publishEndpoint ?? throw new ArgumentNullException(nameof(publishEndpoint));
-        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+        _syncLogService = syncLogService ?? throw new ArgumentNullException(nameof(syncLogService));
     }
 
     /// <summary>
     /// Finds all tickers with Finalized or Closed status that are at least 7 days past close/expiration
-    /// and enqueues cleanup jobs for each
+    /// and enqueues cleanup jobs for each (max 500 markets per call)
     /// </summary>
     public async Task<int> EnqueueCleanupJobsAsync(CancellationToken cancellationToken = default)
     {
@@ -52,23 +51,24 @@ public class CleanupService
 
             if (tickersToCleanup.Count == 0)
             {
-                _logger.LogInformation("No finalized or closed markets found for cleanup");
+                await _syncLogService.LogSyncEventAsync("CleanupMarketData_NoMarketsFound", 0, cancellationToken);
                 return 0;
             }
 
-            _logger.LogInformation("Queueing cleanup for {Count} finalized/closed markets", tickersToCleanup.Count);
+            await _syncLogService.LogSyncEventAsync("CleanupMarketData_QueueingStarted", tickersToCleanup.Count, cancellationToken);
 
             foreach (var tickerId in tickersToCleanup)
             {
                 await _publishEndpoint.Publish(new CleanupMarketData(tickerId), cancellationToken);
             }
 
-            _logger.LogInformation("Successfully queued {Count} cleanup jobs", tickersToCleanup.Count);
+            await _syncLogService.LogSyncEventAsync("CleanupMarketData_QueueingCompleted", tickersToCleanup.Count, cancellationToken);
+
             return tickersToCleanup.Count;
         }
-        catch (Exception ex)
+        catch (Exception)
         {
-            _logger.LogError(ex, "Error enqueueing cleanup jobs");
+            await _syncLogService.LogSyncEventAsync("CleanupMarketData_Error", 0, cancellationToken);
             throw;
         }
     }
@@ -80,50 +80,50 @@ public class CleanupService
     {
         try
         {
-            _logger.LogInformation("Starting cleanup for ticker {TickerId}", tickerId);
+            await _syncLogService.LogSyncEventAsync($"CleanupTicker_Started_{tickerId}", 1, cancellationToken);
 
             var totalDeleted = 0;
 
             // 1. Delete from market_snapshots
             var snapshotsDeleted = await DeleteMarketSnapshotsAsync(tickerId, cancellationToken);
             totalDeleted += snapshotsDeleted;
-            _logger.LogDebug("Deleted {Count} market_snapshots for ticker {TickerId}", snapshotsDeleted, tickerId);
+            await _syncLogService.LogSyncEventAsync($"CleanupTicker_MarketSnapshots_{tickerId}", snapshotsDeleted, cancellationToken);
 
             // 2. Delete from market_snapshots_latest
             var snapshotsLatestDeleted = await DeleteMarketSnapshotsLatestAsync(tickerId, cancellationToken);
             totalDeleted += snapshotsLatestDeleted;
-            _logger.LogDebug("Deleted {Count} market_snapshots_latest for ticker {TickerId}", snapshotsLatestDeleted, tickerId);
+            await _syncLogService.LogSyncEventAsync($"CleanupTicker_MarketSnapshotsLatest_{tickerId}", snapshotsLatestDeleted, cancellationToken);
 
             // 3. Delete from market_candlesticks
             var candlesticksDeleted = await DeleteMarketCandlesticksAsync(tickerId, cancellationToken);
             totalDeleted += candlesticksDeleted;
-            _logger.LogDebug("Deleted {Count} market_candlesticks for ticker {TickerId}", candlesticksDeleted, tickerId);
+            await _syncLogService.LogSyncEventAsync($"CleanupTicker_MarketCandlesticks_{tickerId}", candlesticksDeleted, cancellationToken);
 
             // 4. Delete from orderbook_snapshots (uses MarketId)
             var orderbookSnapshotsDeleted = await DeleteOrderbookSnapshotsAsync(tickerId, cancellationToken);
             totalDeleted += orderbookSnapshotsDeleted;
-            _logger.LogDebug("Deleted {Count} orderbook_snapshots for ticker {TickerId}", orderbookSnapshotsDeleted, tickerId);
+            await _syncLogService.LogSyncEventAsync($"CleanupTicker_OrderbookSnapshots_{tickerId}", orderbookSnapshotsDeleted, cancellationToken);
 
             // 5. Delete from orderbook_events (uses MarketId)
             var orderbookEventsDeleted = await DeleteOrderbookEventsAsync(tickerId, cancellationToken);
             totalDeleted += orderbookEventsDeleted;
-            _logger.LogDebug("Deleted {Count} orderbook_events for ticker {TickerId}", orderbookEventsDeleted, tickerId);
+            await _syncLogService.LogSyncEventAsync($"CleanupTicker_OrderbookEvents_{tickerId}", orderbookEventsDeleted, cancellationToken);
 
             // 6. Delete from analytics_market_features
             var analyticsDeleted = await DeleteAnalyticsMarketFeaturesAsync(tickerId, cancellationToken);
             totalDeleted += analyticsDeleted;
-            _logger.LogDebug("Deleted {Count} analytics_market_features for ticker {TickerId}", analyticsDeleted, tickerId);
+            await _syncLogService.LogSyncEventAsync($"CleanupTicker_AnalyticsMarketFeatures_{tickerId}", analyticsDeleted, cancellationToken);
 
             // 7. Delete from market_highpriority
             var highPriorityDeleted = await DeleteMarketHighPriorityAsync(tickerId, cancellationToken);
             totalDeleted += highPriorityDeleted;
-            _logger.LogDebug("Deleted {Count} market_highpriority for ticker {TickerId}", highPriorityDeleted, tickerId);
+            await _syncLogService.LogSyncEventAsync($"CleanupTicker_MarketHighPriority_{tickerId}", highPriorityDeleted, cancellationToken);
 
-            _logger.LogInformation("Cleanup complete for ticker {TickerId}: {TotalDeleted} total records deleted", tickerId, totalDeleted);
+            await _syncLogService.LogSyncEventAsync($"CleanupTicker_Completed_{tickerId}", totalDeleted, cancellationToken);
         }
-        catch (Exception ex)
+        catch (Exception)
         {
-            _logger.LogError(ex, "Error cleaning up data for ticker {TickerId}", tickerId);
+            await _syncLogService.LogSyncEventAsync($"CleanupTicker_Error_{tickerId}", 0, cancellationToken);
             throw;
         }
     }
@@ -181,9 +181,9 @@ public class CleanupService
             await _dbContext.Database.ExecuteSqlRawAsync(sql, cancellationToken);
             return 1; // Indicate success (actual count not available for async mutations)
         }
-        catch (Exception ex)
+        catch (Exception)
         {
-            _logger.LogWarning(ex, "Error executing SQL: {Sql}", sql);
+            await _syncLogService.LogSyncEventAsync("CleanupTicker_SqlExecutionError", 0, cancellationToken);
             return 0;
         }
     }
