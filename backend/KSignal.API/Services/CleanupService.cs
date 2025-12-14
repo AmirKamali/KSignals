@@ -89,27 +89,32 @@ public class CleanupService
             totalDeleted += snapshotsDeleted;
             _logger.LogDebug("Deleted {Count} market_snapshots for ticker {TickerId}", snapshotsDeleted, tickerId);
 
-            // 2. Delete from market_candlesticks
+            // 2. Delete from market_snapshots_latest
+            var snapshotsLatestDeleted = await DeleteMarketSnapshotsLatestAsync(tickerId, cancellationToken);
+            totalDeleted += snapshotsLatestDeleted;
+            _logger.LogDebug("Deleted {Count} market_snapshots_latest for ticker {TickerId}", snapshotsLatestDeleted, tickerId);
+
+            // 3. Delete from market_candlesticks
             var candlesticksDeleted = await DeleteMarketCandlesticksAsync(tickerId, cancellationToken);
             totalDeleted += candlesticksDeleted;
             _logger.LogDebug("Deleted {Count} market_candlesticks for ticker {TickerId}", candlesticksDeleted, tickerId);
 
-            // 3. Delete from orderbook_snapshots (uses MarketId)
+            // 4. Delete from orderbook_snapshots (uses MarketId)
             var orderbookSnapshotsDeleted = await DeleteOrderbookSnapshotsAsync(tickerId, cancellationToken);
             totalDeleted += orderbookSnapshotsDeleted;
             _logger.LogDebug("Deleted {Count} orderbook_snapshots for ticker {TickerId}", orderbookSnapshotsDeleted, tickerId);
 
-            // 4. Delete from orderbook_events (uses MarketId)
+            // 5. Delete from orderbook_events (uses MarketId)
             var orderbookEventsDeleted = await DeleteOrderbookEventsAsync(tickerId, cancellationToken);
             totalDeleted += orderbookEventsDeleted;
             _logger.LogDebug("Deleted {Count} orderbook_events for ticker {TickerId}", orderbookEventsDeleted, tickerId);
 
-            // 5. Delete from analytics_market_features
+            // 6. Delete from analytics_market_features
             var analyticsDeleted = await DeleteAnalyticsMarketFeaturesAsync(tickerId, cancellationToken);
             totalDeleted += analyticsDeleted;
             _logger.LogDebug("Deleted {Count} analytics_market_features for ticker {TickerId}", analyticsDeleted, tickerId);
 
-            // 6. Delete from market_highpriority
+            // 7. Delete from market_highpriority
             var highPriorityDeleted = await DeleteMarketHighPriorityAsync(tickerId, cancellationToken);
             totalDeleted += highPriorityDeleted;
             _logger.LogDebug("Deleted {Count} market_highpriority for ticker {TickerId}", highPriorityDeleted, tickerId);
@@ -127,6 +132,13 @@ public class CleanupService
     {
         // ClickHouse requires ALTER TABLE ... DELETE for MergeTree tables
         var sql = $"ALTER TABLE kalshi_signals.market_snapshots DELETE WHERE Ticker = '{EscapeSqlString(tickerId)}'";
+        return await ExecuteRawSqlAsync(sql, cancellationToken);
+    }
+
+    private async Task<int> DeleteMarketSnapshotsLatestAsync(string tickerId, CancellationToken cancellationToken)
+    {
+        // ClickHouse requires ALTER TABLE ... DELETE for MergeTree tables
+        var sql = $"ALTER TABLE kalshi_signals.market_snapshots_latest DELETE WHERE Ticker = '{EscapeSqlString(tickerId)}'";
         return await ExecuteRawSqlAsync(sql, cancellationToken);
     }
 
