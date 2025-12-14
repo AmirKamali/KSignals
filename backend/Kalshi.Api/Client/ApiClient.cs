@@ -140,7 +140,37 @@ namespace Kalshi.Api.Client
             // at this point, it must be a model (json)
             try
             {
+                // Check for rate limiting error before attempting deserialization
+                if (!string.IsNullOrWhiteSpace(response.Content) &&
+                    response.Content.Contains("too_many_requests"))
+                {
+                    try
+                    {
+                        // Try to parse the error response
+                        var errorResponse = JsonConvert.DeserializeObject<dynamic>(response.Content);
+                        if (errorResponse?.error?.code == "too_many_requests")
+                        {
+                            var errorMessage = errorResponse?.error?.message?.ToString() ?? "too many requests";
+                            throw new RateLimitExceededException(429, errorMessage, response.Content);
+                        }
+                    }
+                    catch (RateLimitExceededException)
+                    {
+                        // Re-throw RateLimitExceededException
+                        throw;
+                    }
+                    catch
+                    {
+                        // If parsing fails, continue with normal deserialization
+                    }
+                }
+
                 return JsonConvert.DeserializeObject(response.Content, type, _serializerSettings);
+            }
+            catch (RateLimitExceededException)
+            {
+                // Re-throw rate limit exception without wrapping
+                throw;
             }
             catch (Exception e)
             {

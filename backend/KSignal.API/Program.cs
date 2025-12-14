@@ -1,16 +1,16 @@
+using System.Text;
+using ClickHouse.EntityFrameworkCore.Extensions;
+using DotNetEnv;
 using Kalshi.Api;
 using Kalshi.Api.Configuration;
 using KSignal.API.Data;
-using Microsoft.EntityFrameworkCore;
-using KSignal.API.Services;
 using KSignal.API.Models;
-using Microsoft.AspNetCore.Authentication.JwtBearer;
-using Microsoft.IdentityModel.Tokens;
-using System.Text;
-using Microsoft.Extensions.Logging;
+using KSignal.API.Services;
 using MassTransit;
-using ClickHouse.EntityFrameworkCore.Extensions;
-using DotNetEnv;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
+using Microsoft.IdentityModel.Tokens;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -148,14 +148,14 @@ builder.Services.AddMassTransit(x =>
 
     x.AddConsumer<KSignal.API.SynchronizeConsumers.SynchronizeMarketDataConsumer>(cfg =>
     {
-        cfg.ConcurrentMessageLimit = 5;
+        cfg.ConcurrentMessageLimit = 1;
     });
     x.AddConsumer<KSignal.API.SynchronizeConsumers.SynchronizeTagsCategoriesConsumer>();
     x.AddConsumer<KSignal.API.SynchronizeConsumers.SynchronizeSeriesConsumer>();
     x.AddConsumer<KSignal.API.SynchronizeConsumers.SynchronizeEventsConsumer>();
     x.AddConsumer<KSignal.API.SynchronizeConsumers.SynchronizeEventDetailConsumer>(cfg =>
     {
-        cfg.ConcurrentMessageLimit = 3;
+        cfg.ConcurrentMessageLimit = 1;
     });
     x.AddConsumer<KSignal.API.SynchronizeConsumers.SynchronizeOrderbookConsumer>();
     x.AddConsumer<KSignal.API.SynchronizeConsumers.SynchronizeCandlesticksConsumer>();
@@ -242,9 +242,9 @@ builder.Services.AddAuthentication(options =>
         OnAuthenticationFailed = context =>
         {
             var logger = context.HttpContext.RequestServices.GetRequiredService<ILogger<Program>>();
-            logger.LogError(context.Exception, 
-                "JWT authentication failed. Error: {Error}, Path: {Path}", 
-                context.Exception?.Message, 
+            logger.LogError(context.Exception,
+                "JWT authentication failed. Error: {Error}, Path: {Path}",
+                context.Exception?.Message,
                 context.Request.Path);
             return Task.CompletedTask;
         },

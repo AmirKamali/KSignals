@@ -65,4 +65,21 @@ namespace Kalshi.Api.Client
         }
     }
 
+    /// <summary>
+    /// Rate Limit Exceeded Exception - thrown when API returns too_many_requests error
+    /// </summary>
+    public class RateLimitExceededException : ApiException
+    {
+        /// <summary>
+        /// Initializes a new instance of the <see cref="RateLimitExceededException"/> class.
+        /// </summary>
+        /// <param name="errorCode">HTTP status code (usually 429).</param>
+        /// <param name="message">Error message.</param>
+        /// <param name="errorContent">Error content.</param>
+        public RateLimitExceededException(int errorCode, string message, object errorContent = null)
+            : base(errorCode, message, errorContent)
+        {
+        }
+    }
+
 }

@@ -1,3 +1,4 @@
+using Kalshi.Api.Client;
 using KSignal.API.Messaging;
 using KSignal.API.Services;
 using MassTransit;
@@ -20,6 +21,24 @@ public class SynchronizeEventsConsumer : IConsumer<SynchronizeEvents>
 
     public async Task Consume(ConsumeContext<SynchronizeEvents> context)
     {
-        await _synchronizationService.SynchronizeEventsAsync(context.Message, context.CancellationToken);
+        try
+        {
+            await _synchronizationService.SynchronizeEventsAsync(context.Message, context.CancellationToken);
+        }
+        catch (RateLimitExceededException rateLimitEx)
+        {
+            // Rate limit exceeded - log warning and gracefully complete the job without retry
+            _logger.LogWarning(rateLimitEx,
+                "Rate limit exceeded during events synchronization. Job will be removed without retry. " +
+                "Message: {Message}",
+                rateLimitEx.Message);
+
+            // Job will be gracefully completed without retry
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error during events synchronization");
+            throw;
+        }
     }
 }

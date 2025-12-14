@@ -59,7 +59,16 @@ services:
       - rabbitmq-data:/var/lib/rabbitmq
     networks:
       - kalshi-network
+      - web
     restart: unless-stopped
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.rabbitmq.rule=Host(`kalshisignals.com`)"
+      - "traefik.http.routers.rabbitmq.entrypoints=rabbitmq"
+      - "traefik.http.routers.rabbitmq.tls=true"
+      - "traefik.http.routers.rabbitmq.tls.certresolver=letsencrypt"
+      - "traefik.http.services.rabbitmq.loadbalancer.server.port=15672"
+      - "traefik.http.routers.rabbitmq.middlewares=default-secure-headers@file"
 
   # Web Client
   web:

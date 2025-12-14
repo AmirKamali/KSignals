@@ -1,3 +1,4 @@
+using Kalshi.Api.Client;
 using KSignal.API.Messaging;
 using KSignal.API.Services;
 using MassTransit;
@@ -29,6 +30,17 @@ public class SynchronizeMarketDataConsumer : IConsumer<SynchronizeMarketData>
         try
         {
             await _synchronizationService.SynchronizeMarketDataAsync(context.Message, context.CancellationToken);
+        }
+        catch (RateLimitExceededException rateLimitEx)
+        {
+            // Rate limit exceeded - log warning and gracefully complete the job without retry
+            _logger.LogWarning(rateLimitEx,
+                "Rate limit exceeded during market data synchronization. Job will be removed without retry. " +
+                "Message: {Message}, Cursor: {Cursor}",
+                rateLimitEx.Message,
+                context.Message.Cursor);
+
+            // Job will be removed via the finally block - no retry
         }
         catch (Exception ex)
         {
