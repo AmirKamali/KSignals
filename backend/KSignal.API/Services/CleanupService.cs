@@ -33,19 +33,21 @@ public class CleanupService
     {
         try
         {
-            var sevenDaysAgo = DateTime.UtcNow.AddDays(-7);
+            var sevenDaysAgo = DateTime.UtcNow.AddDays(-2);
 
             // Find distinct tickers where:
             // 1. Status is Finalized or Closed
             // 2. CloseTime or ExpectedExpirationTime is at least 7 days ago
+            // 3. Limit to 500 markets per call
             var tickersToCleanup = await _dbContext.MarketSnapshots
                 .AsNoTracking()
-                .Where(s => 
+                .Where(s =>
                     (s.Status == "Finalized" || s.Status == "Closed" || s.Status == "finalized" || s.Status == "closed") &&
-                    (s.CloseTime <= sevenDaysAgo || 
+                    (s.CloseTime <= sevenDaysAgo ||
                      (s.ExpectedExpirationTime.HasValue && s.ExpectedExpirationTime.Value <= sevenDaysAgo)))
                 .Select(s => s.Ticker)
                 .Distinct()
+                .Take(500)
                 .ToListAsync(cancellationToken);
 
             if (tickersToCleanup.Count == 0)
