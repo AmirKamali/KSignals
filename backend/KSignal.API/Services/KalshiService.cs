@@ -74,17 +74,18 @@ public class KalshiService
         if (maxCloseTime.HasValue)
             baseQuery = baseQuery.Where(x => x.Snapshot == null || x.Snapshot.CloseTime <= maxCloseTime.Value);
 
-        // Apply search filter
+        // Apply search filter (case-insensitive)
         if (searchTerm != null)
         {
-            var likePattern = $"%{searchTerm}%";
+            var lowerSearchTerm = searchTerm.ToLower();
+            var likePattern = $"%{lowerSearchTerm}%";
             baseQuery = baseQuery.Where(x =>
-                EF.Functions.Like(x.Event.Title, likePattern) ||
-                EF.Functions.Like(x.Event.SubTitle, likePattern) ||
-                EF.Functions.Like(x.Snapshot.YesSubTitle, likePattern) ||
-                EF.Functions.Like(x.Snapshot.NoSubTitle, likePattern) ||
-                EF.Functions.Like(x.Event.EventTicker, likePattern) ||
-                EF.Functions.Like(x.Snapshot.Ticker, likePattern));
+                EF.Functions.Like(x.Event.Title.ToLower(), likePattern) ||
+                EF.Functions.Like(x.Event.SubTitle.ToLower(), likePattern) ||
+                EF.Functions.Like(x.Snapshot.YesSubTitle.ToLower(), likePattern) ||
+                EF.Functions.Like(x.Snapshot.NoSubTitle.ToLower(), likePattern) ||
+                EF.Functions.Like(x.Event.EventTicker.ToLower(), likePattern) ||
+                EF.Functions.Like(x.Snapshot.Ticker.ToLower(), likePattern));
         }
 
         // Execute query and get all results

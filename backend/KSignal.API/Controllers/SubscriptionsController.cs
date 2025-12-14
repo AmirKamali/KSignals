@@ -33,6 +33,34 @@ public class SubscriptionsController : ControllerBase
         _logger = logger;
     }
 
+    [HttpGet("health-keys")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    public async Task<IActionResult> HealthCheckKeys(CancellationToken cancellationToken)
+    {
+        var secretKeyCheck = await ValidateSecretKeyAsync(cancellationToken);
+        var publishableKeyCheck = ValidatePublishableKey();
+        var webhookSecretCheck = ValidateWebhookSecret();
+        var priceIdsCheck = await ValidatePriceIdsAsync(cancellationToken);
+
+        var allHealthy = secretKeyCheck.IsValid &&
+                        publishableKeyCheck.IsValid &&
+                        webhookSecretCheck.IsValid &&
+                        priceIdsCheck.IsValid;
+
+        return Ok(new
+        {
+            healthy = allHealthy,
+            checks = new
+            {
+                secretKey = secretKeyCheck,
+                publishableKey = publishableKeyCheck,
+                webhookSecret = webhookSecretCheck,
+                priceIds = priceIdsCheck
+            },
+            timestamp = DateTime.UtcNow
+        });
+    }
+
     [HttpGet("plans")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     public async Task<IActionResult> GetPlans(CancellationToken cancellationToken)
@@ -361,5 +389,350 @@ public class SubscriptionsController : ControllerBase
     {
         return User.FindFirstValue(ClaimTypes.NameIdentifier)
             ?? User.FindFirstValue(JwtRegisteredClaimNames.Sub);
+    }
+
+    private async Task<ValidationResult> ValidateSecretKeyAsync(CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(_stripeOptions.SecretKey))
+        {
+            return new ValidationResult
+            {
+                IsValid = false,
+                Message = "Secret key is not configured",
+                Details = new { keyType = "none" }
+            };
+        }
+
+        // Determine key type (test vs live)
+        var keyType = _stripeOptions.SecretKey.StartsWith("sk_test_") ? "test" :
+                     _stripeOptions.SecretKey.StartsWith("sk_live_") ? "live" : "unknown";
+
+        try
+        {
+            // Test the key by retrieving balance
+            var balanceService = new Stripe.BalanceService();
+            var balance = await balanceService.GetAsync(cancellationToken: cancellationToken);
+
+            // Also test listing customers to verify read permissions
+            var customerService = new Stripe.CustomerService();
+            var customers = await customerService.ListAsync(
+                new Stripe.CustomerListOptions { Limit = 1 },
+                cancellationToken: cancellationToken);
+
+            return new ValidationResult
+            {
+                IsValid = true,
+                Message = "Secret key is valid and working",
+                Details = new
+                {
+                    keyType,
+                    balance = new
+                    {
+                        available = balance.Available?.Select(b => new
+                        {
+                            amount = b.Amount,
+                            currency = b.Currency
+                        }).ToList(),
+                        pending = balance.Pending?.Select(b => new
+                        {
+                            amount = b.Amount,
+                            currency = b.Currency
+                        }).ToList()
+                    },
+                    permissions = new
+                    {
+                        canReadBalance = true,
+                        canReadCustomers = true
+                    },
+                    testRequest = new
+                    {
+                        method = "GET",
+                        endpoint = "/v1/balance",
+                        statusCode = 200
+                    }
+                }
+            };
+        }
+        catch (Stripe.StripeException ex)
+        {
+            return new ValidationResult
+            {
+                IsValid = false,
+                Message = $"Secret key validation failed: {ex.Message}",
+                Details = new
+                {
+                    keyType,
+                    errorCode = ex.StripeError?.Code,
+                    errorType = ex.StripeError?.Type,
+                    httpStatusCode = ex.HttpStatusCode,
+                    testRequest = new
+                    {
+                        method = "GET",
+                        endpoint = "/v1/balance",
+                        statusCode = ex.HttpStatusCode
+                    }
+                }
+            };
+        }
+        catch (Exception ex)
+        {
+            return new ValidationResult
+            {
+                IsValid = false,
+                Message = $"Unexpected error validating secret key: {ex.Message}",
+                Details = new { keyType, exceptionType = ex.GetType().Name }
+            };
+        }
+    }
+
+    private ValidationResult ValidatePublishableKey()
+    {
+        if (string.IsNullOrWhiteSpace(_stripeOptions.PublishableKey))
+        {
+            return new ValidationResult
+            {
+                IsValid = false,
+                Message = "Publishable key is not configured",
+                Details = new { keyType = "none" }
+            };
+        }
+
+        var keyType = _stripeOptions.PublishableKey.StartsWith("pk_test_") ? "test" :
+                     _stripeOptions.PublishableKey.StartsWith("pk_live_") ? "live" : "unknown";
+
+        var isValidFormat = _stripeOptions.PublishableKey.StartsWith("pk_test_") ||
+                           _stripeOptions.PublishableKey.StartsWith("pk_live_");
+
+        return new ValidationResult
+        {
+            IsValid = isValidFormat,
+            Message = isValidFormat ? "Publishable key format is valid" : "Publishable key format is invalid",
+            Details = new { keyType }
+        };
+    }
+
+    private ValidationResult ValidateWebhookSecret()
+    {
+        if (string.IsNullOrWhiteSpace(_stripeOptions.WebhookSecret))
+        {
+            return new ValidationResult
+            {
+                IsValid = false,
+                Message = "Webhook secret is not configured"
+            };
+        }
+
+        var isValidFormat = _stripeOptions.WebhookSecret.StartsWith("whsec_");
+
+        if (!isValidFormat)
+        {
+            return new ValidationResult
+            {
+                IsValid = false,
+                Message = "Webhook secret format is invalid"
+            };
+        }
+
+        // Test webhook secret by simulating event construction
+        try
+        {
+            var testPayload = @"{
+                ""id"": ""evt_test_webhook"",
+                ""object"": ""event"",
+                ""type"": ""customer.created"",
+                ""created"": " + DateTimeOffset.UtcNow.ToUnixTimeSeconds() + @",
+                ""data"": {
+                    ""object"": {
+                        ""id"": ""cus_test"",
+                        ""object"": ""customer""
+                    }
+                }
+            }";
+
+            var timestamp = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
+            var signature = $"t={timestamp},v1=test_signature";
+
+            // We can't fully test without a real Stripe signature, but we can validate the secret format
+            // and that it doesn't throw when attempting to use it
+            try
+            {
+                var stripeEvent = Stripe.EventUtility.ConstructEvent(
+                    testPayload,
+                    signature,
+                    _stripeOptions.WebhookSecret,
+                    throwOnApiVersionMismatch: false
+                );
+            }
+            catch (Stripe.StripeException ex) when (ex.Message.Contains("signature"))
+            {
+                // Expected - we're using a fake signature, but the secret format is valid
+                return new ValidationResult
+                {
+                    IsValid = true,
+                    Message = "Webhook secret format is valid (signature validation works)",
+                    Details = new
+                    {
+                        format = "valid",
+                        note = "Full webhook validation requires real Stripe signature",
+                        testAttempted = true,
+                        expectedError = "Invalid signature (expected with test data)"
+                    }
+                };
+            }
+
+            return new ValidationResult
+            {
+                IsValid = true,
+                Message = "Webhook secret format is valid",
+                Details = new
+                {
+                    format = "valid",
+                    testAttempted = true
+                }
+            };
+        }
+        catch (Exception ex)
+        {
+            return new ValidationResult
+            {
+                IsValid = false,
+                Message = $"Webhook secret validation failed: {ex.Message}",
+                Details = new
+                {
+                    format = "may be invalid",
+                    error = ex.Message
+                }
+            };
+        }
+    }
+
+    private async Task<ValidationResult> ValidatePriceIdsAsync(CancellationToken cancellationToken)
+    {
+        var coreDataValid = !string.IsNullOrWhiteSpace(_stripeOptions.CoreDataPriceId) &&
+                           _stripeOptions.CoreDataPriceId.StartsWith("price_");
+        var coreDataAnnualValid = !string.IsNullOrWhiteSpace(_stripeOptions.CoreDataAnnualPriceId) &&
+                                 _stripeOptions.CoreDataAnnualPriceId.StartsWith("price_");
+
+        var issues = new List<string>();
+        var priceDetails = new Dictionary<string, object>();
+
+        // Validate Core Data Price
+        if (!coreDataValid)
+        {
+            issues.Add("CoreDataPriceId is missing or invalid");
+            priceDetails["coreData"] = new { isValid = false, value = "not configured" };
+        }
+        else
+        {
+            try
+            {
+                var priceService = new Stripe.PriceService();
+                var price = await priceService.GetAsync(_stripeOptions.CoreDataPriceId, cancellationToken: cancellationToken);
+
+                priceDetails["coreData"] = new
+                {
+                    isValid = true,
+                    value = _stripeOptions.CoreDataPriceId,
+                    verified = true,
+                    apiResponse = new
+                    {
+                        id = price.Id,
+                        active = price.Active,
+                        currency = price.Currency,
+                        unitAmount = price.UnitAmount,
+                        recurring = price.Recurring != null ? new
+                        {
+                            interval = price.Recurring.Interval,
+                            intervalCount = price.Recurring.IntervalCount
+                        } : null,
+                        product = price.ProductId
+                    }
+                };
+            }
+            catch (Stripe.StripeException ex)
+            {
+                issues.Add($"CoreDataPriceId exists but API verification failed: {ex.Message}");
+                priceDetails["coreData"] = new
+                {
+                    isValid = false,
+                    value = _stripeOptions.CoreDataPriceId,
+                    verified = false,
+                    error = ex.Message,
+                    errorCode = ex.StripeError?.Code
+                };
+            }
+        }
+
+        // Validate Core Data Annual Price
+        if (!coreDataAnnualValid)
+        {
+            issues.Add("CoreDataAnnualPriceId is missing or invalid");
+            priceDetails["coreDataAnnual"] = new { isValid = false, value = "not configured" };
+        }
+        else
+        {
+            try
+            {
+                var priceService = new Stripe.PriceService();
+                var price = await priceService.GetAsync(_stripeOptions.CoreDataAnnualPriceId, cancellationToken: cancellationToken);
+
+                priceDetails["coreDataAnnual"] = new
+                {
+                    isValid = true,
+                    value = _stripeOptions.CoreDataAnnualPriceId,
+                    verified = true,
+                    apiResponse = new
+                    {
+                        id = price.Id,
+                        active = price.Active,
+                        currency = price.Currency,
+                        unitAmount = price.UnitAmount,
+                        recurring = price.Recurring != null ? new
+                        {
+                            interval = price.Recurring.Interval,
+                            intervalCount = price.Recurring.IntervalCount
+                        } : null,
+                        product = price.ProductId
+                    }
+                };
+            }
+            catch (Stripe.StripeException ex)
+            {
+                issues.Add($"CoreDataAnnualPriceId exists but API verification failed: {ex.Message}");
+                priceDetails["coreDataAnnual"] = new
+                {
+                    isValid = false,
+                    value = _stripeOptions.CoreDataAnnualPriceId,
+                    verified = false,
+                    error = ex.Message,
+                    errorCode = ex.StripeError?.Code
+                };
+            }
+        }
+
+        var isValid = issues.Count == 0;
+
+        return new ValidationResult
+        {
+            IsValid = isValid,
+            Message = isValid ? "All price IDs are configured and verified via Stripe API" : string.Join(", ", issues),
+            Details = new
+            {
+                priceIds = priceDetails,
+                testRequest = new
+                {
+                    method = "GET",
+                    endpoint = "/v1/prices/:id",
+                    tested = coreDataValid || coreDataAnnualValid
+                }
+            }
+        };
+    }
+
+    private class ValidationResult
+    {
+        public bool IsValid { get; set; }
+        public string Message { get; set; } = string.Empty;
+        public object? Details { get; set; }
     }
 }
