@@ -400,21 +400,8 @@ namespace Kalshi.Api.Api
             localVarRequestOptions.Operation = "ApiKeysApi.CreateApiKey";
             localVarRequestOptions.OperationIndex = operationIndex;
 
-            // authentication (kalshiAccessSignature) required
-            if (!string.IsNullOrEmpty(this.Configuration.GetApiKeyWithPrefix("KALSHI-ACCESS-SIGNATURE")))
-            {
-                localVarRequestOptions.HeaderParameters.Add("KALSHI-ACCESS-SIGNATURE", this.Configuration.GetApiKeyWithPrefix("KALSHI-ACCESS-SIGNATURE"));
-            }
-            // authentication (kalshiAccessKey) required
-            if (!string.IsNullOrEmpty(this.Configuration.GetApiKeyWithPrefix("KALSHI-ACCESS-KEY")))
-            {
-                localVarRequestOptions.HeaderParameters.Add("KALSHI-ACCESS-KEY", this.Configuration.GetApiKeyWithPrefix("KALSHI-ACCESS-KEY"));
-            }
-            // authentication (kalshiAccessTimestamp) required
-            if (!string.IsNullOrEmpty(this.Configuration.GetApiKeyWithPrefix("KALSHI-ACCESS-TIMESTAMP")))
-            {
-                localVarRequestOptions.HeaderParameters.Add("KALSHI-ACCESS-TIMESTAMP", this.Configuration.GetApiKeyWithPrefix("KALSHI-ACCESS-TIMESTAMP"));
-            }
+            // authentication (kalshiAccessSignature, kalshiAccessKey, kalshiAccessTimestamp) required
+            AuthenticationHelper.AddAuthenticationHeaders(localVarRequestOptions, this.Configuration);
 
             // make the HTTP request
             var localVarResponse = this.Client.Post<CreateApiKeyResponse>("/api_keys", localVarRequestOptions, this.Configuration);
@@ -489,21 +476,8 @@ namespace Kalshi.Api.Api
             localVarRequestOptions.Operation = "ApiKeysApi.CreateApiKey";
             localVarRequestOptions.OperationIndex = operationIndex;
 
-            // authentication (kalshiAccessSignature) required
-            if (!string.IsNullOrEmpty(this.Configuration.GetApiKeyWithPrefix("KALSHI-ACCESS-SIGNATURE")))
-            {
-                localVarRequestOptions.HeaderParameters.Add("KALSHI-ACCESS-SIGNATURE", this.Configuration.GetApiKeyWithPrefix("KALSHI-ACCESS-SIGNATURE"));
-            }
-            // authentication (kalshiAccessKey) required
-            if (!string.IsNullOrEmpty(this.Configuration.GetApiKeyWithPrefix("KALSHI-ACCESS-KEY")))
-            {
-                localVarRequestOptions.HeaderParameters.Add("KALSHI-ACCESS-KEY", this.Configuration.GetApiKeyWithPrefix("KALSHI-ACCESS-KEY"));
-            }
-            // authentication (kalshiAccessTimestamp) required
-            if (!string.IsNullOrEmpty(this.Configuration.GetApiKeyWithPrefix("KALSHI-ACCESS-TIMESTAMP")))
-            {
-                localVarRequestOptions.HeaderParameters.Add("KALSHI-ACCESS-TIMESTAMP", this.Configuration.GetApiKeyWithPrefix("KALSHI-ACCESS-TIMESTAMP"));
-            }
+            // authentication (kalshiAccessSignature, kalshiAccessKey, kalshiAccessTimestamp) required
+            AuthenticationHelper.AddAuthenticationHeaders(localVarRequestOptions, this.Configuration);
 
             // make the HTTP request
             var localVarResponse = await this.AsynchronousClient.PostAsync<CreateApiKeyResponse>("/api_keys", localVarRequestOptions, this.Configuration, cancellationToken).ConfigureAwait(false);
@@ -574,21 +548,8 @@ namespace Kalshi.Api.Api
             localVarRequestOptions.Operation = "ApiKeysApi.DeleteApiKey";
             localVarRequestOptions.OperationIndex = operationIndex;
 
-            // authentication (kalshiAccessSignature) required
-            if (!string.IsNullOrEmpty(this.Configuration.GetApiKeyWithPrefix("KALSHI-ACCESS-SIGNATURE")))
-            {
-                localVarRequestOptions.HeaderParameters.Add("KALSHI-ACCESS-SIGNATURE", this.Configuration.GetApiKeyWithPrefix("KALSHI-ACCESS-SIGNATURE"));
-            }
-            // authentication (kalshiAccessKey) required
-            if (!string.IsNullOrEmpty(this.Configuration.GetApiKeyWithPrefix("KALSHI-ACCESS-KEY")))
-            {
-                localVarRequestOptions.HeaderParameters.Add("KALSHI-ACCESS-KEY", this.Configuration.GetApiKeyWithPrefix("KALSHI-ACCESS-KEY"));
-            }
-            // authentication (kalshiAccessTimestamp) required
-            if (!string.IsNullOrEmpty(this.Configuration.GetApiKeyWithPrefix("KALSHI-ACCESS-TIMESTAMP")))
-            {
-                localVarRequestOptions.HeaderParameters.Add("KALSHI-ACCESS-TIMESTAMP", this.Configuration.GetApiKeyWithPrefix("KALSHI-ACCESS-TIMESTAMP"));
-            }
+            // authentication (kalshiAccessSignature, kalshiAccessKey, kalshiAccessTimestamp) required
+            AuthenticationHelper.AddAuthenticationHeaders(localVarRequestOptions, this.Configuration);
 
             // make the HTTP request
             var localVarResponse = this.Client.Delete<Object>("/api_keys/{api_key}", localVarRequestOptions, this.Configuration);
@@ -660,21 +621,8 @@ namespace Kalshi.Api.Api
             localVarRequestOptions.Operation = "ApiKeysApi.DeleteApiKey";
             localVarRequestOptions.OperationIndex = operationIndex;
 
-            // authentication (kalshiAccessSignature) required
-            if (!string.IsNullOrEmpty(this.Configuration.GetApiKeyWithPrefix("KALSHI-ACCESS-SIGNATURE")))
-            {
-                localVarRequestOptions.HeaderParameters.Add("KALSHI-ACCESS-SIGNATURE", this.Configuration.GetApiKeyWithPrefix("KALSHI-ACCESS-SIGNATURE"));
-            }
-            // authentication (kalshiAccessKey) required
-            if (!string.IsNullOrEmpty(this.Configuration.GetApiKeyWithPrefix("KALSHI-ACCESS-KEY")))
-            {
-                localVarRequestOptions.HeaderParameters.Add("KALSHI-ACCESS-KEY", this.Configuration.GetApiKeyWithPrefix("KALSHI-ACCESS-KEY"));
-            }
-            // authentication (kalshiAccessTimestamp) required
-            if (!string.IsNullOrEmpty(this.Configuration.GetApiKeyWithPrefix("KALSHI-ACCESS-TIMESTAMP")))
-            {
-                localVarRequestOptions.HeaderParameters.Add("KALSHI-ACCESS-TIMESTAMP", this.Configuration.GetApiKeyWithPrefix("KALSHI-ACCESS-TIMESTAMP"));
-            }
+            // authentication (kalshiAccessSignature, kalshiAccessKey, kalshiAccessTimestamp) required
+            AuthenticationHelper.AddAuthenticationHeaders(localVarRequestOptions, this.Configuration);
 
             // make the HTTP request
             var localVarResponse = await this.AsynchronousClient.DeleteAsync<Object>("/api_keys/{api_key}", localVarRequestOptions, this.Configuration, cancellationToken).ConfigureAwait(false);
@@ -748,21 +696,8 @@ namespace Kalshi.Api.Api
             localVarRequestOptions.Operation = "ApiKeysApi.GenerateApiKey";
             localVarRequestOptions.OperationIndex = operationIndex;
 
-            // authentication (kalshiAccessSignature) required
-            if (!string.IsNullOrEmpty(this.Configuration.GetApiKeyWithPrefix("KALSHI-ACCESS-SIGNATURE")))
-            {
-                localVarRequestOptions.HeaderParameters.Add("KALSHI-ACCESS-SIGNATURE", this.Configuration.GetApiKeyWithPrefix("KALSHI-ACCESS-SIGNATURE"));
-            }
-            // authentication (kalshiAccessKey) required
-            if (!string.IsNullOrEmpty(this.Configuration.GetApiKeyWithPrefix("KALSHI-ACCESS-KEY")))
-            {
-                localVarRequestOptions.HeaderParameters.Add("KALSHI-ACCESS-KEY", this.Configuration.GetApiKeyWithPrefix("KALSHI-ACCESS-KEY"));
-            }
-            // authentication (kalshiAccessTimestamp) required
-            if (!string.IsNullOrEmpty(this.Configuration.GetApiKeyWithPrefix("KALSHI-ACCESS-TIMESTAMP")))
-            {
-                localVarRequestOptions.HeaderParameters.Add("KALSHI-ACCESS-TIMESTAMP", this.Configuration.GetApiKeyWithPrefix("KALSHI-ACCESS-TIMESTAMP"));
-            }
+            // authentication (kalshiAccessSignature, kalshiAccessKey, kalshiAccessTimestamp) required
+            AuthenticationHelper.AddAuthenticationHeaders(localVarRequestOptions, this.Configuration);
 
             // make the HTTP request
             var localVarResponse = this.Client.Post<GenerateApiKeyResponse>("/api_keys/generate", localVarRequestOptions, this.Configuration);
@@ -837,21 +772,8 @@ namespace Kalshi.Api.Api
             localVarRequestOptions.Operation = "ApiKeysApi.GenerateApiKey";
             localVarRequestOptions.OperationIndex = operationIndex;
 
-            // authentication (kalshiAccessSignature) required
-            if (!string.IsNullOrEmpty(this.Configuration.GetApiKeyWithPrefix("KALSHI-ACCESS-SIGNATURE")))
-            {
-                localVarRequestOptions.HeaderParameters.Add("KALSHI-ACCESS-SIGNATURE", this.Configuration.GetApiKeyWithPrefix("KALSHI-ACCESS-SIGNATURE"));
-            }
-            // authentication (kalshiAccessKey) required
-            if (!string.IsNullOrEmpty(this.Configuration.GetApiKeyWithPrefix("KALSHI-ACCESS-KEY")))
-            {
-                localVarRequestOptions.HeaderParameters.Add("KALSHI-ACCESS-KEY", this.Configuration.GetApiKeyWithPrefix("KALSHI-ACCESS-KEY"));
-            }
-            // authentication (kalshiAccessTimestamp) required
-            if (!string.IsNullOrEmpty(this.Configuration.GetApiKeyWithPrefix("KALSHI-ACCESS-TIMESTAMP")))
-            {
-                localVarRequestOptions.HeaderParameters.Add("KALSHI-ACCESS-TIMESTAMP", this.Configuration.GetApiKeyWithPrefix("KALSHI-ACCESS-TIMESTAMP"));
-            }
+            // authentication (kalshiAccessSignature, kalshiAccessKey, kalshiAccessTimestamp) required
+            AuthenticationHelper.AddAuthenticationHeaders(localVarRequestOptions, this.Configuration);
 
             // make the HTTP request
             var localVarResponse = await this.AsynchronousClient.PostAsync<GenerateApiKeyResponse>("/api_keys/generate", localVarRequestOptions, this.Configuration, cancellationToken).ConfigureAwait(false);
@@ -915,21 +837,8 @@ namespace Kalshi.Api.Api
             localVarRequestOptions.Operation = "ApiKeysApi.GetApiKeys";
             localVarRequestOptions.OperationIndex = operationIndex;
 
-            // authentication (kalshiAccessSignature) required
-            if (!string.IsNullOrEmpty(this.Configuration.GetApiKeyWithPrefix("KALSHI-ACCESS-SIGNATURE")))
-            {
-                localVarRequestOptions.HeaderParameters.Add("KALSHI-ACCESS-SIGNATURE", this.Configuration.GetApiKeyWithPrefix("KALSHI-ACCESS-SIGNATURE"));
-            }
-            // authentication (kalshiAccessKey) required
-            if (!string.IsNullOrEmpty(this.Configuration.GetApiKeyWithPrefix("KALSHI-ACCESS-KEY")))
-            {
-                localVarRequestOptions.HeaderParameters.Add("KALSHI-ACCESS-KEY", this.Configuration.GetApiKeyWithPrefix("KALSHI-ACCESS-KEY"));
-            }
-            // authentication (kalshiAccessTimestamp) required
-            if (!string.IsNullOrEmpty(this.Configuration.GetApiKeyWithPrefix("KALSHI-ACCESS-TIMESTAMP")))
-            {
-                localVarRequestOptions.HeaderParameters.Add("KALSHI-ACCESS-TIMESTAMP", this.Configuration.GetApiKeyWithPrefix("KALSHI-ACCESS-TIMESTAMP"));
-            }
+            // authentication (kalshiAccessSignature, kalshiAccessKey, kalshiAccessTimestamp) required
+            AuthenticationHelper.AddAuthenticationHeaders(localVarRequestOptions, this.Configuration);
 
             // make the HTTP request
             var localVarResponse = this.Client.Get<GetApiKeysResponse>("/api_keys", localVarRequestOptions, this.Configuration);
@@ -994,21 +903,8 @@ namespace Kalshi.Api.Api
             localVarRequestOptions.Operation = "ApiKeysApi.GetApiKeys";
             localVarRequestOptions.OperationIndex = operationIndex;
 
-            // authentication (kalshiAccessSignature) required
-            if (!string.IsNullOrEmpty(this.Configuration.GetApiKeyWithPrefix("KALSHI-ACCESS-SIGNATURE")))
-            {
-                localVarRequestOptions.HeaderParameters.Add("KALSHI-ACCESS-SIGNATURE", this.Configuration.GetApiKeyWithPrefix("KALSHI-ACCESS-SIGNATURE"));
-            }
-            // authentication (kalshiAccessKey) required
-            if (!string.IsNullOrEmpty(this.Configuration.GetApiKeyWithPrefix("KALSHI-ACCESS-KEY")))
-            {
-                localVarRequestOptions.HeaderParameters.Add("KALSHI-ACCESS-KEY", this.Configuration.GetApiKeyWithPrefix("KALSHI-ACCESS-KEY"));
-            }
-            // authentication (kalshiAccessTimestamp) required
-            if (!string.IsNullOrEmpty(this.Configuration.GetApiKeyWithPrefix("KALSHI-ACCESS-TIMESTAMP")))
-            {
-                localVarRequestOptions.HeaderParameters.Add("KALSHI-ACCESS-TIMESTAMP", this.Configuration.GetApiKeyWithPrefix("KALSHI-ACCESS-TIMESTAMP"));
-            }
+            // authentication (kalshiAccessSignature, kalshiAccessKey, kalshiAccessTimestamp) required
+            AuthenticationHelper.AddAuthenticationHeaders(localVarRequestOptions, this.Configuration);
 
             // make the HTTP request
             var localVarResponse = await this.AsynchronousClient.GetAsync<GetApiKeysResponse>("/api_keys", localVarRequestOptions, this.Configuration, cancellationToken).ConfigureAwait(false);

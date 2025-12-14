@@ -971,21 +971,8 @@ namespace Kalshi.Api.Api
             localVarRequestOptions.Operation = "MarketApi.GetMarketOrderbook";
             localVarRequestOptions.OperationIndex = operationIndex;
 
-            // authentication (kalshiAccessSignature) required
-            if (!string.IsNullOrEmpty(this.Configuration.GetApiKeyWithPrefix("KALSHI-ACCESS-SIGNATURE")))
-            {
-                localVarRequestOptions.HeaderParameters.Add("KALSHI-ACCESS-SIGNATURE", this.Configuration.GetApiKeyWithPrefix("KALSHI-ACCESS-SIGNATURE"));
-            }
-            // authentication (kalshiAccessKey) required
-            if (!string.IsNullOrEmpty(this.Configuration.GetApiKeyWithPrefix("KALSHI-ACCESS-KEY")))
-            {
-                localVarRequestOptions.HeaderParameters.Add("KALSHI-ACCESS-KEY", this.Configuration.GetApiKeyWithPrefix("KALSHI-ACCESS-KEY"));
-            }
-            // authentication (kalshiAccessTimestamp) required
-            if (!string.IsNullOrEmpty(this.Configuration.GetApiKeyWithPrefix("KALSHI-ACCESS-TIMESTAMP")))
-            {
-                localVarRequestOptions.HeaderParameters.Add("KALSHI-ACCESS-TIMESTAMP", this.Configuration.GetApiKeyWithPrefix("KALSHI-ACCESS-TIMESTAMP"));
-            }
+            // authentication (kalshiAccessSignature, kalshiAccessKey, kalshiAccessTimestamp) required
+            AuthenticationHelper.AddAuthenticationHeaders(localVarRequestOptions, this.Configuration);
 
             // make the HTTP request
             var localVarResponse = this.Client.Get<GetMarketOrderbookResponse>("/markets/{ticker}/orderbook", localVarRequestOptions, this.Configuration);
@@ -1065,21 +1052,8 @@ namespace Kalshi.Api.Api
             localVarRequestOptions.Operation = "MarketApi.GetMarketOrderbook";
             localVarRequestOptions.OperationIndex = operationIndex;
 
-            // authentication (kalshiAccessSignature) required
-            if (!string.IsNullOrEmpty(this.Configuration.GetApiKeyWithPrefix("KALSHI-ACCESS-SIGNATURE")))
-            {
-                localVarRequestOptions.HeaderParameters.Add("KALSHI-ACCESS-SIGNATURE", this.Configuration.GetApiKeyWithPrefix("KALSHI-ACCESS-SIGNATURE"));
-            }
-            // authentication (kalshiAccessKey) required
-            if (!string.IsNullOrEmpty(this.Configuration.GetApiKeyWithPrefix("KALSHI-ACCESS-KEY")))
-            {
-                localVarRequestOptions.HeaderParameters.Add("KALSHI-ACCESS-KEY", this.Configuration.GetApiKeyWithPrefix("KALSHI-ACCESS-KEY"));
-            }
-            // authentication (kalshiAccessTimestamp) required
-            if (!string.IsNullOrEmpty(this.Configuration.GetApiKeyWithPrefix("KALSHI-ACCESS-TIMESTAMP")))
-            {
-                localVarRequestOptions.HeaderParameters.Add("KALSHI-ACCESS-TIMESTAMP", this.Configuration.GetApiKeyWithPrefix("KALSHI-ACCESS-TIMESTAMP"));
-            }
+            // authentication (kalshiAccessSignature, kalshiAccessKey, kalshiAccessTimestamp) required
+            AuthenticationHelper.AddAuthenticationHeaders(localVarRequestOptions, this.Configuration);
 
             // make the HTTP request
             var localVarResponse = await this.AsynchronousClient.GetAsync<GetMarketOrderbookResponse>("/markets/{ticker}/orderbook", localVarRequestOptions, this.Configuration, cancellationToken).ConfigureAwait(false);
