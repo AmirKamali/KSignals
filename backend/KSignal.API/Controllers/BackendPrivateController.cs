@@ -357,10 +357,11 @@ public class BackendPrivateController : ControllerBase
     }
 
     /// <summary>
-    /// Cancels all pending MassTransit RabbitMQ jobs by purging all consumer queues.
+    /// Cancels all pending MassTransit RabbitMQ jobs by purging all consumer queues
+    /// and clears all distributed locks and counters from Redis.
     /// This removes all queued messages but does not stop currently processing jobs.
     /// </summary>
-    /// <returns>Result with counts of purged queues and any errors</returns>
+    /// <returns>Result with counts of purged queues, cleared locks/counters, and any errors</returns>
     [HttpPost("cancel-all-jobs")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status500InternalServerError)]
@@ -368,9 +369,14 @@ public class BackendPrivateController : ControllerBase
     {
         try
         {
-            _logger.LogWarning("Cancel all jobs requested - purging all RabbitMQ queues");
+            _logger.LogWarning("Cancel all jobs requested - purging all RabbitMQ queues and clearing all locks/counters");
 
+            // Purge all RabbitMQ queues
             var result = await _rabbitMqManagementService.PurgeAllQueuesAsync(HttpContext.RequestAborted);
+
+            // Clear all locks and counters from Redis (pattern: sync:*)
+            _logger.LogInformation("Clearing all Redis locks and counters with pattern: sync:*");
+            await _redisCacheService.DeleteByPatternAsync("sync:*", HttpContext.RequestAborted);
 
             if (result.Success)
             {
@@ -379,7 +385,8 @@ public class BackendPrivateController : ControllerBase
                     success = true,
                     purged_queues = result.PurgedQueues,
                     skipped_queues = result.SkippedQueues,
-                    message = $"Successfully purged {result.PurgedQueues.Count} queues, skipped {result.SkippedQueues.Count} (not found)"
+                    locks_cleared = true,
+                    message = $"Successfully purged {result.PurgedQueues.Count} queues, skipped {result.SkippedQueues.Count} (not found), and cleared all locks/counters"
                 });
             }
             else
@@ -389,8 +396,9 @@ public class BackendPrivateController : ControllerBase
                     success = false,
                     purged_queues = result.PurgedQueues,
                     skipped_queues = result.SkippedQueues,
+                    locks_cleared = true,
                     errors = result.Errors,
-                    message = $"Completed with errors: purged {result.PurgedQueues.Count} queues, {result.Errors.Count} errors"
+                    message = $"Completed with errors: purged {result.PurgedQueues.Count} queues, {result.Errors.Count} errors, but cleared all locks/counters"
                 });
             }
         }
