@@ -23,7 +23,8 @@
       "Bash(dotnet restore:*)",
       "WebFetch(domain:github.com)",
       "Bash(dotnet clean:*)",
-      "WebFetch(domain:docs.stripe.com)"
+      "WebFetch(domain:docs.stripe.com)",
+      "Bash(docker-compose ps:*)"
     ],
     "deny": [],
     "ask": []

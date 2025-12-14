@@ -1,9 +1,9 @@
 using System.Net.Http.Headers;
 using System.Text.Json;
+using KSignals.DTO;
 using Microsoft.AspNetCore.WebUtilities;
 using Microsoft.Extensions.Options;
 using web_asp.Models;
-using KSignals.DTO;
 
 namespace web_asp.Services;
 
@@ -87,7 +87,7 @@ public class BackendClient
 
             var url = $"{_options.BaseUrl.TrimEnd('/')}/api/users/login";
             _logger.LogDebug("LoginAsync: Calling {Url} for FirebaseId: {FirebaseId}", url, firebaseId);
-            
+
             var content = new StringContent(
                 JsonSerializer.Serialize(request),
                 System.Text.Encoding.UTF8,
@@ -132,7 +132,7 @@ public class BackendClient
                     return (false, "Invalid response from server.", null);
                 }
 
-                _logger.LogDebug("LoginAsync: Successfully logged in. Username: {Username}, Token length: {TokenLength}", 
+                _logger.LogDebug("LoginAsync: Successfully logged in. Username: {Username}, Token length: {TokenLength}",
                     signInResponse.Username, signInResponse.Token.Length);
                 return (true, null, signInResponse);
             }
@@ -174,9 +174,9 @@ public class BackendClient
             };
 
             var url = $"{_options.BaseUrl.TrimEnd('/')}/api/users/profile";
-            _logger.LogDebug("UpdateNameAsync: Calling {Url} with FirstName: {FirstName}, LastName: {LastName}", 
+            _logger.LogDebug("UpdateNameAsync: Calling {Url} with FirstName: {FirstName}, LastName: {LastName}",
                 url, firstName, lastName);
-            
+
             using var message = new HttpRequestMessage(HttpMethod.Put, url)
             {
                 Content = new StringContent(
@@ -238,7 +238,7 @@ public class BackendClient
             }
             catch (Exception deserializeEx)
             {
-                _logger.LogError(deserializeEx, 
+                _logger.LogError(deserializeEx,
                     "UpdateNameAsync: Failed to deserialize response. Body: {Body}", responseBody);
                 return (false, "Invalid response format from server.", null);
             }
@@ -267,7 +267,7 @@ public class BackendClient
 
             var url = $"{_options.BaseUrl.TrimEnd('/')}/api/users/me";
             _logger.LogDebug("GetUserProfileAsync: Calling {Url} with JWT token (length: {JwtLength})", url, jwt.Length);
-            
+
             using var message = new HttpRequestMessage(HttpMethod.Get, url);
             message.Headers.Authorization = new AuthenticationHeaderValue("Bearer", jwt);
 
@@ -317,13 +317,13 @@ public class BackendClient
                     _logger.LogWarning("GetUserProfileAsync: Deserialized profile is null. Response body: {Body}", responseBody);
                     return (false, "Invalid response from server.", null);
                 }
-                
+
                 _logger.LogDebug("GetUserProfileAsync: Successfully retrieved profile for user: {Username}", profile.Username);
                 return (true, null, profile);
             }
             catch (Exception deserializeEx)
             {
-                _logger.LogError(deserializeEx, 
+                _logger.LogError(deserializeEx,
                     "GetUserProfileAsync: Failed to deserialize response. Body: {Body}", responseBody);
                 return (false, "Invalid response format from server.", null);
             }
@@ -639,7 +639,11 @@ public class BackendClient
 
             if (!response.IsSuccessStatusCode)
             {
-                return (false, $"Subscription fetch failed ({response.StatusCode})", null);
+                // Return more specific error message for 401 (expected for unauthenticated users)
+                var errorMsg = response.StatusCode == System.Net.HttpStatusCode.Unauthorized
+                    ? $"Subscription fetch failed (Unauthorized)"
+                    : $"Subscription fetch failed ({response.StatusCode})";
+                return (false, errorMsg, null);
             }
 
             var summary = JsonSerializer.Deserialize<SubscriptionSummaryResponse>(body, _jsonOptions);
@@ -717,6 +721,12 @@ public class BackendClient
 
             if (!response.IsSuccessStatusCode)
             {
+                // Return more specific error for 401 (authentication required)
+                if (response.StatusCode == System.Net.HttpStatusCode.Unauthorized)
+                {
+                    return (false, "Unauthorized - Please log in to continue", null);
+                }
+
                 var error = $"Payment link failed ({response.StatusCode})";
                 try
                 {

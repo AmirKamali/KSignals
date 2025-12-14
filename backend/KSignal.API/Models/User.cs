@@ -5,7 +5,7 @@ namespace KSignal.API.Models;
 public class User
 {
     [Key]
-    public ulong Id { get; set; }
+    public Guid Id { get; set; }
 
     [Required]
     [MaxLength(255)]
@@ -28,11 +28,9 @@ public class User
     [MaxLength(255)]
     public string? StripeCustomerId { get; set; }
 
-    [MaxLength(64)]
-    public string? ActiveSubscriptionId { get; set; }
+    public Guid? ActiveSubscriptionId { get; set; }
 
-    [MaxLength(64)]
-    public string? ActivePlanId { get; set; }
+    public Guid? ActivePlanId { get; set; }
 
     [MaxLength(64)]
     public string SubscriptionStatus { get; set; } = "none";

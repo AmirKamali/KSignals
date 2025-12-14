@@ -3,27 +3,27 @@ using Microsoft.EntityFrameworkCore;
 
 namespace KSignal.API.Data;
 
-    public class KalshiDbContext : DbContext
+public class KalshiDbContext : DbContext
+{
+    public KalshiDbContext(DbContextOptions<KalshiDbContext> options) : base(options)
     {
-        public KalshiDbContext(DbContextOptions<KalshiDbContext> options) : base(options)
-        {
-        }
+    }
 
-        public DbSet<MarketSnapshot> MarketSnapshots => Set<MarketSnapshot>();
-        public DbSet<MarketSnapshotLatest> MarketSnapshotsLatestView => Set<MarketSnapshotLatest>("vw_market_snapshots_latest");
-        public DbSet<TagsCategory> TagsCategories => Set<TagsCategory>();
-        public DbSet<User> Users => Set<User>();
-        public DbSet<SubscriptionPlan> SubscriptionPlans => Set<SubscriptionPlan>();
-        public DbSet<UserSubscription> UserSubscriptions => Set<UserSubscription>();
-        public DbSet<SubscriptionEventLog> SubscriptionEvents => Set<SubscriptionEventLog>();
-        public DbSet<MarketSeries> MarketSeries => Set<MarketSeries>();
-        public DbSet<MarketEvent> MarketEvents => Set<MarketEvent>();
-        public DbSet<MarketHighPriority> MarketHighPriorities => Set<MarketHighPriority>();
-        public DbSet<OrderbookSnapshot> OrderbookSnapshots => Set<OrderbookSnapshot>();
-        public DbSet<OrderbookEvent> OrderbookEvents => Set<OrderbookEvent>();
-        public DbSet<MarketCandlestickData> MarketCandlesticks => Set<MarketCandlestickData>();
-        public DbSet<AnalyticsMarketFeature> AnalyticsMarketFeatures => Set<AnalyticsMarketFeature>();
-        public DbSet<SyncLog> SyncLogs => Set<SyncLog>();
+    public DbSet<MarketSnapshot> MarketSnapshots => Set<MarketSnapshot>();
+    public DbSet<MarketSnapshotLatest> MarketSnapshotsLatestView => Set<MarketSnapshotLatest>("vw_market_snapshots_latest");
+    public DbSet<TagsCategory> TagsCategories => Set<TagsCategory>();
+    public DbSet<User> Users => Set<User>();
+    public DbSet<SubscriptionPlan> SubscriptionPlans => Set<SubscriptionPlan>();
+    public DbSet<UserSubscription> UserSubscriptions => Set<UserSubscription>();
+    public DbSet<SubscriptionEventLog> SubscriptionEvents => Set<SubscriptionEventLog>();
+    public DbSet<MarketSeries> MarketSeries => Set<MarketSeries>();
+    public DbSet<MarketEvent> MarketEvents => Set<MarketEvent>();
+    public DbSet<MarketHighPriority> MarketHighPriorities => Set<MarketHighPriority>();
+    public DbSet<OrderbookSnapshot> OrderbookSnapshots => Set<OrderbookSnapshot>();
+    public DbSet<OrderbookEvent> OrderbookEvents => Set<OrderbookEvent>();
+    public DbSet<MarketCandlestickData> MarketCandlesticks => Set<MarketCandlestickData>();
+    public DbSet<AnalyticsMarketFeature> AnalyticsMarketFeatures => Set<AnalyticsMarketFeature>();
+    public DbSet<SyncLog> SyncLogs => Set<SyncLog>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -171,10 +171,10 @@ namespace KSignal.API.Data;
         var user = modelBuilder.Entity<User>();
         user.ToTable("Users");
         user.HasKey(e => e.Id);
-        // ClickHouse generates Id via DEFAULT generateSerialID('users')
-        // ClickHouse doesn't support RETURNING clause, so we can't retrieve the generated ID
-        // The Id will remain 0 in the entity after SaveChanges, but that's fine since we use FirebaseId for lookups
-        user.Property(e => e.Id).ValueGeneratedNever();
+        // ClickHouse generates Id via DEFAULT generateUUIDv4() in the database
+        // However, ClickHouse doesn't support RETURNING clause, so we generate client-side via EF Core value generator
+        // This allows EF Core to know the ID immediately after insert without requiring RETURNING
+        user.Property(e => e.Id).ValueGeneratedOnAdd().HasDefaultValueSql("generateUUIDv4()");
         user.HasIndex(e => e.FirebaseId).IsUnique();
         user.Property(e => e.FirebaseId).HasMaxLength(255).IsRequired();
         user.Property(e => e.Username).HasMaxLength(255);
@@ -182,22 +182,27 @@ namespace KSignal.API.Data;
         user.Property(e => e.LastName).HasMaxLength(255);
         user.Property(e => e.Email).HasMaxLength(255);
         // IsComnEmailOn is UInt8 in ClickHouse (0/1), EF Core handles bool conversion
-        user.Property(e => e.IsComnEmailOn).HasDefaultValue(false);
+        // Don't use HasDefaultValue() - it triggers RETURNING clause in ClickHouse
+        // Always set values explicitly in code
+        user.Property(e => e.IsComnEmailOn);
         user.Property(e => e.StripeCustomerId).HasMaxLength(255);
-        user.Property(e => e.ActiveSubscriptionId).HasMaxLength(64);
-        user.Property(e => e.ActivePlanId).HasMaxLength(64);
-        user.Property(e => e.SubscriptionStatus).HasMaxLength(64).HasDefaultValue("none");
+        user.Property(e => e.ActiveSubscriptionId);
+        user.Property(e => e.ActivePlanId);
+        user.Property(e => e.SubscriptionStatus).HasMaxLength(64);
         user.Property(e => e.CreatedAt).IsRequired();
         user.Property(e => e.UpdatedAt).IsRequired();
 
         var plan = modelBuilder.Entity<SubscriptionPlan>();
         plan.ToTable("subscription_plans");
         plan.HasKey(e => e.Id);
-        plan.Property(e => e.Id).ValueGeneratedNever();
+        plan.Property(e => e.Id).ValueGeneratedOnAdd().HasDefaultValueSql("generateUUIDv4()");
         plan.HasIndex(e => e.Code).IsUnique();
         plan.Property(e => e.Code).HasMaxLength(80).IsRequired();
         plan.Property(e => e.Name).HasMaxLength(255).IsRequired();
         plan.Property(e => e.StripePriceId).HasMaxLength(255).IsRequired();
+        plan.HasIndex(e => e.StripePriceId);
+        // Don't use HasDefaultValue() - it triggers RETURNING clause in ClickHouse
+        // Always set values explicitly in code
         plan.Property(e => e.Currency).HasMaxLength(16).IsRequired();
         plan.Property(e => e.Interval).HasMaxLength(32).IsRequired();
         plan.Property(e => e.Amount).IsRequired();
@@ -209,33 +214,57 @@ namespace KSignal.API.Data;
         var subscription = modelBuilder.Entity<UserSubscription>();
         subscription.ToTable("user_subscriptions");
         subscription.HasKey(e => e.Id);
-        subscription.Property(e => e.Id).ValueGeneratedNever();
+        subscription.Property(e => e.Id).ValueGeneratedOnAdd().HasDefaultValueSql("generateUUIDv4()");
         subscription.Property(e => e.UserId).IsRequired();
-        subscription.Property(e => e.PlanId).HasMaxLength(64).IsRequired();
+        subscription.HasIndex(e => e.UserId);
+        subscription.Property(e => e.PlanId).IsRequired();
+        subscription.HasIndex(e => e.PlanId);
+        // Don't use HasDefaultValue() - it triggers RETURNING clause in ClickHouse
+        // Always set values explicitly in code
         subscription.Property(e => e.Status).HasMaxLength(64).IsRequired();
         subscription.Property(e => e.StripeSubscriptionId).HasMaxLength(255);
+        subscription.HasIndex(e => e.StripeSubscriptionId);
         subscription.Property(e => e.StripeCustomerId).HasMaxLength(255);
         subscription.Property(e => e.CancelAtPeriodEnd).IsRequired();
         subscription.Property(e => e.CurrentPeriodStart);
         subscription.Property(e => e.CurrentPeriodEnd);
         subscription.Property(e => e.CreatedAt).IsRequired();
         subscription.Property(e => e.UpdatedAt).IsRequired();
-        subscription.HasIndex(e => e.UserId);
-        subscription.HasIndex(e => e.StripeSubscriptionId);
-        subscription.HasIndex(e => e.PlanId);
+        // Configure relationship with User
+        subscription.HasOne(e => e.User)
+            .WithMany()
+            .HasForeignKey(e => e.UserId)
+            .OnDelete(DeleteBehavior.Restrict);
+        // Configure relationship with Plan
+        subscription.HasOne(e => e.Plan)
+            .WithMany()
+            .HasForeignKey(e => e.PlanId)
+            .OnDelete(DeleteBehavior.Restrict);
 
         var subscriptionLog = modelBuilder.Entity<SubscriptionEventLog>();
         subscriptionLog.ToTable("subscription_events");
         subscriptionLog.HasKey(e => e.Id);
-        subscriptionLog.Property(e => e.Id).ValueGeneratedNever();
+        subscriptionLog.Property(e => e.Id).ValueGeneratedOnAdd().HasDefaultValueSql("generateUUIDv4()");
         subscriptionLog.Property(e => e.UserId).IsRequired();
-        subscriptionLog.Property(e => e.SubscriptionId).HasMaxLength(64);
+        subscriptionLog.HasIndex(e => e.UserId);
+        subscriptionLog.Property(e => e.SubscriptionId);
+        subscriptionLog.HasIndex(e => e.SubscriptionId);
         subscriptionLog.Property(e => e.EventType).HasMaxLength(64).IsRequired();
+        subscriptionLog.HasIndex(e => e.EventType);
         subscriptionLog.Property(e => e.Notes).HasMaxLength(512);
         subscriptionLog.Property(e => e.Data);
         subscriptionLog.Property(e => e.CreatedAt).IsRequired();
-        subscriptionLog.HasIndex(e => e.UserId);
-        subscriptionLog.HasIndex(e => e.SubscriptionId);
+        subscriptionLog.HasIndex(e => e.CreatedAt);
+        // Configure relationship with User
+        subscriptionLog.HasOne(e => e.User)
+            .WithMany()
+            .HasForeignKey(e => e.UserId)
+            .OnDelete(DeleteBehavior.Restrict);
+        // Configure relationship with Subscription
+        subscriptionLog.HasOne(e => e.Subscription)
+            .WithMany()
+            .HasForeignKey(e => e.SubscriptionId)
+            .OnDelete(DeleteBehavior.SetNull);
 
         var marketSeries = modelBuilder.Entity<MarketSeries>();
         marketSeries.ToTable("market_series");

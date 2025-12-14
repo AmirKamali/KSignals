@@ -65,7 +65,7 @@ public class StripeSubscriptionService
             { "userId", user.Id.ToString() },
             { "firebaseId", user.FirebaseId },
             { "planCode", plan.Code },
-            { "planId", plan.Id }
+            { "planId", plan.Id.ToString() }
         };
 
         // Add user email and username to metadata if available
@@ -97,21 +97,10 @@ public class StripeSubscriptionService
                 }
             },
             Metadata = metadata,
-            // Use existing customer instead of creating new one
-            CustomerCreation = string.IsNullOrWhiteSpace(customerId) ? "always" : "if_required",
             SubscriptionData = new PaymentLinkSubscriptionDataOptions
             {
                 Metadata = metadata,
                 Description = $"{plan.Name} subscription for {user.Email ?? user.Username ?? user.FirebaseId}"
-            },
-            InvoiceCreation = new PaymentLinkInvoiceCreationOptions
-            {
-                Enabled = true,
-                InvoiceData = new PaymentLinkInvoiceCreationInvoiceDataOptions
-                {
-                    Description = $"{plan.Name} - {user.Email ?? user.Username ?? user.FirebaseId}",
-                    Metadata = metadata
-                }
             }
         };
 
@@ -119,7 +108,7 @@ public class StripeSubscriptionService
         if (!string.IsNullOrWhiteSpace(customerId))
         {
             // For payment links, we can't set customer directly, but CustomerCreation will link it
-            _logger.LogInformation("Creating payment link for existing customer {CustomerId} (User {UserId})", customerId, user.Id);
+            _logger.LogInformation("Creating payment link for existing customer {CustomerId} (FirebaseId {FirebaseId})", customerId, user.FirebaseId);
         }
 
         var paymentLinkService = new PaymentLinkService();
@@ -162,19 +151,19 @@ public class StripeSubscriptionService
         UserSubscription? subscription = null;
 
         // Load subscription plan if user has one
-        if (!string.IsNullOrWhiteSpace(user.ActivePlanId))
+        if (user.ActivePlanId.HasValue)
         {
             plan = await _db.SubscriptionPlans
                 .AsNoTracking()
-                .FirstOrDefaultAsync(p => p.Id == user.ActivePlanId, cancellationToken);
+                .FirstOrDefaultAsync(p => p.Id == user.ActivePlanId.Value, cancellationToken);
         }
 
         // Load subscription details
-        if (!string.IsNullOrWhiteSpace(user.ActiveSubscriptionId))
+        if (user.ActiveSubscriptionId.HasValue)
         {
             subscription = await _db.UserSubscriptions
                 .AsNoTracking()
-                .FirstOrDefaultAsync(s => s.Id == user.ActiveSubscriptionId, cancellationToken);
+                .FirstOrDefaultAsync(s => s.Id == user.ActiveSubscriptionId.Value, cancellationToken);
         }
 
         // User has active subscription if status is active and subscription period hasn't ended
@@ -241,13 +230,19 @@ public class StripeSubscriptionService
 
             case "invoice.payment_succeeded":
                 var invoice = stripeEvent.Data.Object as Invoice;
-                // In Clover API, subscription is accessed via Parent.SubscriptionDetails.Subscription
-                var invoiceSubscription = invoice?.Parent?.SubscriptionDetails?.Subscription;
-                if (invoiceSubscription?.Id != null)
+                var invoiceSubscriptionId =
+                    invoice?.Parent?.SubscriptionDetails?.Subscription?.Id ??
+                    invoice?.Parent?.SubscriptionDetails?.SubscriptionId;
+
+                if (!string.IsNullOrWhiteSpace(invoiceSubscriptionId))
                 {
                     var subscriptionService = new SubscriptionService();
-                    var paidSubscription = await subscriptionService.GetAsync(invoiceSubscription.Id, cancellationToken: cancellationToken);
+                    var paidSubscription = await subscriptionService.GetAsync(invoiceSubscriptionId, cancellationToken: cancellationToken);
                     await UpsertSubscriptionAsync(paidSubscription, stripeEvent.Type, cancellationToken);
+                }
+                else
+                {
+                    _logger.LogWarning("invoice.payment_succeeded without subscription id. Invoice {InvoiceId}", invoice?.Id);
                 }
                 break;
 
@@ -273,10 +268,50 @@ public class StripeSubscriptionService
     private async Task HandlePaymentIntentAsync(PaymentIntent intent, string eventType, CancellationToken cancellationToken)
     {
         var user = await ResolveUserAsync(intent.CustomerId, intent.Metadata, cancellationToken);
+        var metadataFirebaseId = intent.Metadata.TryGetValue("firebaseId", out var firebaseId)
+            ? firebaseId
+            : null;
+
+        // Fallback: resolve via charge metadata/email if payment intent metadata/customer didn't match
+        if (user == null && !string.IsNullOrWhiteSpace(intent.LatestChargeId))
+        {
+            var chargeService = new ChargeService();
+            var charge = await chargeService.GetAsync(intent.LatestChargeId, cancellationToken: cancellationToken);
+
+            user = await ResolveUserAsync(charge.CustomerId, charge.Metadata, cancellationToken);
+
+            if (user == null && !string.IsNullOrWhiteSpace(charge.BillingDetails?.Email))
+            {
+                user = await _db.Users.FirstOrDefaultAsync(u => u.Email == charge.BillingDetails.Email, cancellationToken);
+            }
+
+            if (user != null && string.IsNullOrWhiteSpace(user.StripeCustomerId) && !string.IsNullOrWhiteSpace(charge.CustomerId))
+            {
+                user.StripeCustomerId = charge.CustomerId;
+                user.UpdatedAt = DateTime.UtcNow;
+                await _db.SaveChangesAsync(cancellationToken);
+            }
+        }
+
         if (user == null)
         {
-            _logger.LogWarning("Payment intent {PaymentIntentId} processed without matching user (customer {CustomerId})", intent.Id, intent.CustomerId);
+            _logger.LogWarning(
+                "Payment intent {PaymentIntentId} processed without matching user (customer {CustomerId}, charge {ChargeId}, firebaseId {FirebaseId})",
+                intent.Id,
+                intent.CustomerId,
+                intent.LatestChargeId,
+                metadataFirebaseId ?? "(none)");
             return;
+        }
+
+        if (!string.IsNullOrWhiteSpace(metadataFirebaseId) &&
+            !string.Equals(metadataFirebaseId, user.FirebaseId, StringComparison.Ordinal))
+        {
+            _logger.LogWarning(
+                "Payment intent {PaymentIntentId} metadata FirebaseId {MetadataFirebaseId} does not match user (FirebaseId {UserFirebaseId})",
+                intent.Id,
+                metadataFirebaseId,
+                user.FirebaseId);
         }
 
         if (!string.IsNullOrWhiteSpace(intent.CustomerId) && string.IsNullOrWhiteSpace(user.StripeCustomerId))
@@ -285,6 +320,8 @@ public class StripeSubscriptionService
             user.UpdatedAt = DateTime.UtcNow;
             await _db.SaveChangesAsync(cancellationToken);
         }
+
+        await SyncSubscriptionFromPaymentIntentAsync(intent, user, eventType, cancellationToken);
 
         await LogEventAsync(
             user,
@@ -298,6 +335,72 @@ public class StripeSubscriptionService
                 intent.Currency
             }),
             cancellationToken);
+    }
+
+    private async Task SyncSubscriptionFromPaymentIntentAsync(
+        PaymentIntent intent,
+        User user,
+        string eventType,
+        CancellationToken cancellationToken)
+    {
+        var invoiceId = intent.Metadata.TryGetValue("invoiceId", out var metaInvoiceId)
+            ? metaInvoiceId
+            : null;
+        var subscriptionId = intent.Metadata.TryGetValue("subscriptionId", out var metaSubId)
+            ? metaSubId
+            : null;
+
+        var planId = intent.Metadata.TryGetValue("planId", out var metadataPlanId) ? metadataPlanId : null;
+        var planCode = intent.Metadata.TryGetValue("planCode", out var metadataPlanCode) ? metadataPlanCode : null;
+
+        if (!string.IsNullOrWhiteSpace(subscriptionId))
+        {
+            var subscriptionService = new SubscriptionService();
+            var subscription = await subscriptionService.GetAsync(subscriptionId, cancellationToken: cancellationToken);
+            if (subscription != null)
+            {
+                await UpsertSubscriptionAsync(subscription, eventType, cancellationToken);
+                return;
+            }
+        }
+
+        SubscriptionPlan? plan = null;
+        if (!string.IsNullOrWhiteSpace(planId) && Guid.TryParse(planId, out var parsedPlanId))
+        {
+            plan = await _db.SubscriptionPlans.FirstOrDefaultAsync(p => p.Id == parsedPlanId, cancellationToken);
+        }
+
+        if (plan == null && !string.IsNullOrWhiteSpace(planCode))
+        {
+            plan = await _db.SubscriptionPlans.FirstOrDefaultAsync(p => p.Code == planCode, cancellationToken);
+        }
+
+        if (plan != null)
+        {
+            var subscriptionShell = await EnsureSubscriptionShellAsync(user, plan, cancellationToken);
+            subscriptionShell.Status = "active";
+            subscriptionShell.UpdatedAt = DateTime.UtcNow;
+
+            user.SubscriptionStatus = subscriptionShell.Status;
+            user.ActivePlanId = plan.Id;
+            user.UpdatedAt = DateTime.UtcNow;
+            await _db.SaveChangesAsync(cancellationToken);
+
+            await LogEventAsync(
+                user,
+                subscriptionShell.Id,
+                eventType,
+                $"Payment intent {intent.Id} activated plan {plan.Code} without Stripe subscription reference",
+                null,
+                cancellationToken);
+        }
+        else
+        {
+            _logger.LogWarning(
+                "Payment intent {PaymentIntentId} succeeded but no subscription could be resolved (invoice {InvoiceId})",
+                intent.Id,
+                invoiceId ?? "(none)");
+        }
     }
 
     private async Task UpsertSubscriptionAsync(Subscription subscription, string eventType, CancellationToken cancellationToken)
@@ -317,22 +420,31 @@ public class StripeSubscriptionService
             : null;
 
         var currentSub = await _db.UserSubscriptions
-            .FirstOrDefaultAsync(s => s.StripeSubscriptionId == subscription.Id || s.Id == user.ActiveSubscriptionId, cancellationToken);
+            .FirstOrDefaultAsync(s =>
+                s.StripeSubscriptionId == subscription.Id ||
+                s.Id == user.ActiveSubscriptionId ||
+                s.UserId == user.Id,
+                cancellationToken);
 
         if (currentSub == null)
         {
             currentSub = new UserSubscription
             {
-                Id = user.ActiveSubscriptionId ?? Guid.NewGuid().ToString("N"),
+                Id = Guid.NewGuid(), // Generate UUID client-side to avoid RETURNING clause
                 UserId = user.Id,
-                CreatedAt = DateTime.UtcNow
+                Status = "pending", // Set explicitly to avoid RETURNING clause
+                CreatedAt = DateTime.UtcNow,
+                UpdatedAt = DateTime.UtcNow // Set explicitly to avoid RETURNING clause
             };
             _db.UserSubscriptions.Add(currentSub);
         }
 
         currentSub.StripeSubscriptionId = subscription.Id;
         currentSub.StripeCustomerId = customerId;
-        currentSub.PlanId = plan?.Id ?? currentSub.PlanId ?? planPriceId ?? string.Empty;
+        if (plan != null)
+        {
+            currentSub.PlanId = plan.Id;
+        }
         currentSub.Status = subscription.Status ?? "unknown";
         currentSub.CancelAtPeriodEnd = subscription.CancelAtPeriodEnd;
 
@@ -376,15 +488,15 @@ public class StripeSubscriptionService
 
     private async Task<UserSubscription> EnsureSubscriptionShellAsync(User user, SubscriptionPlan plan, CancellationToken cancellationToken)
     {
-        var existing = !string.IsNullOrWhiteSpace(user.ActiveSubscriptionId)
-            ? await _db.UserSubscriptions.FirstOrDefaultAsync(s => s.Id == user.ActiveSubscriptionId, cancellationToken)
-            : null;
+        var existing = user.ActiveSubscriptionId.HasValue
+            ? await _db.UserSubscriptions.FirstOrDefaultAsync(s => s.Id == user.ActiveSubscriptionId.Value, cancellationToken)
+            : await _db.UserSubscriptions.FirstOrDefaultAsync(s => s.UserId == user.Id, cancellationToken);
 
         if (existing == null)
         {
             existing = new UserSubscription
             {
-                Id = Guid.NewGuid().ToString("N"),
+                Id = Guid.NewGuid(), // Generate UUID client-side to avoid RETURNING clause
                 UserId = user.Id,
                 PlanId = plan.Id,
                 Status = "pending_payment",
@@ -466,7 +578,7 @@ public class StripeSubscriptionService
 
         if (metadata != null && metadata.Count > 0)
         {
-            if (metadata.TryGetValue("userId", out var userIdRaw) && ulong.TryParse(userIdRaw, out var userId))
+            if (metadata.TryGetValue("userId", out var userIdRaw) && Guid.TryParse(userIdRaw, out var userId))
             {
                 var byId = await _db.Users.FirstOrDefaultAsync(u => u.Id == userId, cancellationToken);
                 if (byId != null)
@@ -493,18 +605,23 @@ public class StripeSubscriptionService
         var changed = false;
         var seedPlans = new List<SubscriptionPlan>();
 
+        var now = DateTime.UtcNow;
+
         if (!string.IsNullOrWhiteSpace(_options.CoreDataPriceId))
         {
             seedPlans.Add(new SubscriptionPlan
             {
-                Id = "core-data",
+                Id = Guid.NewGuid(), // Generate UUID client-side to avoid RETURNING clause
                 Code = "core-data",
                 Name = "Core Data",
                 StripePriceId = _options.CoreDataPriceId,
                 Currency = "usd",
                 Interval = "month",
                 Amount = 79,
-                Description = "Streamlined market data feed with history and export support."
+                IsActive = true, // Set explicitly to avoid RETURNING clause
+                Description = "Streamlined market data feed with history and export support.",
+                CreatedAt = now, // Set explicitly to avoid RETURNING clause
+                UpdatedAt = now // Set explicitly to avoid RETURNING clause
             });
         }
 
@@ -512,20 +629,23 @@ public class StripeSubscriptionService
         {
             seedPlans.Add(new SubscriptionPlan
             {
-                Id = "core-data-annual",
+                Id = Guid.NewGuid(), // Generate UUID client-side to avoid RETURNING clause
                 Code = "core-data-annual",
                 Name = "Core Data",
                 StripePriceId = _options.CoreDataAnnualPriceId,
                 Currency = "usd",
                 Interval = "year",
                 Amount = 790,
-                Description = "Annual billing for Core Data."
+                IsActive = true, // Set explicitly to avoid RETURNING clause
+                Description = "Annual billing for Core Data.",
+                CreatedAt = now, // Set explicitly to avoid RETURNING clause
+                UpdatedAt = now // Set explicitly to avoid RETURNING clause
             });
         }
 
         foreach (var seed in seedPlans)
         {
-            var existing = await _db.SubscriptionPlans.FirstOrDefaultAsync(p => p.Id == seed.Id, cancellationToken);
+            var existing = await _db.SubscriptionPlans.FirstOrDefaultAsync(p => p.Code == seed.Code, cancellationToken);
             if (existing == null)
             {
                 _db.SubscriptionPlans.Add(seed);
@@ -559,10 +679,11 @@ public class StripeSubscriptionService
         return changed;
     }
 
-    private async Task LogEventAsync(User user, string? subscriptionId, string eventType, string? notes, string? data, CancellationToken cancellationToken)
+    private async Task LogEventAsync(User user, Guid? subscriptionId, string eventType, string? notes, string? data, CancellationToken cancellationToken)
     {
         _db.SubscriptionEvents.Add(new SubscriptionEventLog
         {
+            Id = Guid.NewGuid(), // Generate UUID client-side to avoid RETURNING clause
             UserId = user.Id,
             SubscriptionId = subscriptionId,
             EventType = eventType,

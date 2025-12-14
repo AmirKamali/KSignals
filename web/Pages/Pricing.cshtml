@@ -159,17 +159,7 @@
                                 <button type="submit" class="btn btn-outline">Manage billing</button>
                             </form>
                         }
-                        @if (isCoreTier && !isCurrent)
-                        {
-                            <a href="@Model.CoreDataPaymentLink"
-                               class="btn btn-primary cadence-link"
-                               data-monthly-href="@Model.CoreDataPaymentLink"
-                               data-annual-href="@Model.CoreDataAnnualPaymentLink">
-                                <span class="cta-label cta-monthly">Choose monthly</span>
-                                <span class="cta-label cta-annual">Choose annual</span>
-                            </a>
-                        }
-                        else if (!isCoreTier)
+                        @if (!isCurrent)
                         {
                             <form method="post" asp-page-handler="Checkout">
                                 <input type="hidden"
@@ -248,12 +238,6 @@
 
                 document.querySelectorAll('.cadence-value').forEach(input => {
                     input.value = normalized;
-                });
-
-                document.querySelectorAll('.cadence-link').forEach(link => {
-                    const monthly = link.dataset.monthlyHref;
-                    const annual = link.dataset.annualHref;
-                    link.href = normalized === 'annual' && annual ? annual : monthly || annual || '#';
                 });
             };
 

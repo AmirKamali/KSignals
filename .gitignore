@@ -9,7 +9,9 @@ shared/KSignals.DTO/obj
 firebase_credentials_raw.json
 firebase-credentials.json
 .env
+.env.*
 logs/backend.log
 logs/frontend.log
 backend/KSignal.API.Tests/obj
 backend/KSignal.API.Tests/bin
+backend/KSignal.API/.dotnet

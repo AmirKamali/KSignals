@@ -10,8 +10,17 @@ using System.Text;
 using Microsoft.Extensions.Logging;
 using MassTransit;
 using ClickHouse.EntityFrameworkCore.Extensions;
+using DotNetEnv;
 
 var builder = WebApplication.CreateBuilder(args);
+
+// Load environment-specific .env file if it exists
+var envFileName = builder.Environment.IsDevelopment() ? ".env.dev" : ".env";
+var envFilePath = Path.Combine(Directory.GetCurrentDirectory(), envFileName);
+if (File.Exists(envFilePath))
+{
+    Env.Load(envFilePath);
+}
 
 // Add services to the container.
 builder.Services.AddCors(options =>
@@ -175,7 +184,22 @@ builder.Services.AddScoped<SynchronizationService>();
 builder.Services.AddScoped<AnalyticsService>();
 builder.Services.AddScoped<CleanupService>();
 builder.Services.AddScoped<ISyncLogService, SyncLogService>();
-builder.Services.Configure<StripeOptions>(builder.Configuration.GetSection(StripeOptions.SectionName));
+
+// Configure Stripe options from environment variables with fallback to appsettings
+var stripeSection = builder.Configuration.GetSection(StripeOptions.SectionName);
+builder.Services.Configure<StripeOptions>(options =>
+{
+    options.SecretKey = Environment.GetEnvironmentVariable("STRIPE_SECRET_KEY") ?? stripeSection["SecretKey"] ?? string.Empty;
+    options.PublishableKey = Environment.GetEnvironmentVariable("STRIPE_PUBLISHABLE_KEY") ?? stripeSection["PublishableKey"] ?? string.Empty;
+    options.WebhookSecret = Environment.GetEnvironmentVariable("STRIPE_WEBHOOK_SECRET") ?? stripeSection["WebhookSecret"] ?? string.Empty;
+    options.SuccessUrl = Environment.GetEnvironmentVariable("STRIPE_SUCCESS_URL") ?? stripeSection["SuccessUrl"] ?? string.Empty;
+    options.CancelUrl = Environment.GetEnvironmentVariable("STRIPE_CANCEL_URL") ?? stripeSection["CancelUrl"] ?? string.Empty;
+    options.BillingPortalReturnUrl = Environment.GetEnvironmentVariable("STRIPE_BILLING_PORTAL_RETURN_URL") ?? stripeSection["BillingPortalReturnUrl"] ?? string.Empty;
+    options.CoreDataPriceId = Environment.GetEnvironmentVariable("STRIPE_CORE_DATA_PRICE_ID") ?? stripeSection["CoreDataPriceId"] ?? string.Empty;
+    options.CoreDataAnnualPriceId = Environment.GetEnvironmentVariable("STRIPE_CORE_DATA_ANNUAL_PRICE_ID") ?? stripeSection["CoreDataAnnualPriceId"];
+    options.PremiumPriceId = Environment.GetEnvironmentVariable("STRIPE_PREMIUM_PRICE_ID") ?? stripeSection["PremiumPriceId"];
+});
+
 builder.Services.AddScoped<StripeSubscriptionService>();
 // builder.Services.AddSingleton<RefreshService>(); // Commented out - RefreshService is currently commented out
 

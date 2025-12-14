@@ -1,8 +1,7 @@
+using KSignals.DTO;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
-using Microsoft.Extensions.Configuration;
 using web_asp.Services;
-using KSignals.DTO;
 
 namespace web_asp.Pages;
 
@@ -10,31 +9,18 @@ public class PricingModel : PageModel
 {
     private readonly BackendClient _backendClient;
     private readonly ILogger<PricingModel> _logger;
-    private readonly string _coreDataPaymentLink;
-    private readonly string _coreDataAnnualPaymentLink;
 
     public List<SubscriptionTierDto> Tiers { get; private set; } = new();
     public List<SubscriptionPlanDto> Plans { get; private set; } = new();
     public SubscriptionSummaryResponse? CurrentSubscription { get; private set; }
     public string? ErrorMessage { get; private set; }
     public string? StatusMessage { get; private set; }
-    public string CoreDataPaymentLink => _coreDataPaymentLink;
-    public string CoreDataAnnualPaymentLink => _coreDataAnnualPaymentLink;
     public string SelectedCadence { get; private set; } = "monthly";
 
-    public PricingModel(BackendClient backendClient, ILogger<PricingModel> logger, IConfiguration configuration)
+    public PricingModel(BackendClient backendClient, ILogger<PricingModel> logger)
     {
         _backendClient = backendClient;
         _logger = logger;
-        var configuredLink = configuration["payment_link_core_data"];
-        _coreDataPaymentLink = string.IsNullOrWhiteSpace(configuredLink)
-            ? "https://buy.stripe.com/test_5kQ00kbN8fqjeqPdfwafS00"
-            : configuredLink;
-
-        var configuredAnnualLink = configuration["payment_link_core_data_annual"];
-        _coreDataAnnualPaymentLink = string.IsNullOrWhiteSpace(configuredAnnualLink)
-            ? _coreDataPaymentLink
-            : configuredAnnualLink;
     }
 
     public async Task OnGetAsync()
@@ -77,6 +63,14 @@ public class PricingModel : PageModel
         var (success, error, checkout) = await _backendClient.CreateCheckoutSessionAsync(jwt, planCode, successUrl, cancelUrl);
         if (!success || checkout == null)
         {
+            // If authentication failed, redirect to login instead of showing error
+            if (error?.Contains("Unauthorized", StringComparison.OrdinalIgnoreCase) == true ||
+                error?.Contains("401", StringComparison.OrdinalIgnoreCase) == true)
+            {
+                var returnUrl = Url.Page("/Pricing", null, new { plan = planCode });
+                return RedirectToPage("/Login", new { returnUrl });
+            }
+
             ErrorMessage = error ?? "Unable to start payment link. Please try again.";
             await LoadDataAsync();
             return Page();
@@ -132,7 +126,16 @@ public class PricingModel : PageModel
             }
             else
             {
-                _logger.LogWarning("Unable to load subscription status: {Error}", error);
+                // Log as debug for expected cases (401 Unauthorized = user not authenticated or token expired)
+                // This is normal behavior for unauthenticated users viewing the pricing page
+                if (error?.Contains("Unauthorized", StringComparison.OrdinalIgnoreCase) == true)
+                {
+                    _logger.LogDebug("User not authenticated or token expired, skipping subscription status fetch");
+                }
+                else
+                {
+                    _logger.LogWarning("Unable to load subscription status: {Error}", error);
+                }
             }
         }
     }

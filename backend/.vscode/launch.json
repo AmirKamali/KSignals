@@ -16,7 +16,8 @@
         "uriFormat": "%s/swagger"
       },
       "env": {
-        "ASPNETCORE_ENVIRONMENT": "Development"
+        "ASPNETCORE_ENVIRONMENT": "Development",
+        "JWT_SECRET" : "vS2d7BbiCp5AKQBaKnKzhuDTamgh1g+Sw0vFkbQ/qKxRnEqUlenrYH4ZCDk5tUoW"
       },
       "sourceFileMap": {
         "/Views": "${workspaceFolder}/Views"

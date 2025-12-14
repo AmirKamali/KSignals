@@ -5,8 +5,7 @@ namespace KSignal.API.Models;
 public class SubscriptionPlan
 {
     [Key]
-    [MaxLength(64)]
-    public string Id { get; set; } = Guid.NewGuid().ToString("N");
+    public Guid Id { get; set; }
 
     [Required]
     [MaxLength(80)]

@@ -1,18 +1,23 @@
 using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations.Schema;
 
 namespace KSignal.API.Models;
 
 public class SubscriptionEventLog
 {
     [Key]
-    [MaxLength(64)]
-    public string Id { get; set; } = Guid.NewGuid().ToString("N");
+    public Guid Id { get; set; }
 
     [Required]
-    public ulong UserId { get; set; }
+    public Guid UserId { get; set; }
 
-    [MaxLength(64)]
-    public string? SubscriptionId { get; set; }
+    [ForeignKey(nameof(UserId))]
+    public User? User { get; set; }
+
+    public Guid? SubscriptionId { get; set; }
+
+    [ForeignKey(nameof(SubscriptionId))]
+    public UserSubscription? Subscription { get; set; }
 
     [Required]
     [MaxLength(64)]

@@ -217,7 +217,7 @@ public class SubscriptionsController : ControllerBase
 
     private SubscriptionPlanDto MapPlan(SubscriptionPlan plan) => new()
     {
-        Id = plan.Id,
+        Id = plan.Id.ToString(),
         Code = plan.Code,
         Name = plan.Name,
         Amount = plan.Amount,
@@ -277,7 +277,7 @@ public class SubscriptionsController : ControllerBase
     {
         new SubscriptionPlan
         {
-            Id = "free",
+            Id = Guid.Parse("00000000-0000-0000-0000-000000000001"),
             Code = "free",
             Name = "Free",
             StripePriceId = string.Empty,
@@ -289,7 +289,7 @@ public class SubscriptionsController : ControllerBase
         },
         new SubscriptionPlan
         {
-            Id = "core-data",
+            Id = Guid.Parse("00000000-0000-0000-0000-000000000002"),
             Code = "core-data",
             Name = "Core Data",
             StripePriceId = _stripeOptions.CoreDataPriceId ?? string.Empty,
@@ -301,7 +301,7 @@ public class SubscriptionsController : ControllerBase
         },
         new SubscriptionPlan
         {
-            Id = "core-data-annual",
+            Id = Guid.Parse("00000000-0000-0000-0000-000000000003"),
             Code = "core-data-annual",
             Name = "Core Data",
             StripePriceId = _stripeOptions.CoreDataAnnualPriceId ?? string.Empty,
@@ -341,16 +341,16 @@ public class SubscriptionsController : ControllerBase
     private async Task<(SubscriptionPlan? Plan, DateTime? PeriodEnd)> LoadSubscriptionAsync(User user, CancellationToken cancellationToken)
     {
         SubscriptionPlan? plan = null;
-        if (!string.IsNullOrWhiteSpace(user.ActivePlanId))
+        if (user.ActivePlanId.HasValue)
         {
-            plan = await _db.SubscriptionPlans.AsNoTracking().FirstOrDefaultAsync(p => p.Id == user.ActivePlanId, cancellationToken);
+            plan = await _db.SubscriptionPlans.AsNoTracking().FirstOrDefaultAsync(p => p.Id == user.ActivePlanId.Value, cancellationToken);
         }
 
         DateTime? periodEnd = null;
-        if (!string.IsNullOrWhiteSpace(user.ActiveSubscriptionId))
+        if (user.ActiveSubscriptionId.HasValue)
         {
             var subscription = await _db.UserSubscriptions.AsNoTracking()
-                .FirstOrDefaultAsync(s => s.Id == user.ActiveSubscriptionId, cancellationToken);
+                .FirstOrDefaultAsync(s => s.Id == user.ActiveSubscriptionId.Value, cancellationToken);
             periodEnd = subscription?.CurrentPeriodEnd;
         }
 

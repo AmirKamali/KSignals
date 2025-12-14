@@ -1,3 +1,6 @@
+using System.IdentityModel.Tokens.Jwt;
+using System.Security.Claims;
+using System.Text;
 using KSignal.API.Data;
 using KSignal.API.Models;
 using KSignals.DTO;
@@ -5,9 +8,6 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
-using System.IdentityModel.Tokens.Jwt;
-using System.Security.Claims;
-using System.Text;
 
 namespace KSignal.API.Controllers;
 
@@ -30,17 +30,17 @@ public class UsersController : ControllerBase
         CancellationToken cancellationToken)
     {
         SubscriptionPlan? plan = null;
-        if (!string.IsNullOrWhiteSpace(user.ActivePlanId))
+        if (user.ActivePlanId.HasValue)
         {
             plan = await _db.SubscriptionPlans.AsNoTracking()
-                .FirstOrDefaultAsync(p => p.Id == user.ActivePlanId, cancellationToken);
+                .FirstOrDefaultAsync(p => p.Id == user.ActivePlanId.Value, cancellationToken);
         }
 
         DateTime? periodEnd = null;
-        if (!string.IsNullOrWhiteSpace(user.ActiveSubscriptionId))
+        if (user.ActiveSubscriptionId.HasValue)
         {
             var subscription = await _db.UserSubscriptions.AsNoTracking()
-                .FirstOrDefaultAsync(s => s.Id == user.ActiveSubscriptionId, cancellationToken);
+                .FirstOrDefaultAsync(s => s.Id == user.ActiveSubscriptionId.Value, cancellationToken);
             periodEnd = subscription?.CurrentPeriodEnd;
         }
 
@@ -56,7 +56,7 @@ public class UsersController : ControllerBase
             Name = $"{user.FirstName} {user.LastName}".Trim(),
             Email = user.Email ?? string.Empty,
             SubscriptionStatus = user.SubscriptionStatus ?? "none",
-            ActivePlanId = plan?.Id ?? user.ActivePlanId,
+            ActivePlanId = plan?.Id.ToString() ?? user.ActivePlanId?.ToString(),
             ActivePlanCode = plan?.Code,
             ActivePlanName = plan?.Name,
             CurrentPeriodEnd = currentPeriodEnd
@@ -74,7 +74,7 @@ public class UsersController : ControllerBase
             CreatedAt = user.CreatedAt,
             UpdatedAt = user.UpdatedAt,
             SubscriptionStatus = user.SubscriptionStatus ?? "none",
-            ActivePlanId = plan?.Id ?? user.ActivePlanId,
+            ActivePlanId = plan?.Id.ToString() ?? user.ActivePlanId?.ToString(),
             ActivePlanCode = plan?.Code,
             ActivePlanName = plan?.Name,
             CurrentPeriodEnd = currentPeriodEnd
@@ -170,12 +170,14 @@ public class UsersController : ControllerBase
         {
             var user = new User
             {
+                Id = Guid.NewGuid(), // Generate UUID client-side to avoid RETURNING clause
                 FirebaseId = request.FirebaseId,
                 Username = request.Username,
                 FirstName = request.FirstName,
                 LastName = request.LastName,
                 Email = request.Email,
                 IsComnEmailOn = request.IsComnEmailOn,
+                SubscriptionStatus = "none", // Set explicitly to avoid RETURNING clause
                 CreatedAt = now,
                 UpdatedAt = now
             };
@@ -264,12 +266,14 @@ public class UsersController : ControllerBase
         {
             user = new User
             {
+                Id = Guid.NewGuid(), // Generate UUID client-side to avoid RETURNING clause
                 FirebaseId = request.FirebaseId,
                 Username = request.Username,
                 FirstName = request.FirstName,
                 LastName = request.LastName,
                 Email = request.Email,
                 IsComnEmailOn = true,
+                SubscriptionStatus = "none", // Set explicitly to avoid RETURNING clause
                 CreatedAt = now,
                 UpdatedAt = now
             };
@@ -283,8 +287,6 @@ public class UsersController : ControllerBase
             user.Email = request.Email ?? user.Email;
             user.UpdatedAt = now;
         }
-
-        user.SubscriptionStatus ??= "none";
 
         await _db.SaveChangesAsync(cancellationToken);
 
