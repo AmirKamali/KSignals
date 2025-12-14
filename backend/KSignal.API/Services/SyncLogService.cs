@@ -12,7 +12,8 @@ public interface ISyncLogService
     /// <param name="eventName">Name of the sync event</param>
     /// <param name="numbersEnqueued">Number of jobs/messages enqueued</param>
     /// <param name="cancellationToken">Cancellation token</param>
-    Task LogSyncEventAsync(string eventName, int numbersEnqueued, CancellationToken cancellationToken = default);
+    /// <param name="type">Log type/severity level (default: Info)</param>
+    Task LogSyncEventAsync(string eventName, int numbersEnqueued, CancellationToken cancellationToken = default, LogType type = LogType.Info);
 }
 
 public class SyncLogService : ISyncLogService
@@ -28,7 +29,7 @@ public class SyncLogService : ISyncLogService
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
 
-    public async Task LogSyncEventAsync(string eventName, int numbersEnqueued, CancellationToken cancellationToken = default)
+    public async Task LogSyncEventAsync(string eventName, int numbersEnqueued, CancellationToken cancellationToken = default, LogType type = LogType.Info)
     {
         if (string.IsNullOrWhiteSpace(eventName))
         {
@@ -46,17 +47,18 @@ public class SyncLogService : ISyncLogService
             {
                 EventName = eventName,
                 NumbersEnqueued = numbersEnqueued,
+                Type = type.ToString(),
                 LogDate = DateTime.UtcNow
             };
 
             await _dbContext.SyncLogs.AddAsync(syncLog, cancellationToken);
             await _dbContext.SaveChangesAsync(cancellationToken);
 
-            _logger.LogInformation("Logged sync event: {EventName}, Enqueued: {NumbersEnqueued}", eventName, numbersEnqueued);
+            _logger.LogInformation("Logged sync event: {EventName}, Type: {Type}, Enqueued: {NumbersEnqueued}", eventName, type, numbersEnqueued);
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Failed to log sync event: {EventName}, Enqueued: {NumbersEnqueued}", eventName, numbersEnqueued);
+            _logger.LogError(ex, "Failed to log sync event: {EventName}, Type: {Type}, Enqueued: {NumbersEnqueued}", eventName, type, numbersEnqueued);
             // Don't rethrow - logging should not break the sync operation
         }
     }

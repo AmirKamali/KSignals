@@ -1,5 +1,6 @@
 using KSignal.API.Data;
 using KSignal.API.Messaging;
+using KSignal.API.Models;
 using MassTransit;
 using Microsoft.EntityFrameworkCore;
 
@@ -51,24 +52,24 @@ public class CleanupService
 
             if (tickersToCleanup.Count == 0)
             {
-                await _syncLogService.LogSyncEventAsync("CleanupMarketData_NoMarketsFound", 0, cancellationToken);
+                await _syncLogService.LogSyncEventAsync("CleanupMarketData_NoMarketsFound", 0, cancellationToken, LogType.Info);
                 return 0;
             }
 
-            await _syncLogService.LogSyncEventAsync("CleanupMarketData_QueueingStarted", tickersToCleanup.Count, cancellationToken);
+            await _syncLogService.LogSyncEventAsync("CleanupMarketData_QueueingStarted", tickersToCleanup.Count, cancellationToken, LogType.Info);
 
             foreach (var tickerId in tickersToCleanup)
             {
                 await _publishEndpoint.Publish(new CleanupMarketData(tickerId), cancellationToken);
             }
 
-            await _syncLogService.LogSyncEventAsync("CleanupMarketData_QueueingCompleted", tickersToCleanup.Count, cancellationToken);
+            await _syncLogService.LogSyncEventAsync("CleanupMarketData_QueueingCompleted", tickersToCleanup.Count, cancellationToken, LogType.Info);
 
             return tickersToCleanup.Count;
         }
         catch (Exception)
         {
-            await _syncLogService.LogSyncEventAsync("CleanupMarketData_Error", 0, cancellationToken);
+            await _syncLogService.LogSyncEventAsync("CleanupMarketData_Error", 0, cancellationToken, LogType.ERROR);
             throw;
         }
     }
@@ -80,50 +81,50 @@ public class CleanupService
     {
         try
         {
-            await _syncLogService.LogSyncEventAsync($"CleanupTicker_Started_{tickerId}", 1, cancellationToken);
+            await _syncLogService.LogSyncEventAsync($"CleanupTicker_Started_{tickerId}", 1, cancellationToken, LogType.Info);
 
             var totalDeleted = 0;
 
             // 1. Delete from market_snapshots
             var snapshotsDeleted = await DeleteMarketSnapshotsAsync(tickerId, cancellationToken);
             totalDeleted += snapshotsDeleted;
-            await _syncLogService.LogSyncEventAsync($"CleanupTicker_MarketSnapshots_{tickerId}", snapshotsDeleted, cancellationToken);
+            await _syncLogService.LogSyncEventAsync($"CleanupTicker_MarketSnapshots_{tickerId}", snapshotsDeleted, cancellationToken, LogType.DEBUG);
 
             // 2. Delete from market_snapshots_latest
             var snapshotsLatestDeleted = await DeleteMarketSnapshotsLatestAsync(tickerId, cancellationToken);
             totalDeleted += snapshotsLatestDeleted;
-            await _syncLogService.LogSyncEventAsync($"CleanupTicker_MarketSnapshotsLatest_{tickerId}", snapshotsLatestDeleted, cancellationToken);
+            await _syncLogService.LogSyncEventAsync($"CleanupTicker_MarketSnapshotsLatest_{tickerId}", snapshotsLatestDeleted, cancellationToken, LogType.DEBUG);
 
             // 3. Delete from market_candlesticks
             var candlesticksDeleted = await DeleteMarketCandlesticksAsync(tickerId, cancellationToken);
             totalDeleted += candlesticksDeleted;
-            await _syncLogService.LogSyncEventAsync($"CleanupTicker_MarketCandlesticks_{tickerId}", candlesticksDeleted, cancellationToken);
+            await _syncLogService.LogSyncEventAsync($"CleanupTicker_MarketCandlesticks_{tickerId}", candlesticksDeleted, cancellationToken, LogType.DEBUG);
 
             // 4. Delete from orderbook_snapshots (uses MarketId)
             var orderbookSnapshotsDeleted = await DeleteOrderbookSnapshotsAsync(tickerId, cancellationToken);
             totalDeleted += orderbookSnapshotsDeleted;
-            await _syncLogService.LogSyncEventAsync($"CleanupTicker_OrderbookSnapshots_{tickerId}", orderbookSnapshotsDeleted, cancellationToken);
+            await _syncLogService.LogSyncEventAsync($"CleanupTicker_OrderbookSnapshots_{tickerId}", orderbookSnapshotsDeleted, cancellationToken, LogType.DEBUG);
 
             // 5. Delete from orderbook_events (uses MarketId)
             var orderbookEventsDeleted = await DeleteOrderbookEventsAsync(tickerId, cancellationToken);
             totalDeleted += orderbookEventsDeleted;
-            await _syncLogService.LogSyncEventAsync($"CleanupTicker_OrderbookEvents_{tickerId}", orderbookEventsDeleted, cancellationToken);
+            await _syncLogService.LogSyncEventAsync($"CleanupTicker_OrderbookEvents_{tickerId}", orderbookEventsDeleted, cancellationToken, LogType.DEBUG);
 
             // 6. Delete from analytics_market_features
             var analyticsDeleted = await DeleteAnalyticsMarketFeaturesAsync(tickerId, cancellationToken);
             totalDeleted += analyticsDeleted;
-            await _syncLogService.LogSyncEventAsync($"CleanupTicker_AnalyticsMarketFeatures_{tickerId}", analyticsDeleted, cancellationToken);
+            await _syncLogService.LogSyncEventAsync($"CleanupTicker_AnalyticsMarketFeatures_{tickerId}", analyticsDeleted, cancellationToken, LogType.DEBUG);
 
             // 7. Delete from market_highpriority
             var highPriorityDeleted = await DeleteMarketHighPriorityAsync(tickerId, cancellationToken);
             totalDeleted += highPriorityDeleted;
-            await _syncLogService.LogSyncEventAsync($"CleanupTicker_MarketHighPriority_{tickerId}", highPriorityDeleted, cancellationToken);
+            await _syncLogService.LogSyncEventAsync($"CleanupTicker_MarketHighPriority_{tickerId}", highPriorityDeleted, cancellationToken, LogType.DEBUG);
 
-            await _syncLogService.LogSyncEventAsync($"CleanupTicker_Completed_{tickerId}", totalDeleted, cancellationToken);
+            await _syncLogService.LogSyncEventAsync($"CleanupTicker_Completed_{tickerId}", totalDeleted, cancellationToken, LogType.Info);
         }
         catch (Exception)
         {
-            await _syncLogService.LogSyncEventAsync($"CleanupTicker_Error_{tickerId}", 0, cancellationToken);
+            await _syncLogService.LogSyncEventAsync($"CleanupTicker_Error_{tickerId}", 0, cancellationToken, LogType.ERROR);
             throw;
         }
     }
@@ -183,7 +184,7 @@ public class CleanupService
         }
         catch (Exception)
         {
-            await _syncLogService.LogSyncEventAsync("CleanupTicker_SqlExecutionError", 0, cancellationToken);
+            await _syncLogService.LogSyncEventAsync("CleanupTicker_SqlExecutionError", 0, cancellationToken, LogType.WARN);
             return 0;
         }
     }

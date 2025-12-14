@@ -29,6 +29,13 @@ public class SyncLog
     public int NumbersEnqueued { get; set; }
 
     /// <summary>
+    /// Log type/severity level: Info, WARN, ERROR, DEBUG
+    /// </summary>
+    [Required]
+    [MaxLength(10)]
+    public string Type { get; set; } = "Info";
+
+    /// <summary>
     /// Timestamp when the sync job was enqueued
     /// </summary>
     [Required]
