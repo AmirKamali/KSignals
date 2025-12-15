@@ -6,7 +6,6 @@ using KSignal.API.Messaging;
 using KSignal.API.Models;
 using MassTransit;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Logging;
 using Newtonsoft.Json;
 
 namespace KSignal.API.Services;
@@ -18,7 +17,6 @@ public class SynchronizationService
     private readonly IPublishEndpoint _publishEndpoint;
     private readonly ILockService _lockService;
     private readonly ISyncLogService _syncLogService;
-    private readonly ILogger<SynchronizationService> _logger;
 
     private const string MarketSyncLockKey = "sync:market-snapshots:lock";
     private const string MarketSyncCounterKey = "sync:market-snapshots:pending";
@@ -28,15 +26,13 @@ public class SynchronizationService
         KalshiDbContext dbContext,
         IPublishEndpoint publishEndpoint,
         ILockService lockService,
-        ISyncLogService syncLogService,
-        ILogger<SynchronizationService> logger)
+        ISyncLogService syncLogService)
     {
         _kalshiClient = kalshiClient ?? throw new ArgumentNullException(nameof(kalshiClient));
         _dbContext = dbContext ?? throw new ArgumentNullException(nameof(dbContext));
         _publishEndpoint = publishEndpoint ?? throw new ArgumentNullException(nameof(publishEndpoint));
         _lockService = lockService ?? throw new ArgumentNullException(nameof(lockService));
         _syncLogService = syncLogService ?? throw new ArgumentNullException(nameof(syncLogService));
-        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
 
     public async Task EnqueueMarketSyncAsync(
@@ -54,11 +50,11 @@ public class SynchronizationService
 
         if (!lockAcquired)
         {
-            _logger.LogWarning("Failed to acquire lock for market synchronization - another sync is already in progress");
+            await _syncLogService.LogSyncEventAsync("MarketSync_FailedToAcquireLock", 0, cancellationToken, LogType.WARN);
             throw new InvalidOperationException("Market synchronization is already in progress. Please wait for the current operation to complete.");
         }
 
-        _logger.LogInformation("Acquired lock for market synchronization, initialized job counter");
+        await _syncLogService.LogSyncEventAsync("MarketSync_LockAcquired", 1, cancellationToken, LogType.Info);
 
         try
         {
@@ -70,7 +66,7 @@ public class SynchronizationService
                 await _publishEndpoint.Publish(new SynchronizeMarketData(minCreatedTs, maxCreatedTs, status), cancellationToken);
                 messageCount++;
                 await _lockService.IncrementJobCounterAsync(MarketSyncCounterKey, cancellationToken);
-                _logger.LogInformation("Enqueued filtered market sync with {MessageCount} message(s)", messageCount);
+                await _syncLogService.LogSyncEventAsync("MarketSync_FilteredEnqueued", messageCount, cancellationToken, LogType.Info);
                 return;
             }
 
@@ -82,11 +78,11 @@ public class SynchronizationService
             if (!maxCreatedTimeInDb.HasValue)
             {
                 // No data in DB, perform full sync from scratch
-                _logger.LogInformation("No existing market snapshot data found, performing full sync from scratch");
+                await _syncLogService.LogSyncEventAsync("MarketSync_NoExistingData_FullSync", 0, cancellationToken, LogType.Info);
                 await _publishEndpoint.Publish(new SynchronizeMarketData(null, null, null), cancellationToken);
                 messageCount++;
                 await _lockService.IncrementJobCounterAsync(MarketSyncCounterKey, cancellationToken);
-                _logger.LogInformation("Enqueued full market sync with {MessageCount} message(s)", messageCount);
+                await _syncLogService.LogSyncEventAsync("MarketSync_FullSyncEnqueued", messageCount, cancellationToken, LogType.Info);
                 return;
             }
             // Sync1 - Update existing markets (from oldest to newest)
@@ -110,14 +106,11 @@ public class SynchronizationService
             await _publishEndpoint.Publish(new SynchronizeMarketData(minCreatedTsValue, null, null));
             messageCount++;
             await _lockService.IncrementJobCounterAsync(MarketSyncCounterKey, cancellationToken);
-            _logger.LogInformation("Successfully enqueued {MessageCount} market sync message(s), lock will be released when all jobs complete", messageCount);
-
-            // Log the sync event
-            await _syncLogService.LogSyncEventAsync("SynchronizeMarketData", messageCount, cancellationToken);
+            await _syncLogService.LogSyncEventAsync("MarketSync_Enqueued", messageCount, cancellationToken, LogType.Info);
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error while enqueuing market synchronization - releasing lock. Exception type: {ExceptionType}", ex.GetType().Name);
+            await _syncLogService.LogSyncEventAsync($"MarketSync_EnqueueError_{ex.GetType().Name}", 0, cancellationToken, LogType.ERROR);
 
             // Release the lock and reset counter on failure
             await _lockService.ReleaseWithCounterAsync(MarketSyncLockKey, MarketSyncCounterKey, cancellationToken);
@@ -137,7 +130,7 @@ public class SynchronizationService
 
         // Sync markets with filters
         var request = BuildRequest(command.MinCreatedTs, command.MaxCreatedTs, command.Status, command.Cursor);
-        var response = await _kalshiClient.Markets.GetMarketsAsync(limit: 1000, cursor: command.Cursor,
+        var response = await _kalshiClient.Markets.GetMarketsAsync(limit: 200, cursor: command.Cursor,
         minCreatedTs: command.MinCreatedTs,
          maxCreatedTs: command.MaxCreatedTs,
 
@@ -164,12 +157,11 @@ public class SynchronizationService
                 cancellationToken);
             // Track the pagination subjob
             await _lockService.IncrementJobCounterAsync(MarketSyncCounterKey, cancellationToken);
-            _logger.LogDebug("Enqueued pagination message for market sync (cursor present)");
+            await _syncLogService.LogSyncEventAsync("MarketSync_PaginationEnqueued", 1, cancellationToken, LogType.DEBUG);
         }
         else
         {
-            _logger.LogInformation("Completed market sync (MinCreatedTs={MinCreatedTs}, MaxCreatedTs={MaxCreatedTs}, Status={Status})",
-                command.MinCreatedTs, command.MaxCreatedTs, command.Status);
+            await _syncLogService.LogSyncEventAsync("MarketSync_Completed", 1, cancellationToken, LogType.Info);
         }
     }
 
@@ -182,7 +174,7 @@ public class SynchronizationService
 
             if (market == null)
             {
-                _logger.LogWarning("Market {TickerId} was not returned from Kalshi API", marketTickerId);
+                await _syncLogService.LogSyncEventAsync($"MarketSync_SingleMarket_NotFound_{marketTickerId}", 0, cancellationToken, LogType.WARN);
                 return;
             }
 
@@ -193,12 +185,12 @@ public class SynchronizationService
         }
         catch (ApiException apiEx)
         {
-            _logger.LogError(apiEx, "Kalshi API error fetching market {TickerId}", marketTickerId);
+            await _syncLogService.LogSyncEventAsync($"MarketSync_SingleMarket_ApiError_{marketTickerId}", 0, cancellationToken, LogType.ERROR);
             throw;
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error synchronizing market {TickerId}", marketTickerId);
+            await _syncLogService.LogSyncEventAsync($"MarketSync_SingleMarket_Error_{marketTickerId}", 0, cancellationToken, LogType.ERROR);
             throw;
         }
     }
@@ -245,7 +237,7 @@ public class SynchronizationService
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Unexpected error while trying to enqueue tags/categories synchronization. Exception type: {ExceptionType}", ex.GetType().Name);
+            await _syncLogService.LogSyncEventAsync($"TagsCategoriesSync_EnqueueError_{ex.GetType().Name}", 0, cancellationToken, LogType.ERROR);
             throw;
         }
     }
@@ -254,13 +246,13 @@ public class SynchronizationService
     {
         try
         {
-            _logger.LogInformation("Fetching tags and categories from Kalshi API");
+            await _syncLogService.LogSyncEventAsync("TagsCategoriesSync_Fetching", 0, cancellationToken, LogType.Info);
 
             var response = await _kalshiClient.Search.GetTagsForSeriesCategoriesAsync(cancellationToken: cancellationToken);
 
             if (response?.TagsByCategories == null || response.TagsByCategories.Count == 0)
             {
-                _logger.LogWarning("No tags/categories data received from Kalshi API");
+                await _syncLogService.LogSyncEventAsync("TagsCategoriesSync_NoDataReceived", 0, cancellationToken, LogType.WARN);
                 return;
             }
 
@@ -294,7 +286,7 @@ public class SynchronizationService
 
             if (incomingRecords.Count == 0)
             {
-                _logger.LogWarning("No valid tags/categories to save");
+                await _syncLogService.LogSyncEventAsync("TagsCategoriesSync_NoValidData", 0, cancellationToken, LogType.WARN);
                 return;
             }
 
@@ -359,27 +351,37 @@ public class SynchronizationService
 
             await _dbContext.SaveChangesAsync(cancellationToken);
 
-            _logger.LogInformation(
-                "Successfully synchronized tags/categories: {Inserted} inserted, {Updated} updated, {Restored} restored, {Deleted} marked as deleted",
-                insertedCount, updatedCount, restoredCount, deletedCount);
+            await _syncLogService.LogSyncEventAsync(
+                "TagsCategoriesSync_Completed",
+                insertedCount + updatedCount + restoredCount + deletedCount,
+                cancellationToken,
+                LogType.Info);
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error synchronizing tags and categories");
+            await _syncLogService.LogSyncEventAsync("TagsCategoriesSync_Error", 0, cancellationToken, LogType.ERROR);
             throw;
         }
     }
 
     private async Task InsertMarketSnapshotsAsync(IReadOnlyCollection<MarketSnapshot> markets)
     {
-        if (markets.Count == 0)
+        try
         {
-            return;
-        }
+            if (markets.Count == 0)
+            {
+                return;
+            }
 
-        // MarketSnapshotID is auto-generated by ClickHouse via generateUUIDv4()
-        await _dbContext.MarketSnapshots.AddRangeAsync(markets);
-        await _dbContext.SaveChangesAsync();
+            // MarketSnapshotID is auto-generated by ClickHouse via generateUUIDv4()
+            await _dbContext.MarketSnapshots.AddRangeAsync(markets);
+            await _dbContext.SaveChangesAsync();
+        }
+        catch (Exception ex)
+        {
+            await _syncLogService.LogSyncEventAsync($"MarketSnapshots_InsertError_BatchSize{markets.Count}", 0, default, LogType.ERROR);
+            throw;
+        }
     }
 
     public async Task EnqueueSeriesSyncAsync(CancellationToken cancellationToken = default)
@@ -391,7 +393,7 @@ public class SynchronizationService
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Unexpected error while trying to enqueue series synchronization. Exception type: {ExceptionType}", ex.GetType().Name);
+            await _syncLogService.LogSyncEventAsync($"SeriesSync_EnqueueError_{ex.GetType().Name}", 0, cancellationToken, LogType.ERROR);
             throw;
         }
     }
@@ -400,7 +402,7 @@ public class SynchronizationService
     {
         try
         {
-            _logger.LogInformation("Fetching series list from Kalshi API");
+            await _syncLogService.LogSyncEventAsync("SeriesSync_Fetching", 0, cancellationToken, LogType.Info);
 
             var response = await _kalshiClient.Markets.GetSeriesListAsync(
                 includeProductMetadata: true,
@@ -408,7 +410,7 @@ public class SynchronizationService
 
             if (response?.Series == null || response.Series.Count == 0)
             {
-                _logger.LogWarning("No series data received from Kalshi API");
+                await _syncLogService.LogSyncEventAsync("SeriesSync_NoDataReceived", 0, cancellationToken, LogType.WARN);
                 return;
             }
 
@@ -429,7 +431,7 @@ public class SynchronizationService
 
             if (incomingRecords.Count == 0)
             {
-                _logger.LogWarning("No valid series to save");
+                await _syncLogService.LogSyncEventAsync("SeriesSync_NoValidData", 0, cancellationToken, LogType.WARN);
                 return;
             }
 
@@ -474,13 +476,15 @@ public class SynchronizationService
 
             await _dbContext.SaveChangesAsync(cancellationToken);
 
-            _logger.LogInformation(
-                "Successfully synchronized series: {Inserted} inserted/updated (ReplacingMergeTree will dedupe), {Deleted} marked as deleted",
-                insertedCount, deletedCount);
+            await _syncLogService.LogSyncEventAsync(
+                "SeriesSync_Completed",
+                insertedCount + deletedCount,
+                cancellationToken,
+                LogType.Info);
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error synchronizing series");
+            await _syncLogService.LogSyncEventAsync("SeriesSync_Error", 0, cancellationToken, LogType.ERROR);
             throw;
         }
     }
@@ -545,7 +549,7 @@ public class SynchronizationService
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Unexpected error while trying to enqueue events synchronization. Exception type: {ExceptionType}", ex.GetType().Name);
+            await _syncLogService.LogSyncEventAsync($"EventsSync_EnqueueError_{ex.GetType().Name}", 0, cancellationToken, LogType.ERROR);
             throw;
         }
     }
@@ -586,7 +590,7 @@ public class SynchronizationService
 
         if (missingEventTickers.Count > 0)
         {
-            _logger.LogInformation("Found {Count} missing events in market_snapshots, enqueueing individual syncs", missingEventTickers.Count);
+            await _syncLogService.LogSyncEventAsync("EventsSync_MissingEventsFound", missingEventTickers.Count, default, LogType.Info);
 
             // Batch publish for better throughput
             var messages = missingEventTickers.Select(ticker => new SynchronizeEventDetail(ticker));
@@ -610,7 +614,7 @@ public class SynchronizationService
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Unexpected error while trying to enqueue event detail synchronization for {EventTicker}. Exception type: {ExceptionType}", eventTicker, ex.GetType().Name);
+            await _syncLogService.LogSyncEventAsync($"EventDetailSync_EnqueueError_{eventTicker}_{ex.GetType().Name}", 0, cancellationToken, LogType.ERROR);
             throw;
         }
     }
@@ -626,7 +630,7 @@ public class SynchronizationService
 
             if (response?.Event == null)
             {
-                _logger.LogWarning("No event data received for {EventTicker}, skipping", command.EventTicker);
+                await _syncLogService.LogSyncEventAsync($"EventDetailSync_NoData_{command.EventTicker}", 0, cancellationToken, LogType.WARN);
                 return;
             }
 
@@ -649,23 +653,22 @@ public class SynchronizationService
                                           apiEx.Message.Contains("404"))
         {
             // Event doesn't exist or API returned unexpected response format - skip gracefully
-            _logger.LogWarning("Event {EventTicker} not found or invalid response from Kalshi API, skipping: {Message}",
-                command.EventTicker, apiEx.Message);
+            await _syncLogService.LogSyncEventAsync($"EventDetailSync_NotFound_{command.EventTicker}", 0, cancellationToken, LogType.WARN);
         }
         catch (ApiException apiEx) when (apiEx.Message.Contains("too_many_requests"))
         {
             // Rate limited - log and don't crash, let the message be retried
-            _logger.LogWarning("Rate limited while fetching event {EventTicker}", command.EventTicker);
+            await _syncLogService.LogSyncEventAsync($"EventDetailSync_RateLimited_{command.EventTicker}", 0, cancellationToken, LogType.WARN);
             throw; // Rethrow to trigger retry
         }
         catch (ApiException apiEx)
         {
-            _logger.LogError(apiEx, "Kalshi API error fetching event {EventTicker}", command.EventTicker);
+            await _syncLogService.LogSyncEventAsync($"EventDetailSync_ApiError_{command.EventTicker}", 0, cancellationToken, LogType.ERROR);
             // Don't rethrow - allow batch to continue processing other messages
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error synchronizing event detail for {EventTicker}", command.EventTicker);
+            await _syncLogService.LogSyncEventAsync($"EventDetailSync_Error_{command.EventTicker}", 0, cancellationToken, LogType.ERROR);
             // Don't rethrow - allow batch to continue processing other messages
         }
     }
@@ -701,7 +704,7 @@ public class SynchronizationService
             if (eventsToInsert.Count > 0)
             {
                 await _dbContext.MarketEvents.AddRangeAsync(eventsToInsert, cancellationToken);
-                _logger.LogInformation("Inserting {Count} events (ReplacingMergeTree will dedupe)", eventsToInsert.Count);
+                await _syncLogService.LogSyncEventAsync("EventsSync_Inserting", eventsToInsert.Count, cancellationToken, LogType.Info);
             }
 
             await _dbContext.SaveChangesAsync(cancellationToken);
@@ -714,7 +717,7 @@ public class SynchronizationService
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error synchronizing events");
+            await _syncLogService.LogSyncEventAsync("EventsSync_Error", 0, cancellationToken, LogType.ERROR);
             throw;
         }
     }
@@ -750,7 +753,7 @@ public class SynchronizationService
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Unexpected error while trying to enqueue orderbook synchronization. Exception type: {ExceptionType}", ex.GetType().Name);
+            await _syncLogService.LogSyncEventAsync($"OrderbookSync_EnqueueError_{ex.GetType().Name}", 0, cancellationToken, LogType.ERROR);
             throw;
         }
     }
@@ -769,11 +772,11 @@ public class SynchronizationService
 
             if (highPriorityMarkets.Count == 0)
             {
-                _logger.LogWarning("No high-priority markets configured for orderbook sync");
+                await _syncLogService.LogSyncEventAsync("OrderbookSync_NoHighPriorityMarkets", 0, cancellationToken, LogType.WARN);
                 return;
             }
 
-            _logger.LogInformation("Syncing orderbooks for {Count} high-priority markets", highPriorityMarkets.Count);
+            await _syncLogService.LogSyncEventAsync("OrderbookSync_Starting", highPriorityMarkets.Count, cancellationToken, LogType.Info);
 
             var now = DateTime.UtcNow;
             var snapshotsToInsert = new List<OrderbookSnapshot>();
@@ -785,7 +788,7 @@ public class SynchronizationService
             {
                 try
                 {
-                    _logger.LogDebug("Fetching orderbook for market {TickerId}", market.TickerId);
+                    await _syncLogService.LogSyncEventAsync($"OrderbookSync_Fetching_{market.TickerId}", 0, cancellationToken, LogType.DEBUG);
 
                     var response = await _kalshiClient.Markets.GetMarketOrderbookAsync(
                         market.TickerId,
@@ -794,7 +797,7 @@ public class SynchronizationService
 
                     if (response?.Orderbook == null || (response.Orderbook.Yes == null && response.Orderbook.No == null))
                     {
-                        _logger.LogWarning("No orderbook data for market {TickerId}", market.TickerId);
+                        await _syncLogService.LogSyncEventAsync($"OrderbookSync_NoData_{market.TickerId}", 0, cancellationToken, LogType.WARN);
                         continue;
                     }
 
@@ -853,7 +856,7 @@ public class SynchronizationService
                 }
                 catch (Exception ex)
                 {
-                    _logger.LogError(ex, "Error fetching orderbook for market {TickerId}", market.TickerId);
+                    await _syncLogService.LogSyncEventAsync($"OrderbookSync_FetchError_{market.TickerId}", 0, cancellationToken, LogType.ERROR);
                 }
             }
 
@@ -869,12 +872,11 @@ public class SynchronizationService
 
             await _dbContext.SaveChangesAsync(cancellationToken);
 
-            _logger.LogInformation("Orderbook sync complete: {Snapshots} snapshots, {Events} events created",
-                snapshotsToInsert.Count, eventsToInsert.Count);
+            await _syncLogService.LogSyncEventAsync("OrderbookSync_Completed", snapshotsToInsert.Count + eventsToInsert.Count, cancellationToken, LogType.Info);
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error synchronizing orderbooks");
+            await _syncLogService.LogSyncEventAsync("OrderbookSync_Error", 0, cancellationToken, LogType.ERROR);
             throw;
         }
     }
@@ -1026,7 +1028,7 @@ public class SynchronizationService
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Unexpected error while trying to enqueue candlesticks synchronization. Exception type: {ExceptionType}", ex.GetType().Name);
+            await _syncLogService.LogSyncEventAsync($"CandlesticksSync_EnqueueError_{ex.GetType().Name}", 0, cancellationToken, LogType.ERROR);
             throw;
         }
     }
@@ -1044,11 +1046,11 @@ public class SynchronizationService
 
             if (highPriorityMarkets.Count == 0)
             {
-                _logger.LogWarning("No high-priority markets configured for candlestick sync");
+                await _syncLogService.LogSyncEventAsync("CandlesticksSync_NoHighPriorityMarkets", 0, cancellationToken, LogType.WARN);
                 return;
             }
 
-            _logger.LogInformation("Syncing candlesticks for {Count} high-priority markets", highPriorityMarkets.Count);
+            await _syncLogService.LogSyncEventAsync("CandlesticksSync_Starting", highPriorityMarkets.Count, cancellationToken, LogType.Info);
 
             var now = DateTime.UtcNow;
             var candlesticksToInsert = new List<MarketCandlestickData>();
@@ -1069,7 +1071,7 @@ public class SynchronizationService
 
                     if (snapshot == null)
                     {
-                        _logger.LogWarning("No active market snapshot found for ticker {TickerId}", market.TickerId);
+                        await _syncLogService.LogSyncEventAsync($"CandlesticksSync_NoSnapshot_{market.TickerId}", 0, cancellationToken, LogType.WARN);
                         continue;
                     }
 
@@ -1086,7 +1088,7 @@ public class SynchronizationService
 
                     if (string.IsNullOrWhiteSpace(seriesTicker))
                     {
-                        _logger.LogWarning("Could not find SeriesTicker for market {TickerId}", market.TickerId);
+                        await _syncLogService.LogSyncEventAsync($"CandlesticksSync_NoSeriesTicker_{market.TickerId}", 0, cancellationToken, LogType.WARN);
                         continue;
                     }
 
@@ -1102,25 +1104,23 @@ public class SynchronizationService
                     {
                         // Continue from last synced candlestick
                         startTs = lastCandlestick.EndPeriodTs;
-                        _logger.LogDebug("Fetching candlesticks for market {TickerId} from last sync: {LastSync}",
-                            market.TickerId, lastCandlestick.EndPeriodTime);
+                        await _syncLogService.LogSyncEventAsync($"CandlesticksSync_FromLastSync_{market.TickerId}", 0, cancellationToken, LogType.DEBUG);
                     }
                     else
                     {
                         // Start from market creation time
                         startTs = new DateTimeOffset(snapshot.CreatedTime, TimeSpan.Zero).ToUnixTimeSeconds();
-                        _logger.LogDebug("Fetching candlesticks for market {TickerId} from creation: {CreatedTime}",
-                            market.TickerId, snapshot.CreatedTime);
+                        await _syncLogService.LogSyncEventAsync($"CandlesticksSync_FromCreation_{market.TickerId}", 0, cancellationToken, LogType.DEBUG);
                     }
 
                     // Skip if start time is in the future or same as end time
                     if (startTs >= endTs)
                     {
-                        _logger.LogDebug("No new candlesticks to fetch for market {TickerId} (already up to date)", market.TickerId);
+                        await _syncLogService.LogSyncEventAsync($"CandlesticksSync_UpToDate_{market.TickerId}", 0, cancellationToken, LogType.DEBUG);
                         continue;
                     }
 
-                    _logger.LogDebug("Fetching candlesticks for market {TickerId} (series: {SeriesTicker})", market.TickerId, seriesTicker);
+                    await _syncLogService.LogSyncEventAsync($"CandlesticksSync_Fetching_{market.TickerId}", 0, cancellationToken, LogType.DEBUG);
 
                     var response = await _kalshiClient.Markets.GetMarketCandlesticksAsync(
                         seriesTicker,
@@ -1132,7 +1132,7 @@ public class SynchronizationService
 
                     if (response?.Candlesticks == null || response.Candlesticks.Count == 0)
                     {
-                        _logger.LogDebug("No candlestick data for market {TickerId}", market.TickerId);
+                        await _syncLogService.LogSyncEventAsync($"CandlesticksSync_NoData_{market.TickerId}", 0, cancellationToken, LogType.DEBUG);
                         continue;
                     }
 
@@ -1187,7 +1187,7 @@ public class SynchronizationService
                 }
                 catch (Exception ex)
                 {
-                    _logger.LogError(ex, "Error fetching candlesticks for market {TickerId}", market.TickerId);
+                    await _syncLogService.LogSyncEventAsync($"CandlesticksSync_FetchError_{market.TickerId}", 0, cancellationToken, LogType.ERROR);
                 }
             }
 
@@ -1198,11 +1198,11 @@ public class SynchronizationService
                 await _dbContext.SaveChangesAsync(cancellationToken);
             }
 
-            _logger.LogInformation("Candlestick sync complete: {Count} candlesticks created", candlesticksToInsert.Count);
+            await _syncLogService.LogSyncEventAsync("CandlesticksSync_Completed", candlesticksToInsert.Count, cancellationToken, LogType.Info);
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error synchronizing candlesticks");
+            await _syncLogService.LogSyncEventAsync("CandlesticksSync_Error", 0, cancellationToken, LogType.ERROR);
             throw;
         }
     }
