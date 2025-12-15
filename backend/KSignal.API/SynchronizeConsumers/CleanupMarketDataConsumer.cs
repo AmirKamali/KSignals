@@ -25,8 +25,8 @@ public class CleanupMarketDataConsumer : IConsumer<CleanupMarketData>
     public async Task Consume(ConsumeContext<CleanupMarketData> context)
     {
         var message = context.Message;
-        _logger.LogInformation("Processing cleanup for ticker={TickerId}", message.TickerId);
+        _logger.LogInformation("Processing cleanup for {Count} tickers", message.TickerIds?.Length ?? 0);
 
-        await _cleanupService.CleanupMarketDataAsync(message.TickerId, context.CancellationToken);
+        await _cleanupService.CleanupMarketDataAsync(message.TickerIds, context.CancellationToken);
     }
 }

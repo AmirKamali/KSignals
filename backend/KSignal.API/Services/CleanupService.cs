@@ -47,7 +47,7 @@ public class CleanupService
                      (s.ExpectedExpirationTime.HasValue && s.ExpectedExpirationTime.Value <= sevenDaysAgo)))
                 .Select(s => s.Ticker)
                 .Distinct()
-                .Take(10000)
+                .Take(10)
                 .ToListAsync(cancellationToken);
 
             if (tickersToCleanup.Count == 0)
@@ -58,10 +58,10 @@ public class CleanupService
 
             await _syncLogService.LogSyncEventAsync("CleanupMarketData_QueueingStarted", tickersToCleanup.Count, cancellationToken, LogType.Info);
 
-            foreach (var tickerId in tickersToCleanup)
-            {
-                await _publishEndpoint.Publish(new CleanupMarketData(tickerId), cancellationToken);
-            }
+
+
+            await _publishEndpoint.Publish(new CleanupMarketData(tickersToCleanup.ToArray()), cancellationToken);
+
 
             await _syncLogService.LogSyncEventAsync("CleanupMarketData_QueueingCompleted", tickersToCleanup.Count, cancellationToken, LogType.Info);
 
@@ -75,101 +75,148 @@ public class CleanupService
     }
 
     /// <summary>
-    /// Cleans up all data for a specific ticker from all related tables
+    /// Cleans up all data for specific tickers from all related tables
     /// </summary>
-    public async Task CleanupMarketDataAsync(string tickerId, CancellationToken cancellationToken = default)
+    public async Task CleanupMarketDataAsync(string[] tickerIds, CancellationToken cancellationToken = default)
     {
+        if (tickerIds == null || tickerIds.Length == 0)
+        {
+            return;
+        }
+
         try
         {
-            await _syncLogService.LogSyncEventAsync($"CleanupTicker_Started_{tickerId}", 1, cancellationToken, LogType.Info);
+            await _syncLogService.LogSyncEventAsync($"CleanupTicker_Started_Batch_{tickerIds.Length}", tickerIds.Length, cancellationToken, LogType.Info);
 
             var totalDeleted = 0;
 
             // 1. Delete from market_snapshots
-            var snapshotsDeleted = await DeleteMarketSnapshotsAsync(tickerId, cancellationToken);
+            var snapshotsDeleted = await DeleteMarketSnapshotsAsync(tickerIds, cancellationToken);
             totalDeleted += snapshotsDeleted;
-            await _syncLogService.LogSyncEventAsync($"CleanupTicker_MarketSnapshots_{tickerId}", snapshotsDeleted, cancellationToken, LogType.DEBUG);
+            await _syncLogService.LogSyncEventAsync($"CleanupTicker_MarketSnapshots_Batch_{tickerIds.Length}", snapshotsDeleted, cancellationToken, LogType.DEBUG);
 
             // 2. Delete from market_snapshots_latest
-            var snapshotsLatestDeleted = await DeleteMarketSnapshotsLatestAsync(tickerId, cancellationToken);
+            var snapshotsLatestDeleted = await DeleteMarketSnapshotsLatestAsync(tickerIds, cancellationToken);
             totalDeleted += snapshotsLatestDeleted;
-            await _syncLogService.LogSyncEventAsync($"CleanupTicker_MarketSnapshotsLatest_{tickerId}", snapshotsLatestDeleted, cancellationToken, LogType.DEBUG);
+            await _syncLogService.LogSyncEventAsync($"CleanupTicker_MarketSnapshotsLatest_Batch_{tickerIds.Length}", snapshotsLatestDeleted, cancellationToken, LogType.DEBUG);
 
             // 3. Delete from market_candlesticks
-            var candlesticksDeleted = await DeleteMarketCandlesticksAsync(tickerId, cancellationToken);
+            var candlesticksDeleted = await DeleteMarketCandlesticksAsync(tickerIds, cancellationToken);
             totalDeleted += candlesticksDeleted;
-            await _syncLogService.LogSyncEventAsync($"CleanupTicker_MarketCandlesticks_{tickerId}", candlesticksDeleted, cancellationToken, LogType.DEBUG);
+            await _syncLogService.LogSyncEventAsync($"CleanupTicker_MarketCandlesticks_Batch_{tickerIds.Length}", candlesticksDeleted, cancellationToken, LogType.DEBUG);
 
             // 4. Delete from orderbook_snapshots (uses MarketId)
-            var orderbookSnapshotsDeleted = await DeleteOrderbookSnapshotsAsync(tickerId, cancellationToken);
+            var orderbookSnapshotsDeleted = await DeleteOrderbookSnapshotsAsync(tickerIds, cancellationToken);
             totalDeleted += orderbookSnapshotsDeleted;
-            await _syncLogService.LogSyncEventAsync($"CleanupTicker_OrderbookSnapshots_{tickerId}", orderbookSnapshotsDeleted, cancellationToken, LogType.DEBUG);
+            await _syncLogService.LogSyncEventAsync($"CleanupTicker_OrderbookSnapshots_Batch_{tickerIds.Length}", orderbookSnapshotsDeleted, cancellationToken, LogType.DEBUG);
 
             // 5. Delete from orderbook_events (uses MarketId)
-            var orderbookEventsDeleted = await DeleteOrderbookEventsAsync(tickerId, cancellationToken);
+            var orderbookEventsDeleted = await DeleteOrderbookEventsAsync(tickerIds, cancellationToken);
             totalDeleted += orderbookEventsDeleted;
-            await _syncLogService.LogSyncEventAsync($"CleanupTicker_OrderbookEvents_{tickerId}", orderbookEventsDeleted, cancellationToken, LogType.DEBUG);
+            await _syncLogService.LogSyncEventAsync($"CleanupTicker_OrderbookEvents_Batch_{tickerIds.Length}", orderbookEventsDeleted, cancellationToken, LogType.DEBUG);
 
             // 6. Delete from analytics_market_features
-            var analyticsDeleted = await DeleteAnalyticsMarketFeaturesAsync(tickerId, cancellationToken);
+            var analyticsDeleted = await DeleteAnalyticsMarketFeaturesAsync(tickerIds, cancellationToken);
             totalDeleted += analyticsDeleted;
-            await _syncLogService.LogSyncEventAsync($"CleanupTicker_AnalyticsMarketFeatures_{tickerId}", analyticsDeleted, cancellationToken, LogType.DEBUG);
+            await _syncLogService.LogSyncEventAsync($"CleanupTicker_AnalyticsMarketFeatures_Batch_{tickerIds.Length}", analyticsDeleted, cancellationToken, LogType.DEBUG);
 
             // 7. Delete from market_highpriority
-            var highPriorityDeleted = await DeleteMarketHighPriorityAsync(tickerId, cancellationToken);
+            var highPriorityDeleted = await DeleteMarketHighPriorityAsync(tickerIds, cancellationToken);
             totalDeleted += highPriorityDeleted;
-            await _syncLogService.LogSyncEventAsync($"CleanupTicker_MarketHighPriority_{tickerId}", highPriorityDeleted, cancellationToken, LogType.DEBUG);
+            await _syncLogService.LogSyncEventAsync($"CleanupTicker_MarketHighPriority_Batch_{tickerIds.Length}", highPriorityDeleted, cancellationToken, LogType.DEBUG);
 
-            await _syncLogService.LogSyncEventAsync($"CleanupTicker_Completed_{tickerId}", totalDeleted, cancellationToken, LogType.Info);
+            await _syncLogService.LogSyncEventAsync($"CleanupTicker_Completed_Batch_{tickerIds.Length}", totalDeleted, cancellationToken, LogType.Info);
         }
         catch (Exception)
         {
-            await _syncLogService.LogSyncEventAsync($"CleanupTicker_Error_{tickerId}", 0, cancellationToken, LogType.ERROR);
+            await _syncLogService.LogSyncEventAsync($"CleanupTicker_Error_Batch_{tickerIds.Length}", 0, cancellationToken, LogType.ERROR);
             throw;
         }
     }
 
-    private async Task<int> DeleteMarketSnapshotsAsync(string tickerId, CancellationToken cancellationToken)
+    private async Task<int> DeleteMarketSnapshotsAsync(string[] tickerIds, CancellationToken cancellationToken)
     {
+        if (tickerIds == null || tickerIds.Length == 0)
+        {
+            return 0;
+        }
+
         // ClickHouse requires ALTER TABLE ... DELETE for MergeTree tables
-        var sql = $"ALTER TABLE kalshi_signals.market_snapshots DELETE WHERE Ticker = '{EscapeSqlString(tickerId)}'";
+        var tickerList = string.Join(",", tickerIds.Select(t => $"'{EscapeSqlString(t)}'"));
+        var sql = $"ALTER TABLE kalshi_signals.market_snapshots DELETE WHERE Ticker IN ({tickerList})";
         return await ExecuteRawSqlAsync(sql, cancellationToken);
     }
 
-    private async Task<int> DeleteMarketSnapshotsLatestAsync(string tickerId, CancellationToken cancellationToken)
+    private async Task<int> DeleteMarketSnapshotsLatestAsync(string[] tickerIds, CancellationToken cancellationToken)
     {
+        if (tickerIds == null || tickerIds.Length == 0)
+        {
+            return 0;
+        }
+
         // ClickHouse requires ALTER TABLE ... DELETE for MergeTree tables
-        var sql = $"ALTER TABLE kalshi_signals.market_snapshots_latest DELETE WHERE Ticker = '{EscapeSqlString(tickerId)}'";
+        var tickerList = string.Join(",", tickerIds.Select(t => $"'{EscapeSqlString(t)}'"));
+        var sql = $"ALTER TABLE kalshi_signals.market_snapshots_latest DELETE WHERE Ticker IN ({tickerList})";
         return await ExecuteRawSqlAsync(sql, cancellationToken);
     }
 
-    private async Task<int> DeleteMarketCandlesticksAsync(string tickerId, CancellationToken cancellationToken)
+    private async Task<int> DeleteMarketCandlesticksAsync(string[] tickerIds, CancellationToken cancellationToken)
     {
-        var sql = $"ALTER TABLE kalshi_signals.market_candlesticks DELETE WHERE Ticker = '{EscapeSqlString(tickerId)}'";
+        if (tickerIds == null || tickerIds.Length == 0)
+        {
+            return 0;
+        }
+
+        var tickerList = string.Join(",", tickerIds.Select(t => $"'{EscapeSqlString(t)}'"));
+        var sql = $"ALTER TABLE kalshi_signals.market_candlesticks DELETE WHERE Ticker IN ({tickerList})";
         return await ExecuteRawSqlAsync(sql, cancellationToken);
     }
 
-    private async Task<int> DeleteOrderbookSnapshotsAsync(string tickerId, CancellationToken cancellationToken)
+    private async Task<int> DeleteOrderbookSnapshotsAsync(string[] tickerIds, CancellationToken cancellationToken)
     {
-        var sql = $"ALTER TABLE kalshi_signals.orderbook_snapshots DELETE WHERE MarketId = '{EscapeSqlString(tickerId)}'";
+        if (tickerIds == null || tickerIds.Length == 0)
+        {
+            return 0;
+        }
+
+        var tickerList = string.Join(",", tickerIds.Select(t => $"'{EscapeSqlString(t)}'"));
+        var sql = $"ALTER TABLE kalshi_signals.orderbook_snapshots DELETE WHERE MarketId IN ({tickerList})";
         return await ExecuteRawSqlAsync(sql, cancellationToken);
     }
 
-    private async Task<int> DeleteOrderbookEventsAsync(string tickerId, CancellationToken cancellationToken)
+    private async Task<int> DeleteOrderbookEventsAsync(string[] tickerIds, CancellationToken cancellationToken)
     {
-        var sql = $"ALTER TABLE kalshi_signals.orderbook_events DELETE WHERE MarketId = '{EscapeSqlString(tickerId)}'";
+        if (tickerIds == null || tickerIds.Length == 0)
+        {
+            return 0;
+        }
+
+        var tickerList = string.Join(",", tickerIds.Select(t => $"'{EscapeSqlString(t)}'"));
+        var sql = $"ALTER TABLE kalshi_signals.orderbook_events DELETE WHERE MarketId IN ({tickerList})";
         return await ExecuteRawSqlAsync(sql, cancellationToken);
     }
 
-    private async Task<int> DeleteAnalyticsMarketFeaturesAsync(string tickerId, CancellationToken cancellationToken)
+    private async Task<int> DeleteAnalyticsMarketFeaturesAsync(string[] tickerIds, CancellationToken cancellationToken)
     {
-        var sql = $"ALTER TABLE kalshi_signals.analytics_market_features DELETE WHERE Ticker = '{EscapeSqlString(tickerId)}'";
+        if (tickerIds == null || tickerIds.Length == 0)
+        {
+            return 0;
+        }
+
+        var tickerList = string.Join(",", tickerIds.Select(t => $"'{EscapeSqlString(t)}'"));
+        var sql = $"ALTER TABLE kalshi_signals.analytics_market_features DELETE WHERE Ticker IN ({tickerList})";
         return await ExecuteRawSqlAsync(sql, cancellationToken);
     }
 
-    private async Task<int> DeleteMarketHighPriorityAsync(string tickerId, CancellationToken cancellationToken)
+    private async Task<int> DeleteMarketHighPriorityAsync(string[] tickerIds, CancellationToken cancellationToken)
     {
-        var sql = $"ALTER TABLE kalshi_signals.market_highpriority DELETE WHERE TickerId = '{EscapeSqlString(tickerId)}'";
+        if (tickerIds == null || tickerIds.Length == 0)
+        {
+            return 0;
+        }
+
+        var tickerList = string.Join(",", tickerIds.Select(t => $"'{EscapeSqlString(t)}'"));
+        var sql = $"ALTER TABLE kalshi_signals.market_highpriority DELETE WHERE TickerId IN ({tickerList})";
         return await ExecuteRawSqlAsync(sql, cancellationToken);
     }
 

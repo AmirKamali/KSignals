@@ -340,7 +340,7 @@ public class BackendPrivateController : ControllerBase
     {
         try
         {
-            await _cleanupService.CleanupMarketDataAsync(tickerId, HttpContext.RequestAborted);
+            await _cleanupService.CleanupMarketDataAsync(new[] { tickerId }, HttpContext.RequestAborted);
 
             return Ok(new
             {
