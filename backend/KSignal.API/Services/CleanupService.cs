@@ -47,7 +47,7 @@ public class CleanupService
                      (s.ExpectedExpirationTime.HasValue && s.ExpectedExpirationTime.Value <= sevenDaysAgo)))
                 .Select(s => s.Ticker)
                 .Distinct()
-                .Take(500)
+                .Take(10000)
                 .ToListAsync(cancellationToken);
 
             if (tickersToCleanup.Count == 0)

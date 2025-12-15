@@ -36,6 +36,19 @@ public class SyncLog
     public string Type { get; set; } = "Info";
 
     /// <summary>
+    /// Component/class name that generated this log entry
+    /// </summary>
+    [Required]
+    [MaxLength(255)]
+    public string Component { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Indicates whether this log was generated in Debug mode (true) or Release mode (false)
+    /// </summary>
+    [Required]
+    public bool IsDebug { get; set; }
+
+    /// <summary>
     /// Timestamp when the sync job was enqueued
     /// </summary>
     [Required]

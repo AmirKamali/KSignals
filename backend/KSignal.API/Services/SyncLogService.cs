@@ -1,3 +1,4 @@
+using System.Runtime.CompilerServices;
 using KSignal.API.Data;
 using KSignal.API.Models;
 using Microsoft.Extensions.Logging;
@@ -13,7 +14,13 @@ public interface ISyncLogService
     /// <param name="numbersEnqueued">Number of jobs/messages enqueued</param>
     /// <param name="cancellationToken">Cancellation token</param>
     /// <param name="type">Log type/severity level (default: Info)</param>
-    Task LogSyncEventAsync(string eventName, int numbersEnqueued, CancellationToken cancellationToken = default, LogType type = LogType.Info);
+    /// <param name="callerFilePath">Automatically populated with caller's file path</param>
+    Task LogSyncEventAsync(
+        string eventName,
+        int numbersEnqueued,
+        CancellationToken cancellationToken = default,
+        LogType type = LogType.Info,
+        [CallerFilePath] string callerFilePath = "");
 }
 
 public class SyncLogService : ISyncLogService
@@ -29,7 +36,12 @@ public class SyncLogService : ISyncLogService
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
 
-    public async Task LogSyncEventAsync(string eventName, int numbersEnqueued, CancellationToken cancellationToken = default, LogType type = LogType.Info)
+    public async Task LogSyncEventAsync(
+        string eventName,
+        int numbersEnqueued,
+        CancellationToken cancellationToken = default,
+        LogType type = LogType.Info,
+        [CallerFilePath] string callerFilePath = "")
     {
         if (string.IsNullOrWhiteSpace(eventName))
         {
@@ -41,6 +53,12 @@ public class SyncLogService : ISyncLogService
             throw new ArgumentException("Numbers enqueued cannot be negative", nameof(numbersEnqueued));
         }
 
+        // Extract component name from file path
+        var component = ExtractComponentName(callerFilePath);
+
+        // Determine if running in Debug mode
+        var isDebug = IsDebugMode();
+
         try
         {
             var syncLog = new SyncLog
@@ -48,18 +66,53 @@ public class SyncLogService : ISyncLogService
                 EventName = eventName,
                 NumbersEnqueued = numbersEnqueued,
                 Type = type.ToString(),
+                Component = component,
+                IsDebug = isDebug,
                 LogDate = DateTime.UtcNow
             };
 
             await _dbContext.SyncLogs.AddAsync(syncLog, cancellationToken);
             await _dbContext.SaveChangesAsync(cancellationToken);
-
-            _logger.LogInformation("Logged sync event: {EventName}, Type: {Type}, Enqueued: {NumbersEnqueued}", eventName, type, numbersEnqueued);
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Failed to log sync event: {EventName}, Type: {Type}, Enqueued: {NumbersEnqueued}", eventName, type, numbersEnqueued);
             // Don't rethrow - logging should not break the sync operation
+        }
+    }
+
+    /// <summary>
+    /// Determines if the application is running in Debug mode
+    /// </summary>
+    /// <returns>True if Debug mode, False if Release mode</returns>
+    private static bool IsDebugMode()
+    {
+#if DEBUG
+        return true;
+#else
+        return false;
+#endif
+    }
+
+    /// <summary>
+    /// Extracts the component/class name from the caller's file path
+    /// </summary>
+    /// <param name="filePath">Full file path from CallerFilePath attribute</param>
+    /// <returns>Component name (file name without extension)</returns>
+    private static string ExtractComponentName(string filePath)
+    {
+        if (string.IsNullOrWhiteSpace(filePath))
+        {
+            return "Unknown";
+        }
+
+        try
+        {
+            var fileName = Path.GetFileNameWithoutExtension(filePath);
+            return string.IsNullOrWhiteSpace(fileName) ? "Unknown" : fileName;
+        }
+        catch
+        {
+            return "Unknown";
         }
     }
 }

@@ -17,22 +17,21 @@ namespace KSignal.API.Controllers;
 public class EventsController : ControllerBase
 {
     private readonly KalshiClient _kalshiClient;
-    private readonly ILogger<EventsController> _logger;
+    private readonly ISyncLogService _syncLogService;
+    private readonly KalshiService _kalshiService;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="EventsController"/> class.
     /// </summary>
     /// <param name="kalshiClient">The Kalshi API client</param>
-    /// <param name="logger">The logger</param>
+    /// <param name="syncLogService">The sync log service</param>
     /// <param name="kalshiService">Market service for caching and filtering</param>
-    public EventsController(KalshiClient kalshiClient, ILogger<EventsController> logger, KalshiService kalshiService)
+    public EventsController(KalshiClient kalshiClient, ISyncLogService syncLogService, KalshiService kalshiService)
     {
         _kalshiClient = kalshiClient ?? throw new ArgumentNullException(nameof(kalshiClient));
-        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+        _syncLogService = syncLogService ?? throw new ArgumentNullException(nameof(syncLogService));
         _kalshiService = kalshiService ?? throw new ArgumentNullException(nameof(kalshiService));
     }
-
-    private readonly KalshiService _kalshiService;
 
     /// <summary>
     /// Get tags organized by series categories
@@ -52,16 +51,16 @@ public class EventsController : ControllerBase
     {
         try
         {
-            _logger.LogInformation("Fetching tags by categories from Kalshi API");
+            await _syncLogService.LogSyncEventAsync("EventsController_FetchingTagsByCategories", 1, default, LogType.Info);
 
             var response = await _kalshiClient.Search.GetTagsForSeriesCategoriesAsync();
 
-            _logger.LogInformation("Successfully retrieved tags by categories");
+            await _syncLogService.LogSyncEventAsync("EventsController_TagsByCategoriesRetrieved", 1, default, LogType.Info);
             return Ok(response);
         }
         catch (ApiException apiEx)
         {
-            _logger.LogError(apiEx, "API error fetching tags by categories from Kalshi API. Status: {StatusCode}", apiEx.ErrorCode);
+            await _syncLogService.LogSyncEventAsync($"EventsController_ApiError_TagsByCategories_Status{apiEx.ErrorCode}", 0, default, LogType.ERROR);
 
             var statusCode = apiEx.ErrorCode >= 400 && apiEx.ErrorCode < 600
                 ? apiEx.ErrorCode
@@ -75,10 +74,10 @@ public class EventsController : ControllerBase
                 details = apiEx.ErrorContent
             });
         }
-        catch (Exception ex)
+        catch (Exception)
         {
-            _logger.LogError(ex, "Error fetching tags by categories from Kalshi API");
-            return StatusCode(StatusCodes.Status500InternalServerError, new { error = "Failed to retrieve tags by categories", message = ex.Message });
+            await _syncLogService.LogSyncEventAsync("EventsController_Error_TagsByCategories", 0, default, LogType.ERROR);
+            return StatusCode(StatusCodes.Status500InternalServerError, new { error = "Failed to retrieve tags by categories" });
         }
     }
 
@@ -169,7 +168,7 @@ public class EventsController : ControllerBase
         }
         catch (ApiException apiEx)
         {
-            _logger.LogError(apiEx, "Kalshi API error during events fetch");
+            await _syncLogService.LogSyncEventAsync($"EventsController_ApiError_EventsFetch_Status{apiEx.ErrorCode}", 0, cancellationToken, LogType.ERROR);
             return StatusCode(StatusCodes.Status502BadGateway, new
             {
                 error = "Kalshi API error",
@@ -178,10 +177,10 @@ public class EventsController : ControllerBase
                 details = apiEx.ErrorContent
             });
         }
-        catch (Exception ex)
+        catch (Exception)
         {
-            _logger.LogError(ex, "Failed to fetch events");
-            return StatusCode(StatusCodes.Status500InternalServerError, new { error = "Failed to fetch events", message = ex.Message });
+            await _syncLogService.LogSyncEventAsync("EventsController_Error_EventsFetch", 0, cancellationToken, LogType.ERROR);
+            return StatusCode(StatusCodes.Status500InternalServerError, new { error = "Failed to fetch events" });
         }
     }
 
@@ -250,7 +249,7 @@ public class EventsController : ControllerBase
         }
         catch (ApiException apiEx)
         {
-            _logger.LogError(apiEx, "Kalshi API error during event details fetch for {EventTicker}", eventTicker);
+            await _syncLogService.LogSyncEventAsync($"EventsController_ApiError_EventDetails_{eventTicker}_Status{apiEx.ErrorCode}", 0, cancellationToken, LogType.ERROR);
             return StatusCode(StatusCodes.Status502BadGateway, new
             {
                 error = "Kalshi API error",
@@ -259,11 +258,11 @@ public class EventsController : ControllerBase
                 details = apiEx.ErrorContent
             });
         }
-        catch (Exception ex)
+        catch (Exception)
         {
-            _logger.LogError(ex, "Failed to fetch event details for {EventTicker}", eventTicker);
+            await _syncLogService.LogSyncEventAsync($"EventsController_Error_EventDetails_{eventTicker}", 0, cancellationToken, LogType.ERROR);
             return StatusCode(StatusCodes.Status500InternalServerError,
-                new { error = "Failed to fetch event details", message = ex.Message });
+                new { error = "Failed to fetch event details" });
         }
     }
 
