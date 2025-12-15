@@ -130,7 +130,7 @@ public class SynchronizationService
 
         // Sync markets with filters
         var request = BuildRequest(command.MinCreatedTs, command.MaxCreatedTs, command.Status, command.Cursor);
-        var response = await _kalshiClient.Markets.GetMarketsAsync(limit: 200, cursor: command.Cursor,
+        var response = await _kalshiClient.Markets.GetMarketsAsync(limit: 500, cursor: command.Cursor,
         minCreatedTs: command.MinCreatedTs,
          maxCreatedTs: command.MaxCreatedTs,
 
