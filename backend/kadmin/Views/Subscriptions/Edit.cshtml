@@ -1,0 +1,89 @@
+@model SubscriptionEditModel
+@using KSignal.API.Models
+@{
+    var users = ViewBag.Users as List<User> ?? new List<User>();
+    var plans = ViewBag.Plans as List<SubscriptionPlan> ?? new List<SubscriptionPlan>();
+    var isNew = !Model.Id.HasValue;
+    ViewData["Title"] = isNew ? "Create subscription" : "Edit subscription";
+}
+
+<div class="panel">
+    <div class="panel-head">
+        <div>
+            <p class="eyebrow">Billing</p>
+            <h2>@ViewData["Title"]</h2>
+        </div>
+    </div>
+
+    <form asp-action="Edit" method="post" class="stack">
+        <input type="hidden" asp-for="Id" />
+        <div class="field-grid">
+            <label>
+                <span>User</span>
+                <select asp-for="UserId">
+                    <option value="">-- choose user --</option>
+                    @foreach (var user in users)
+                    {
+                        var label = !string.IsNullOrWhiteSpace(user.Email) ? user.Email : user.FirebaseId;
+                        if (!string.IsNullOrWhiteSpace(user.Username))
+                        {
+                            label += $" · {user.Username}";
+                        }
+                        <option value="@user.Id" selected="@(user.Id == Model.UserId ? "selected" : null)">@label</option>
+                    }
+                </select>
+                <span asp-validation-for="UserId" class="validation"></span>
+            </label>
+            <label>
+                <span>Plan</span>
+                <select asp-for="PlanId" asp-items="@(new SelectList(plans, "Id", "Name"))">
+                    <option value="">-- choose plan --</option>
+                </select>
+                <span asp-validation-for="PlanId" class="validation"></span>
+            </label>
+            <label>
+                <span>Status</span>
+                <select asp-for="Status">
+                    <option>active</option>
+                    <option>trialing</option>
+                    <option>past_due</option>
+                    <option>canceled</option>
+                    <option>incomplete</option>
+                    <option>pending</option>
+                </select>
+            </label>
+            <label class="checkbox">
+                <input asp-for="CancelAtPeriodEnd" />
+                <span>Cancel at period end</span>
+            </label>
+        </div>
+
+        <div class="field-grid">
+            <label>
+                <span>Current period start</span>
+                <input type="datetime-local" name="CurrentPeriodStart" value="@(Model.CurrentPeriodStart.HasValue ? Model.CurrentPeriodStart.Value.ToLocalTime().ToString("yyyy-MM-ddTHH:mm") : string.Empty)" />
+            </label>
+            <label>
+                <span>Current period end</span>
+                <input type="datetime-local" name="CurrentPeriodEnd" value="@(Model.CurrentPeriodEnd.HasValue ? Model.CurrentPeriodEnd.Value.ToLocalTime().ToString("yyyy-MM-ddTHH:mm") : string.Empty)" />
+            </label>
+            <label>
+                <span>Stripe subscription id</span>
+                <input asp-for="StripeSubscriptionId" />
+            </label>
+            <label>
+                <span>Stripe customer id</span>
+                <input asp-for="StripeCustomerId" />
+            </label>
+        </div>
+
+        <div class="actions">
+            <button class="btn" type="submit">Save</button>
+            <a class="ghost-link" asp-action="Index">Back to list</a>
+        </div>
+    </form>
+</div>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+}

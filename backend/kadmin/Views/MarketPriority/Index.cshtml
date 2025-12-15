@@ -1,0 +1,92 @@
+@model MarketPriorityPageModel
+@{
+    ViewData["Title"] = "Market high priority";
+}
+
+<div class="panel">
+    <div class="panel-head">
+        <div>
+            <p class="eyebrow">Sync control</p>
+            <h2>Flag a market</h2>
+        </div>
+    </div>
+
+    <form asp-action="Create" method="post" class="stack">
+        <div class="field-grid">
+            <label>
+                <span>Ticker</span>
+                <input asp-for="Form.TickerId" placeholder="e.g. CPI-24JAN24-T01" />
+                <span asp-validation-for="Form.TickerId" class="validation"></span>
+            </label>
+            <label>
+                <span>Priority</span>
+                <input asp-for="Form.Priority" type="number" min="0" />
+                <span asp-validation-for="Form.Priority" class="validation"></span>
+            </label>
+        </div>
+
+        <div class="pill-wrap">
+            <label class="checkbox"><input asp-for="Form.FetchCandlesticks" /> <span>Candlesticks</span></label>
+            <label class="checkbox"><input asp-for="Form.FetchOrderbook" /> <span>Orderbook</span></label>
+            <label class="checkbox"><input asp-for="Form.ProcessAnalyticsL1" /> <span>L1 analytics</span></label>
+            <label class="checkbox"><input asp-for="Form.ProcessAnalyticsL2" /> <span>L2 analytics</span></label>
+            <label class="checkbox"><input asp-for="Form.ProcessAnalyticsL3" /> <span>L3 analytics</span></label>
+        </div>
+
+        <div class="actions">
+            <button class="btn" type="submit">Save</button>
+            <a class="ghost-link" asp-controller="Dashboard" asp-action="Index">Back to dashboard</a>
+        </div>
+    </form>
+</div>
+
+<div class="panel">
+    <div class="panel-head">
+        <div>
+            <p class="eyebrow">Current list</p>
+            <h2>High priority markets</h2>
+        </div>
+        <div class="muted">Total @Model.Items.Count</div>
+    </div>
+    @if (Model.Items.Count == 0)
+    {
+        <div class="empty-state">No markets flagged.</div>
+    }
+    else
+    {
+        <div class="table">
+            <div class="table-row table-header">
+                <span>Ticker</span>
+                <span>Priority</span>
+                <span>Signals</span>
+                <span>Updated</span>
+                <span></span>
+            </div>
+            @foreach (var item in Model.Items)
+            {
+                <div class="table-row">
+                    <span>@item.TickerId</span>
+                    <span class="badge">@item.Priority</span>
+                    <span>
+                        Candles: @(item.FetchCandlesticks ? "on" : "off") |
+                        Orderbook: @(item.FetchOrderbook ? "on" : "off") |
+                        L1:@(item.ProcessAnalyticsL1 ? "y" : "n")
+                        L2:@(item.ProcessAnalyticsL2 ? "y" : "n")
+                        L3:@(item.ProcessAnalyticsL3 ? "y" : "n")
+                    </span>
+                    <span>@item.LastUpdate.ToLocalTime().ToString("MMM dd, HH:mm")</span>
+                    <span>
+                        <form asp-action="Delete" method="post">
+                            <input type="hidden" name="tickerId" value="@item.TickerId" />
+                            <button class="link danger" type="submit" onclick="return confirm('Remove @item.TickerId?');">Remove</button>
+                        </form>
+                    </span>
+                </div>
+            }
+        </div>
+    }
+</div>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+}

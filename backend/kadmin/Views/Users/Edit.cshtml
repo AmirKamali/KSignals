@@ -1,0 +1,148 @@
+@model UserDetailViewModel
+@{
+    var isNew = !Model.Form.Id.HasValue;
+    ViewData["Title"] = isNew ? "Create user" : "Edit user";
+}
+
+<div class="grid two-column">
+    <div class="panel">
+        <div class="panel-head">
+            <div>
+                <p class="eyebrow">User profile</p>
+                <h2>@(isNew ? "New user" : Model.Profile.Username)</h2>
+            </div>
+            @if (!isNew)
+            {
+                <div class="muted">Created @Model.Profile.CreatedAt.ToLocalTime().ToString("MMM dd, yyyy")</div>
+            }
+        </div>
+
+        <form asp-action="Edit" method="post" class="stack">
+            <input type="hidden" asp-for="Form.Id" />
+            <div class="field-grid">
+                <label>
+                    <span>Firebase ID</span>
+                    <input asp-for="Form.FirebaseId" placeholder="firebase uid" />
+                    <span asp-validation-for="Form.FirebaseId" class="validation"></span>
+                </label>
+                <label>
+                    <span>Username</span>
+                    <input asp-for="Form.Username" />
+                    <span asp-validation-for="Form.Username" class="validation"></span>
+                </label>
+                <label>
+                    <span>First name</span>
+                    <input asp-for="Form.FirstName" />
+                </label>
+                <label>
+                    <span>Last name</span>
+                    <input asp-for="Form.LastName" />
+                </label>
+                <label>
+                    <span>Email</span>
+                    <input asp-for="Form.Email" />
+                    <span asp-validation-for="Form.Email" class="validation"></span>
+                </label>
+                <label class="checkbox">
+                    <input asp-for="Form.IsComnEmailOn" />
+                    <span>Comms enabled</span>
+                </label>
+            </div>
+
+            <div class="field-grid">
+                <label>
+                    <span>Subscription status</span>
+                    <input asp-for="Form.SubscriptionStatus" placeholder="active | trialing | canceled | none" />
+                    <span asp-validation-for="Form.SubscriptionStatus" class="validation"></span>
+                </label>
+                <label>
+                    <span>Active plan</span>
+                    <select asp-for="Form.ActivePlanId" asp-items="@(new SelectList(Model.Plans, "Id", "Name"))">
+                        <option value="">-- none --</option>
+                    </select>
+                </label>
+                <label>
+                    <span>Active subscription id</span>
+                    <input asp-for="Form.ActiveSubscriptionId" />
+                </label>
+                <label>
+                    <span>Stripe customer id</span>
+                    <input asp-for="Form.StripeCustomerId" />
+                </label>
+            </div>
+
+            <div class="actions">
+                <button class="btn" type="submit">Save</button>
+                <a class="ghost-link" asp-action="Index">Back to users</a>
+            </div>
+        </form>
+    </div>
+
+    <div class="stack">
+        <div class="panel">
+            <div class="panel-head">
+                <div>
+                    <p class="eyebrow">Subscriptions</p>
+                    <h3>History</h3>
+                </div>
+                <a class="ghost-link" asp-controller="Subscriptions" asp-action="Index" asp-route-userId="@Model.Form.Id">Open list</a>
+            </div>
+            @if (!(Model.Subscriptions?.Any() ?? false))
+            {
+                <div class="empty-state">No subscriptions yet.</div>
+            }
+            else
+            {
+                <div class="table compact">
+                    <div class="table-row table-header">
+                        <span>Plan</span>
+                        <span>Status</span>
+                        <span>Period end</span>
+                    </div>
+                    @foreach (var sub in Model.Subscriptions)
+                    {
+                        <div class="table-row">
+                            <span>@(sub.Plan?.Name ?? sub.PlanId.ToString())</span>
+                            <span class="badge">@sub.Status</span>
+                            <span>@(sub.CurrentPeriodEnd?.ToLocalTime().ToString("MMM dd, HH:mm") ?? "—")</span>
+                        </div>
+                    }
+                </div>
+            }
+        </div>
+
+        <div class="panel">
+            <div class="panel-head">
+                <div>
+                    <p class="eyebrow">Timeline</p>
+                    <h3>Recent events</h3>
+                </div>
+                <a class="ghost-link" asp-controller="Events" asp-action="Create" asp-route-userId="@Model.Form.Id">Log event</a>
+            </div>
+            @if (!(Model.Events?.Any() ?? false))
+            {
+                <div class="empty-state">No events yet.</div>
+            }
+            else
+            {
+                <ul class="timeline">
+                    @foreach (var evt in Model.Events)
+                    {
+                        <li>
+                            <div class="primary">@evt.EventType</div>
+                            <div class="muted">@evt.CreatedAt.ToLocalTime().ToString("MMM dd, HH:mm")</div>
+                            @if (!string.IsNullOrWhiteSpace(evt.Notes))
+                            {
+                                <div class="note">@evt.Notes</div>
+                            }
+                        </li>
+                    }
+                </ul>
+            }
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+}

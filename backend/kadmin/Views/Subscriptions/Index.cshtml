@@ -1,0 +1,53 @@
+@model IEnumerable<KSignal.API.Models.UserSubscription>
+@{
+    ViewData["Title"] = "Subscriptions";
+    var userId = ViewData["UserId"]?.ToString();
+}
+
+<div class="panel">
+    <div class="panel-head">
+        <div>
+            <p class="eyebrow">Billing</p>
+            <h2>Subscriptions</h2>
+        </div>
+        <div class="actions">
+            @if (!string.IsNullOrWhiteSpace(userId))
+            {
+                <a class="ghost-link" asp-action="Index">Clear filter</a>
+            }
+            <a class="btn" asp-action="Edit">New subscription</a>
+        </div>
+    </div>
+
+    <div class="table">
+        <div class="table-row table-header">
+            <span>User</span>
+            <span>Plan</span>
+            <span>Status</span>
+            <span>Period</span>
+            <span></span>
+        </div>
+            @foreach (var sub in Model)
+            {
+                <div class="table-row">
+                    <span>
+                        <div class="primary">@(sub.User?.Email ?? sub.UserId.ToString())</div>
+                        <div class="muted">@sub.User?.Username</div>
+                    </span>
+                    <span>@(sub.Plan?.Name ?? sub.PlanId.ToString())</span>
+                    <span><span class="badge">@sub.Status</span></span>
+                    <span>
+                    @if (sub.CurrentPeriodEnd.HasValue)
+                    {
+                        @sub.CurrentPeriodEnd.Value.ToLocalTime().ToString("MMM dd, HH:mm")
+                    }
+                    else
+                    {
+                        @:—
+                    }
+                </span>
+                <span><a class="ghost-link" asp-action="Edit" asp-route-id="@sub.Id">Open</a></span>
+            </div>
+        }
+    </div>
+</div>

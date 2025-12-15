@@ -1,0 +1,75 @@
+@model EventCreateModel
+@using KSignal.API.Models
+@{
+    var users = ViewBag.Users as List<User> ?? new List<User>();
+    var subscriptions = ViewBag.Subscriptions as List<UserSubscription> ?? new List<UserSubscription>();
+    ViewData["Title"] = "Add subscription event";
+}
+
+<div class="panel">
+    <div class="panel-head">
+        <div>
+            <p class="eyebrow">Monitoring</p>
+            <h2>@ViewData["Title"]</h2>
+        </div>
+    </div>
+
+    <form asp-action="Create" method="post" class="stack">
+        <div class="field-grid">
+            <label>
+                <span>User</span>
+                <select asp-for="UserId">
+                    <option value="">-- choose user --</option>
+                    @foreach (var user in users)
+                    {
+                        var label = !string.IsNullOrWhiteSpace(user.Email) ? user.Email : user.FirebaseId;
+                        if (!string.IsNullOrWhiteSpace(user.Username))
+                        {
+                            label += $" · {user.Username}";
+                        }
+                        <option value="@user.Id" selected="@(Model.UserId == user.Id)">@label</option>
+                    }
+                </select>
+                <span asp-validation-for="UserId" class="validation"></span>
+            </label>
+
+            <label>
+                <span>Subscription (optional)</span>
+                <select asp-for="SubscriptionId">
+                    <option value="">-- none --</option>
+                    @foreach (var sub in subscriptions)
+                    {
+                        var label = $"{sub.Plan?.Name ?? sub.PlanId.ToString()} • {sub.Status}";
+                        <option value="@sub.Id" selected="@(Model.SubscriptionId == sub.Id)">@label</option>
+                    }
+                </select>
+            </label>
+        </div>
+
+        <div class="field-grid">
+            <label>
+                <span>Event type</span>
+                <input asp-for="EventType" placeholder="activated | canceled | paused | refund | ... " />
+                <span asp-validation-for="EventType" class="validation"></span>
+            </label>
+            <label>
+                <span>Notes</span>
+                <input asp-for="Notes" />
+            </label>
+        </div>
+
+        <label>
+            <span>Data (JSON or context)</span>
+            <textarea asp-for="Data" rows="3"></textarea>
+        </label>
+
+        <div class="actions">
+            <button class="btn" type="submit">Save</button>
+            <a class="ghost-link" asp-action="Index">Back to log</a>
+        </div>
+    </form>
+</div>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+}

@@ -1,0 +1,32 @@
+@model IEnumerable<KSignal.API.Models.SubscriptionEventLog>
+@{
+    ViewData["Title"] = "Subscription events";
+}
+
+<div class="panel">
+    <div class="panel-head">
+        <div>
+            <p class="eyebrow">Monitoring</p>
+            <h2>Subscription events</h2>
+        </div>
+        <a class="btn" asp-action="Create">Add event</a>
+    </div>
+
+    <div class="table">
+        <div class="table-row table-header">
+            <span>User</span>
+            <span>Event</span>
+            <span>Notes</span>
+            <span>When</span>
+        </div>
+        @foreach (var evt in Model)
+        {
+            <div class="table-row">
+                <span>@(evt.User?.Email ?? evt.User?.Username ?? evt.UserId.ToString())</span>
+                <span><span class="badge">@evt.EventType</span></span>
+                <span>@(string.IsNullOrWhiteSpace(evt.Notes) ? "—" : evt.Notes)</span>
+                <span>@evt.CreatedAt.ToLocalTime().ToString("MMM dd, HH:mm")</span>
+            </div>
+        }
+    </div>
+</div>

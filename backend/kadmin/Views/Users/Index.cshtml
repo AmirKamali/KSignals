@@ -1,0 +1,48 @@
+@model IEnumerable<UserListItem>
+@{
+    ViewData["Title"] = "Users";
+    var search = ViewData["Search"] as string ?? string.Empty;
+}
+
+<div class="panel">
+    <div class="panel-head">
+        <div>
+            <p class="eyebrow">Directory</p>
+            <h2>Users</h2>
+        </div>
+        <div class="actions">
+            <form method="get" class="inline-form">
+                <input type="text" name="q" value="@search" placeholder="Search email, username, Firebase ID" />
+                <button class="btn">Search</button>
+            </form>
+            <a class="btn ghost" asp-action="Edit">Add user</a>
+        </div>
+    </div>
+
+    <div class="table">
+        <div class="table-row table-header">
+            <span>User</span>
+            <span>Status</span>
+            <span>Active plan</span>
+            <span>Updated</span>
+            <span></span>
+        </div>
+        @foreach (var item in Model)
+        {
+            var user = item.User;
+            var displayName = !string.IsNullOrWhiteSpace(user.Username)
+                ? user.Username
+                : (!string.IsNullOrWhiteSpace(user.Email) ? user.Email : user.FirebaseId);
+            <div class="table-row">
+                <span>
+                    <div class="primary">@displayName</div>
+                    <div class="muted">@user.Email</div>
+                </span>
+                <span><span class="badge">@user.SubscriptionStatus</span></span>
+                <span>@(string.IsNullOrWhiteSpace(item.ActivePlanName) ? "—" : item.ActivePlanName)</span>
+                <span>@user.UpdatedAt.ToLocalTime().ToString("MMM dd, HH:mm")</span>
+                <span><a class="ghost-link" asp-action="Edit" asp-route-id="@user.Id">Open</a></span>
+            </div>
+        }
+    </div>
+</div>

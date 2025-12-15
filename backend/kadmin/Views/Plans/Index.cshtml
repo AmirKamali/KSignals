@@ -1,0 +1,37 @@
+@model IEnumerable<KSignal.API.Models.SubscriptionPlan>
+@{
+    ViewData["Title"] = "Subscription plans";
+}
+
+<div class="panel">
+    <div class="panel-head">
+        <div>
+            <p class="eyebrow">Catalog</p>
+            <h2>Plans</h2>
+        </div>
+        <a class="btn" asp-action="Edit">New plan</a>
+    </div>
+
+    <div class="table">
+        <div class="table-row table-header">
+            <span>Name</span>
+            <span>Code</span>
+            <span>Price</span>
+            <span>Status</span>
+            <span></span>
+        </div>
+        @foreach (var plan in Model)
+        {
+            <div class="table-row">
+                <span>
+                    <div class="primary">@plan.Name</div>
+                    <div class="muted">@plan.Description</div>
+                </span>
+                <span>@plan.Code</span>
+                <span>@($"{plan.Amount} {plan.Currency}/{plan.Interval}")</span>
+                <span><span class="badge">@(plan.IsActive ? "active" : "inactive")</span></span>
+                <span><a class="ghost-link" asp-action="Edit" asp-route-id="@plan.Id">Edit</a></span>
+            </div>
+        }
+    </div>
+</div>

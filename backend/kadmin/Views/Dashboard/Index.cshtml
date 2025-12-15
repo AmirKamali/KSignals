@@ -1,0 +1,91 @@
+@model AdminDashboardViewModel
+@{
+    ViewData["Title"] = "Dashboard";
+}
+
+<div class="grid stats-grid">
+    <div class="stat-card">
+        <div class="stat-label">Total users</div>
+        <div class="stat-value">@Model.TotalUsers</div>
+        <div class="stat-hint">People in the system</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-label">Active subscriptions</div>
+        <div class="stat-value">@Model.ActiveSubscriptions</div>
+        <div class="stat-hint">Currently billing or live</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-label">Plans</div>
+        <div class="stat-value">@Model.Plans</div>
+        <div class="stat-hint">Available offers</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-label">High priority markets</div>
+        <div class="stat-value">@Model.HighPriorityCount</div>
+        <div class="stat-hint">Manage sync focus</div>
+    </div>
+</div>
+
+<div class="grid two-column">
+    <div class="panel">
+        <div class="panel-head">
+            <div>
+                <p class="eyebrow">Activity</p>
+                <h2>Recent subscription events</h2>
+            </div>
+            <a class="ghost-link" asp-controller="Events" asp-action="Index">Open log</a>
+        </div>
+        @if (Model.LatestEvents.Count == 0)
+        {
+            <div class="empty-state">No events captured yet.</div>
+        }
+        else
+        {
+            <div class="table">
+                <div class="table-row table-header">
+                    <span>User</span>
+                    <span>Event</span>
+                    <span>When</span>
+                </div>
+                @foreach (var evt in Model.LatestEvents)
+                {
+                    <div class="table-row">
+                        <span>@evt.UserLabel</span>
+                        <span class="badge">@evt.Event.EventType</span>
+                        <span>@evt.Event.CreatedAt.ToLocalTime().ToString("MMM dd, HH:mm")</span>
+                    </div>
+                }
+            </div>
+        }
+    </div>
+
+    <div class="panel">
+        <div class="panel-head">
+            <div>
+                <p class="eyebrow">Market focus</p>
+                <h2>High priority sync list</h2>
+            </div>
+            <a class="ghost-link" asp-controller="MarketPriority" asp-action="Index">Edit list</a>
+        </div>
+        @if (Model.HighPriority.Count == 0)
+        {
+            <div class="empty-state">No tickers flagged yet.</div>
+        }
+        else
+        {
+            <div class="pill-wrap">
+                @foreach (var market in Model.HighPriority)
+                {
+                    <div class="pill">
+                        <div class="pill-title">@market.TickerId</div>
+                        <div class="pill-meta">
+                            Priority @market.Priority |
+                            Candles: @(market.FetchCandlesticks ? "on" : "off"),
+                            Book: @(market.FetchOrderbook ? "on" : "off")
+                        </div>
+                    </div>
+                }
+            </div>
+        }
+    </div>
+</div>

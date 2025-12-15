@@ -1,0 +1,65 @@
+﻿@{
+    var current = ViewContext.RouteData.Values["controller"]?.ToString() ?? string.Empty;
+    var title = ViewData["Title"]?.ToString() ?? "Overview";
+}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>@title • KAdmin</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
+</head>
+<body>
+    <div class="app-shell">
+        <aside class="sidebar">
+            <div class="brand">
+                <div class="brand-mark">KS</div>
+                <div>
+                    <div class="brand-title">KAdmin</div>
+                    <div class="brand-subtitle">Signals control</div>
+                </div>
+            </div>
+            <nav class="nav-links">
+                <a class="nav-link @(current == "Dashboard" ? "active" : string.Empty)" asp-controller="Dashboard" asp-action="Index">Dashboard</a>
+                <a class="nav-link @(current == "Users" ? "active" : string.Empty)" asp-controller="Users" asp-action="Index">Users</a>
+                <a class="nav-link @(current == "Subscriptions" ? "active" : string.Empty)" asp-controller="Subscriptions" asp-action="Index">Subscriptions</a>
+                <a class="nav-link @(current == "Events" ? "active" : string.Empty)" asp-controller="Events" asp-action="Index">Subscription events</a>
+                <a class="nav-link @(current == "Plans" ? "active" : string.Empty)" asp-controller="Plans" asp-action="Index">Plans</a>
+                <a class="nav-link @(current == "MarketPriority" ? "active" : string.Empty)" asp-controller="MarketPriority" asp-action="Index">Market high priority</a>
+            </nav>
+            <div class="sidebar-foot">
+                <p class="muted small">Manage users, billing, events, and sync focus in one place.</p>
+            </div>
+        </aside>
+        <div class="main">
+            <header class="topbar">
+                <div>
+                    <p class="eyebrow">Operations</p>
+                    <h1>@title</h1>
+                </div>
+                <div class="top-actions">
+                    <span class="status-dot"></span>
+                    Live monitoring
+                </div>
+            </header>
+
+            @if (TempData["Message"] is string message)
+            {
+                var type = TempData["MessageType"] as string ?? "info";
+                <div class="flash @(type == "error" ? "error" : "info")">@message</div>
+            }
+
+            <main role="main" class="content">
+                @RenderBody()
+            </main>
+        </div>
+    </div>
+
+    <script src="~/js/site.js" asp-append-version="true"></script>
+    @await RenderSectionAsync("Scripts", required: false)
+</body>
+</html>

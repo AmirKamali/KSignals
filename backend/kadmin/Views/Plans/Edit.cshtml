@@ -1,0 +1,70 @@
+@model PlanEditModel
+@{
+    var isNew = !Model.Id.HasValue;
+    ViewData["Title"] = isNew ? "Create plan" : "Edit plan";
+}
+
+<div class="panel">
+    <div class="panel-head">
+        <div>
+            <p class="eyebrow">Catalog</p>
+            <h2>@ViewData["Title"]</h2>
+        </div>
+    </div>
+
+    <form asp-action="Edit" method="post" class="stack">
+        <input type="hidden" asp-for="Id" />
+
+        <div class="field-grid">
+            <label>
+                <span>Code</span>
+                <input asp-for="Code" />
+                <span asp-validation-for="Code" class="validation"></span>
+            </label>
+            <label>
+                <span>Name</span>
+                <input asp-for="Name" />
+                <span asp-validation-for="Name" class="validation"></span>
+            </label>
+            <label>
+                <span>Stripe price id</span>
+                <input asp-for="StripePriceId" />
+                <span asp-validation-for="StripePriceId" class="validation"></span>
+            </label>
+        </div>
+
+        <div class="field-grid">
+            <label>
+                <span>Currency</span>
+                <input asp-for="Currency" />
+            </label>
+            <label>
+                <span>Interval</span>
+                <input asp-for="Interval" />
+            </label>
+            <label>
+                <span>Amount</span>
+                <input asp-for="Amount" type="number" step="0.01" />
+            </label>
+            <label class="checkbox">
+                <input asp-for="IsActive" />
+                <span>Active</span>
+            </label>
+        </div>
+
+        <label>
+            <span>Description</span>
+            <textarea asp-for="Description" rows="3"></textarea>
+        </label>
+
+        <div class="actions">
+            <button class="btn" type="submit">Save</button>
+            <button class="btn ghost" type="submit" formaction="@Url.Action("FetchPrice")">Fetch price from Stripe</button>
+            <a class="ghost-link" asp-action="Index">Back to plans</a>
+        </div>
+    </form>
+</div>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+}
