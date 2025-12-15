@@ -148,17 +148,11 @@ builder.Services.AddMassTransit(x =>
 {
     x.SetKebabCaseEndpointNameFormatter();
 
-    x.AddConsumer<KSignal.API.SynchronizeConsumers.SynchronizeMarketDataConsumer>(cfg =>
-    {
-        cfg.ConcurrentMessageLimit = 1;
-    });
+    x.AddConsumer<KSignal.API.SynchronizeConsumers.SynchronizeMarketDataConsumer>();
     x.AddConsumer<KSignal.API.SynchronizeConsumers.SynchronizeTagsCategoriesConsumer>();
     x.AddConsumer<KSignal.API.SynchronizeConsumers.SynchronizeSeriesConsumer>();
     x.AddConsumer<KSignal.API.SynchronizeConsumers.SynchronizeEventsConsumer>();
-    x.AddConsumer<KSignal.API.SynchronizeConsumers.SynchronizeEventDetailConsumer>(cfg =>
-    {
-        cfg.ConcurrentMessageLimit = 1;
-    });
+    x.AddConsumer<KSignal.API.SynchronizeConsumers.SynchronizeEventDetailConsumer>();
     x.AddConsumer<KSignal.API.SynchronizeConsumers.SynchronizeOrderbookConsumer>();
     x.AddConsumer<KSignal.API.SynchronizeConsumers.SynchronizeCandlesticksConsumer>();
     x.AddConsumer<KSignal.API.SynchronizeConsumers.ProcessMarketAnalyticsConsumer>();

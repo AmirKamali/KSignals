@@ -7,7 +7,7 @@ using Microsoft.Extensions.Logging;
 
 namespace KSignal.API.SynchronizeConsumers;
 
-public class SynchronizeEventDetailConsumer : IConsumer<Batch<SynchronizeEventDetail>>
+public class SynchronizeEventDetailConsumer : IConsumer<SynchronizeEventDetail>
 {
     private readonly IServiceScopeFactory _serviceScopeFactory;
     private readonly ISyncLogService _syncLogService;
@@ -23,21 +23,10 @@ public class SynchronizeEventDetailConsumer : IConsumer<Batch<SynchronizeEventDe
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
 
-    public async Task Consume(ConsumeContext<Batch<SynchronizeEventDetail>> context)
+    public async Task Consume(ConsumeContext<SynchronizeEventDetail> context)
     {
-        var batch = context.Message;
-        _logger.LogInformation("Processing batch of {Count} event detail synchronization messages", batch.Length);
-        await _syncLogService.LogSyncEventAsync("SynchronizeEventDetail", batch.Length, context.CancellationToken);
-
-        var tasks = new List<Task>();
-        foreach (var message in batch)
-        {
-            tasks.Add(ProcessMessageAsync(message.Message, context.CancellationToken));
-        }
-
-        await Task.WhenAll(tasks);
-
-        _logger.LogInformation("Completed batch of {Count} event detail synchronization messages", batch.Length);
+        await _syncLogService.LogSyncEventAsync("SynchronizeEventDetail", 1, context.CancellationToken);
+        await ProcessMessageAsync(context.Message, context.CancellationToken);
     }
 
     private async Task ProcessMessageAsync(SynchronizeEventDetail message, CancellationToken cancellationToken)
@@ -65,4 +54,3 @@ public class SynchronizeEventDetailConsumer : IConsumer<Batch<SynchronizeEventDe
         }
     }
 }
-
