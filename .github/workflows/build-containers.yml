@@ -14,12 +14,13 @@ on:
       target:
         description: "Which component(s) to build"
         required: true
-        default: "both"
+        default: "all"
         type: choice
         options:
-          - both
+          - all
           - backend
           - frontend
+          - kadmin
 
 jobs:
   changes:
@@ -27,6 +28,7 @@ jobs:
     outputs:
       backend: ${{ github.event_name == 'workflow_dispatch' && steps.manual.outputs.backend || steps.filter.outputs.backend }}
       frontend: ${{ github.event_name == 'workflow_dispatch' && steps.manual.outputs.frontend || steps.filter.outputs.frontend }}
+      kadmin: ${{ github.event_name == 'workflow_dispatch' && steps.manual.outputs.kadmin || steps.filter.outputs.kadmin }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -40,15 +42,19 @@ jobs:
               - 'backend/**'
             frontend:
               - 'web/**'
+            kadmin:
+              - 'kadmin/**'
 
       - name: Set manual selection
         id: manual
         if: github.event_name == 'workflow_dispatch'
         run: |
-          backend_selected="${{ inputs.target == 'backend' || inputs.target == 'both' }}"
-          frontend_selected="${{ inputs.target == 'frontend' || inputs.target == 'both' }}"
+          backend_selected="${{ inputs.target == 'backend' || inputs.target == 'all' }}"
+          frontend_selected="${{ inputs.target == 'frontend' || inputs.target == 'all' }}"
+          kadmin_selected="${{ inputs.target == 'kadmin' || inputs.target == 'all' }}"
           echo "backend=${backend_selected}" >> "$GITHUB_OUTPUT"
           echo "frontend=${frontend_selected}" >> "$GITHUB_OUTPUT"
+          echo "kadmin=${kadmin_selected}" >> "$GITHUB_OUTPUT"
 
   build-backend:
     needs: changes
@@ -128,6 +134,48 @@ jobs:
           tags: |
             ${{ steps.meta.outputs.frontend_tag_latest }}
             ${{ steps.meta.outputs.frontend_tag_sha }}
+
+      - name: Refresh Watchtower
+        run: |
+          curl --location --request POST 'https://watchtower.nextate.ai/refresh' \
+            --header 'Authorization: Bearer VPS_SERVER_REFRESH'
+
+  build-kadmin:
+    needs: changes
+    if: ${{ needs.changes.outputs.kadmin == 'true' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Compute image tags
+        id: meta
+        run: |
+          owner_lc="${GITHUB_REPOSITORY_OWNER,,}"
+          echo "kadmin_image=ghcr.io/${owner_lc}/ksignals-kadmin" >> "$GITHUB_OUTPUT"
+          echo "kadmin_tag_latest=ghcr.io/${owner_lc}/ksignals-kadmin:latest" >> "$GITHUB_OUTPUT"
+          echo "kadmin_tag_sha=ghcr.io/${owner_lc}/ksignals-kadmin:${GITHUB_SHA}" >> "$GITHUB_OUTPUT"
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build kadmin container image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./kadmin/Dockerfile
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: |
+            ${{ steps.meta.outputs.kadmin_tag_latest }}
+            ${{ steps.meta.outputs.kadmin_tag_sha }}
 
       - name: Refresh Watchtower
         run: |

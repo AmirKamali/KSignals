@@ -45,31 +45,6 @@ services:
       - "traefik.http.services.ksignals-backend.loadbalancer.server.port=3006"
       - "traefik.http.routers.ksignals-backend.middlewares=default-secure-headers@file"
 
-  rabbitmq:
-    image: rabbitmq:3.13-management
-    container_name: rabbitmq
-    platform: ${DOCKER_PLATFORM:-linux/amd64}
-    ports:
-      - "5672:5672"
-      - "15672:15672"
-    environment:
-      - RABBITMQ_DEFAULT_USER=${RABBITMQ_DEFAULT_USER:-guest}
-      - RABBITMQ_DEFAULT_PASS=${RABBITMQ_DEFAULT_PASS:-guest}
-    volumes:
-      - rabbitmq-data:/var/lib/rabbitmq
-    networks:
-      - kalshi-network
-      - web
-    restart: unless-stopped
-    labels:
-      - "traefik.enable=true"
-      - "traefik.http.routers.rabbitmq.rule=Host(`kalshisignals.com`)"
-      - "traefik.http.routers.rabbitmq.entrypoints=rabbitmq"
-      - "traefik.http.routers.rabbitmq.tls=true"
-      - "traefik.http.routers.rabbitmq.tls.certresolver=letsencrypt"
-      - "traefik.http.services.rabbitmq.loadbalancer.server.port=15672"
-      - "traefik.http.routers.rabbitmq.middlewares=default-secure-headers@file"
-
   # Web Client
   web:
     image: ghcr.io/amirkamali/ksignals-frontend:latest
@@ -98,6 +73,47 @@ services:
       - "traefik.http.routers.ksignals-frontend.tls.certresolver=letsencrypt"
       - "traefik.http.services.ksignals-frontend.loadbalancer.server.port=3000"
       - "traefik.http.routers.ksignals-frontend.middlewares=default-secure-headers@file"
+
+  # Admin UI
+  kadmin:
+    build:
+      context: .
+      dockerfile: kadmin/Dockerfile
+    container_name: kalshi-signals-admin
+    platform: ${DOCKER_PLATFORM:-linux/amd64}
+    ports:
+      - "3012:3012"
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - ASPNETCORE_URLS=http://+:3012
+      - ASPNETCORE_HTTP_PORTS=3012
+      - KALSHI_DB_CONNECTION=${KALSHI_DB_CONNECTION:-}
+      - KALSHI_DB_HOST=${KALSHI_DB_HOST:?Set KALSHI_DB_HOST}
+      - KALSHI_DB_PORT=${KALSHI_DB_PORT:-8123}
+      - KALSHI_DB_USER=${KALSHI_DB_USER:?Set KALSHI_DB_USER}
+      - KALSHI_DB_PASSWORD=${KALSHI_DB_PASSWORD:?Set KALSHI_DB_PASSWORD}
+      - KALSHI_DB_NAME=${KALSHI_DB_NAME:-kalshi_signals}
+      - STRIPE_SECRET_KEY=${STRIPE_SECRET_KEY:-}
+    depends_on:
+      - backend
+    networks:
+      - kalshi-network
+      - web
+    restart: unless-stopped
+    labels:
+      - "com.centurylinklabs.watchtower.enable=true"
+      - "traefik.enable=true"
+      - "traefik.http.services.ksignals-admin.loadbalancer.server.port=3012"
+      - "traefik.http.routers.ksignals-admin.rule=Host(`admin.kalshisignals.com`)"
+      - "traefik.http.routers.ksignals-admin.entrypoints=websecure"
+      - "traefik.http.routers.ksignals-admin.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.ksignals-admin.middlewares=default-secure-headers@file"
+      # Access via https://kalshisignals.com:3012 (requires Traefik kadmin entrypoint)
+      - "traefik.http.routers.ksignals-admin-port3012.rule=Host(`kalshisignals.com`)"
+      - "traefik.http.routers.ksignals-admin-port3012.entrypoints=kadmin"
+      - "traefik.http.routers.ksignals-admin-port3012.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.ksignals-admin-port3012.service=ksignals-admin"
+      - "traefik.http.routers.ksignals-admin-port3012.middlewares=default-secure-headers@file"
 
 networks:
   kalshi-network:

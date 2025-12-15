@@ -13,6 +13,10 @@ COPY backend backend
 COPY shared shared
 COPY kadmin kadmin
 
+# Remove appsettings coming from referenced projects so publish output
+# only includes kadmin's configuration files (prevents duplicate paths).
+RUN find /app -type f -name "appsettings*.json" ! -path "/app/kadmin/*" -exec rm {} +
+
 WORKDIR /app/kadmin
 RUN dotnet publish -c Release -o /out /p:UseAppHost=false
 
