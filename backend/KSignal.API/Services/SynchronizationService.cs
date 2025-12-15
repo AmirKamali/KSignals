@@ -92,6 +92,7 @@ public class SynchronizationService
             var diffrentialUpdateStart = await _dbContext.MarketSnapshotsLatestView
                     .AsNoTracking()
                     .Where(m => m.Status == "Active" && m.CloseTime >= twoDaysAgo && m.GenerateDate <= EligibleGenerateDate)
+                    .OrderBy(p => p.GenerateDate)
                     .MinAsync(p => (DateTime?)p.CloseTime);
 
             // Convert DateTime to Unix timestamp (long)
