@@ -9,6 +9,7 @@ public class PricingModel : PageModel
 {
     private readonly BackendClient _backendClient;
     private readonly ILogger<PricingModel> _logger;
+    private readonly bool _useSandboxPricing;
 
     public List<SubscriptionTierDto> Tiers { get; private set; } = new();
     public List<SubscriptionPlanDto> Plans { get; private set; } = new();
@@ -21,6 +22,9 @@ public class PricingModel : PageModel
     {
         _backendClient = backendClient;
         _logger = logger;
+#if DEBUG
+        _useSandboxPricing = true;
+#endif
     }
 
     public async Task OnGetAsync()
@@ -109,7 +113,7 @@ public class PricingModel : PageModel
 
     private async Task LoadDataAsync()
     {
-        var fetchedTiers = (await _backendClient.GetSubscriptionTierPricingAsync()).ToList();
+        var fetchedTiers = (await _backendClient.GetSubscriptionTierPricingAsync(_useSandboxPricing)).ToList();
         Tiers = MergeWithFallbackTiers(fetchedTiers);
         Plans = Tiers
             .SelectMany(t => new[] { t.MonthlyPlan, t.AnnualPlan })
@@ -177,7 +181,8 @@ public class PricingModel : PageModel
                 Amount = 0,
                 Currency = "usd",
                 Interval = "month",
-                Description = "Try Kalshi Signals with free market coverage."
+                Description = "Try Kalshi Signals with free market coverage.",
+                IsSandbox = false
             }
         },
         new SubscriptionTierDto
@@ -192,7 +197,8 @@ public class PricingModel : PageModel
                 Amount = 79,
                 Currency = "usd",
                 Interval = "month",
-                Description = "Live and historical market data feed with export-ready access."
+                Description = "Live and historical market data feed with export-ready access.",
+                IsSandbox = false
             },
             AnnualPlan = new SubscriptionPlanDto
             {
@@ -202,7 +208,8 @@ public class PricingModel : PageModel
                 Amount = 790,
                 Currency = "usd",
                 Interval = "year",
-                Description = "Annual billing for Core Data with export-ready access."
+                Description = "Annual billing for Core Data with export-ready access.",
+                IsSandbox = false
             }
         }
     };

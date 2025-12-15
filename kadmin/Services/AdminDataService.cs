@@ -413,6 +413,7 @@ public class AdminDataService
         plan.Interval = model.Interval.Trim();
         plan.Amount = model.Amount;
         plan.IsActive = model.IsActive;
+        plan.IsSandbox = model.IsSandbox;
         plan.Description = model.Description;
         plan.UpdatedAt = now;
 

@@ -40,6 +40,7 @@ public class PlansController : Controller
                 Currency = plan.Currency,
                 Interval = plan.Interval,
                 Amount = plan.Amount,
+                IsSandbox = plan.IsSandbox,
                 IsActive = plan.IsActive,
                 Description = plan.Description
             };

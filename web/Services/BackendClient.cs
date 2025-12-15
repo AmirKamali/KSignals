@@ -563,11 +563,15 @@ public class BackendClient
         }
     }
 
-    public async Task<IReadOnlyList<SubscriptionPlanDto>> GetSubscriptionPlansAsync()
+    public async Task<IReadOnlyList<SubscriptionPlanDto>> GetSubscriptionPlansAsync(bool isSandbox = false)
     {
         try
         {
             var url = $"{_options.BaseUrl.TrimEnd('/')}/api/subscriptions/plans";
+            if (isSandbox)
+            {
+                url = QueryHelpers.AddQueryString(url, new Dictionary<string, string?> { ["isSandbox"] = "true" });
+            }
             using var response = await _httpClient.GetAsync(url);
             if (!response.IsSuccessStatusCode)
             {
@@ -592,11 +596,15 @@ public class BackendClient
         }
     }
 
-    public async Task<IReadOnlyList<SubscriptionTierDto>> GetSubscriptionTierPricingAsync()
+    public async Task<IReadOnlyList<SubscriptionTierDto>> GetSubscriptionTierPricingAsync(bool isSandbox = false)
     {
         try
         {
             var url = $"{_options.BaseUrl.TrimEnd('/')}/api/subscriptions/tiers";
+            if (isSandbox)
+            {
+                url = QueryHelpers.AddQueryString(url, new Dictionary<string, string?> { ["isSandbox"] = "true" });
+            }
             using var response = await _httpClient.GetAsync(url);
             if (!response.IsSuccessStatusCode)
             {

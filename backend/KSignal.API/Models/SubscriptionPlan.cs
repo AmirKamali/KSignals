@@ -30,6 +30,7 @@ public class SubscriptionPlan
     public decimal Amount { get; set; }
 
     public bool IsActive { get; set; } = true;
+    public bool IsSandbox { get; set; }
 
     [MaxLength(512)]
     public string? Description { get; set; }

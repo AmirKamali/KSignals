@@ -206,6 +206,7 @@ public class KalshiDbContext : DbContext
         plan.Property(e => e.Currency).HasMaxLength(16).IsRequired();
         plan.Property(e => e.Interval).HasMaxLength(32).IsRequired();
         plan.Property(e => e.Amount).IsRequired();
+        plan.Property(e => e.IsSandbox).IsRequired();
         plan.Property(e => e.IsActive).IsRequired();
         plan.Property(e => e.Description).HasMaxLength(512);
         plan.Property(e => e.CreatedAt).IsRequired();

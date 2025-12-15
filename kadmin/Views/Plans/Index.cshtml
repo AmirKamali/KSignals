@@ -17,6 +17,7 @@
             <span>Name</span>
             <span>Code</span>
             <span>Price</span>
+            <span>Env</span>
             <span>Status</span>
             <span></span>
         </div>
@@ -29,6 +30,7 @@
                 </span>
                 <span>@plan.Code</span>
                 <span>@($"{plan.Amount} {plan.Currency}/{plan.Interval}")</span>
+                <span><span class="badge">@(plan.IsSandbox ? "sandbox" : "live")</span></span>
                 <span><span class="badge">@(plan.IsActive ? "active" : "inactive")</span></span>
                 <span><a class="ghost-link" asp-action="Edit" asp-route-id="@plan.Id">Edit</a></span>
             </div>

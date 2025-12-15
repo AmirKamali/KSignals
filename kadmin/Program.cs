@@ -1,8 +1,8 @@
 using ClickHouse.EntityFrameworkCore.Extensions;
 using DotNetEnv;
+using kadmin.Services;
 using KSignal.API.Data;
 using KSignal.API.Models;
-using kadmin.Services;
 using Microsoft.Extensions.Options;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -56,7 +56,6 @@ if (!app.Environment.IsDevelopment())
     app.UseHsts();
 }
 
-app.UseHttpsRedirection();
 app.UseStaticFiles();
 
 app.UseRouting();

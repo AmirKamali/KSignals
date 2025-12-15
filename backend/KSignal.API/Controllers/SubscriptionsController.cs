@@ -63,9 +63,10 @@ public class SubscriptionsController : ControllerBase
 
     [HttpGet("plans")]
     [ProducesResponseType(StatusCodes.Status200OK)]
-    public async Task<IActionResult> GetPlans(CancellationToken cancellationToken)
+    public async Task<IActionResult> GetPlans([FromQuery] bool? isSandbox, CancellationToken cancellationToken)
     {
-        var plans = await _stripe.GetActivePlansAsync(cancellationToken);
+        var sandbox = isSandbox ?? false;
+        var plans = await _stripe.GetActivePlansAsync(cancellationToken, sandbox);
         return Ok(new
         {
             plans = plans.Select(MapPlan)
@@ -74,10 +75,11 @@ public class SubscriptionsController : ControllerBase
 
     [HttpGet("tiers")]
     [ProducesResponseType(StatusCodes.Status200OK)]
-    public async Task<IActionResult> GetTierPricing(CancellationToken cancellationToken)
+    public async Task<IActionResult> GetTierPricing([FromQuery] bool? isSandbox, CancellationToken cancellationToken)
     {
-        var activePlans = await _stripe.GetActivePlansAsync(cancellationToken);
-        var tiers = BuildTiers(activePlans);
+        var sandbox = isSandbox ?? false;
+        var activePlans = await _stripe.GetActivePlansAsync(cancellationToken, sandbox);
+        var tiers = BuildTiers(activePlans, includeFallback: !sandbox);
 
         return Ok(new
         {
@@ -252,13 +254,15 @@ public class SubscriptionsController : ControllerBase
         Currency = plan.Currency,
         Interval = plan.Interval,
         Description = plan.Description,
+        IsSandbox = plan.IsSandbox,
         IsActive = plan.IsActive
     };
 
-    private List<SubscriptionTierDto> BuildTiers(IEnumerable<SubscriptionPlan> activePlans)
+    private List<SubscriptionTierDto> BuildTiers(IEnumerable<SubscriptionPlan> activePlans, bool includeFallback = true)
     {
-        var plansByCode = FallbackPlans()
-            .ToDictionary(p => p.Code, StringComparer.OrdinalIgnoreCase);
+        var plansByCode = includeFallback
+            ? FallbackPlans().ToDictionary(p => p.Code, StringComparer.OrdinalIgnoreCase)
+            : new Dictionary<string, SubscriptionPlan>(StringComparer.OrdinalIgnoreCase);
 
         foreach (var plan in activePlans)
         {
@@ -313,6 +317,7 @@ public class SubscriptionsController : ControllerBase
             Interval = "month",
             Amount = 0,
             Description = "Try Kalshi Signals with free market coverage.",
+            IsSandbox = false,
             IsActive = true
         },
         new SubscriptionPlan
@@ -325,6 +330,7 @@ public class SubscriptionsController : ControllerBase
             Interval = "month",
             Amount = 79,
             Description = "Streamlined market data feed with history and export support.",
+            IsSandbox = false,
             IsActive = true
         },
         new SubscriptionPlan
@@ -337,6 +343,7 @@ public class SubscriptionsController : ControllerBase
             Interval = "year",
             Amount = 790,
             Description = "Annual billing for Core Data.",
+            IsSandbox = false,
             IsActive = true
         }
     };

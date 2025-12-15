@@ -9,5 +9,6 @@ public class SubscriptionPlanDto
     public string Currency { get; set; } = "usd";
     public string Interval { get; set; } = "month";
     public string? Description { get; set; }
+    public bool IsSandbox { get; set; }
     public bool IsActive { get; set; }
 }

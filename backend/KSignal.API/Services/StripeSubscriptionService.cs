@@ -29,10 +29,18 @@ public class StripeSubscriptionService
         }
     }
 
-    public async Task<List<SubscriptionPlan>> GetActivePlansAsync(CancellationToken cancellationToken)
+    public async Task<List<SubscriptionPlan>> GetActivePlansAsync(CancellationToken cancellationToken, bool? isSandbox = null)
     {
-        return await _db.SubscriptionPlans
+        var query = _db.SubscriptionPlans
             .Where(p => p.IsActive)
+            .AsQueryable();
+
+        if (isSandbox.HasValue)
+        {
+            query = query.Where(p => p.IsSandbox == isSandbox.Value);
+        }
+
+        return await query
             .OrderBy(p => p.Amount)
             .ToListAsync(cancellationToken);
     }
@@ -611,6 +619,7 @@ public class StripeSubscriptionService
                 Currency = "usd",
                 Interval = "month",
                 Amount = 79,
+                IsSandbox = false,
                 IsActive = true, // Set explicitly to avoid RETURNING clause
                 Description = "Streamlined market data feed with history and export support.",
                 CreatedAt = now, // Set explicitly to avoid RETURNING clause
@@ -629,6 +638,7 @@ public class StripeSubscriptionService
                 Currency = "usd",
                 Interval = "year",
                 Amount = 790,
+                IsSandbox = false,
                 IsActive = true, // Set explicitly to avoid RETURNING clause
                 Description = "Annual billing for Core Data.",
                 CreatedAt = now, // Set explicitly to avoid RETURNING clause
@@ -652,6 +662,7 @@ public class StripeSubscriptionService
                     existing.Code != seed.Code ||
                     existing.Amount != seed.Amount ||
                     existing.Interval != seed.Interval ||
+                    existing.IsSandbox != seed.IsSandbox ||
                     existing.Description != seed.Description;
 
                 if (needsUpdate)
@@ -661,6 +672,7 @@ public class StripeSubscriptionService
                     existing.Code = seed.Code;
                     existing.Amount = seed.Amount;
                     existing.Interval = seed.Interval;
+                    existing.IsSandbox = seed.IsSandbox;
                     existing.Description = seed.Description;
                     existing.IsActive = true;
                     existing.UpdatedAt = DateTime.UtcNow;
