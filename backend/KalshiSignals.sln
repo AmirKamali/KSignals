@@ -9,8 +9,6 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "KSignal.API", "KSignal.API\
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "KSignals.DTO", "..\shared\KSignals.DTO\KSignals.DTO.csproj", "{0A1B2C3D-4E5F-6071-8899-AABBCCDDEEFF}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "kadmin", "kadmin\kadmin.csproj", "{95E0A891-3FA4-42E2-97E2-58A0603546A0}"
-EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -57,18 +55,6 @@ Global
 		{0A1B2C3D-4E5F-6071-8899-AABBCCDDEEFF}.Release|x64.Build.0 = Release|Any CPU
 		{0A1B2C3D-4E5F-6071-8899-AABBCCDDEEFF}.Release|x86.ActiveCfg = Release|Any CPU
 		{0A1B2C3D-4E5F-6071-8899-AABBCCDDEEFF}.Release|x86.Build.0 = Release|Any CPU
-		{95E0A891-3FA4-42E2-97E2-58A0603546A0}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{95E0A891-3FA4-42E2-97E2-58A0603546A0}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{95E0A891-3FA4-42E2-97E2-58A0603546A0}.Debug|x64.ActiveCfg = Debug|Any CPU
-		{95E0A891-3FA4-42E2-97E2-58A0603546A0}.Debug|x64.Build.0 = Debug|Any CPU
-		{95E0A891-3FA4-42E2-97E2-58A0603546A0}.Debug|x86.ActiveCfg = Debug|Any CPU
-		{95E0A891-3FA4-42E2-97E2-58A0603546A0}.Debug|x86.Build.0 = Debug|Any CPU
-		{95E0A891-3FA4-42E2-97E2-58A0603546A0}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{95E0A891-3FA4-42E2-97E2-58A0603546A0}.Release|Any CPU.Build.0 = Release|Any CPU
-		{95E0A891-3FA4-42E2-97E2-58A0603546A0}.Release|x64.ActiveCfg = Release|Any CPU
-		{95E0A891-3FA4-42E2-97E2-58A0603546A0}.Release|x64.Build.0 = Release|Any CPU
-		{95E0A891-3FA4-42E2-97E2-58A0603546A0}.Release|x86.ActiveCfg = Release|Any CPU
-		{95E0A891-3FA4-42E2-97E2-58A0603546A0}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

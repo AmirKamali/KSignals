@@ -79,9 +79,9 @@
       "type": "coreclr",
       "request": "launch",
       "preLaunchTask": "build-admin",
-      "program": "${workspaceFolder}/backend/kadmin/bin/Debug/net10.0/kadmin.dll",
+      "program": "${workspaceFolder}/kadmin/bin/Debug/net10.0/kadmin.dll",
       "args": [],
-      "cwd": "${workspaceFolder}/backend/kadmin",
+      "cwd": "${workspaceFolder}/kadmin",
       "stopAtEntry": false,
       "serverReadyAction": {
         "action": "openExternally",

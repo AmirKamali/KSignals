@@ -95,7 +95,7 @@
       "type": "process",
       "args": [
         "build",
-        "${workspaceFolder}/backend/kadmin/kadmin.csproj",
+        "${workspaceFolder}/kadmin/kadmin.csproj",
         "/property:GenerateFullPaths=true",
         "/consoleloggerparameters:NoSummary"
       ],
