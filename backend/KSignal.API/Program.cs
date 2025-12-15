@@ -51,7 +51,9 @@ var connectionString = BuildConnectionString(builder.Configuration);
 builder.Configuration["ConnectionStrings:KalshiClickHouse"] = connectionString;
 
 builder.Services.AddDbContext<KalshiDbContext>(options =>
-    options.UseClickHouse(connectionString));
+    options.UseClickHouse(connectionString, clickhouse =>
+        // Increase EF insert batch size to reduce per-command round-trips to ClickHouse
+        clickhouse.MaxBatchSize(1000)));
 
 // Register Kalshi API Client
 // For public endpoints, we can use without authentication
