@@ -626,7 +626,7 @@ public class SynchronizationService
         {
             var response = await _kalshiClient.Events.GetEventAsync(
                 command.EventTicker,
-                withNestedMarkets: false,
+                withNestedMarkets: command.withNestedMarkets,
                 cancellationToken: cancellationToken);
 
             if (response?.Event == null)
@@ -648,6 +648,18 @@ public class SynchronizationService
             var newEvent = MapEventDataToMarketEvent(eventData, now);
             await _dbContext.MarketEvents.AddAsync(newEvent, cancellationToken);
             await _dbContext.SaveChangesAsync(cancellationToken);
+
+            var markets = eventData.Markets ?? response.Markets;
+            if (markets != null && markets.Count > 0)
+            {
+                var fetchedAt = DateTime.UtcNow;
+                var mappedMarkets = markets
+                    .Where(m => m != null)
+                    .Select(m => KalshiService.MapMarket(m, fetchedAt))
+                    .ToList();
+                await InsertMarketSnapshotsAsync(mappedMarkets);
+                await _syncLogService.LogSyncEventAsync($"EventDetailSync_InnerMarkets_{command.EventTicker}", markets.Count, cancellationToken, LogType.DEBUG);
+            }
         }
         catch (ApiException apiEx) when (apiEx.Message.Contains("not found") ||
                                           apiEx.Message.Contains("Required property") ||

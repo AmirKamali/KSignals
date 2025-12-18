@@ -217,7 +217,7 @@ public class BackendPrivateController : ControllerBase
                 return BadRequest(new { error = "Event ticker is required" });
             }
 
-            await _synchronizationService.EnqueueEventDetailSyncAsync(eventTicker);
+            await _synchronizationService.EnqueueEventDetailSyncAsync(eventTicker, withNestedMarkets: true);
             return Accepted(new
             {
                 started = true,
