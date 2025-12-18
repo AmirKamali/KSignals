@@ -184,33 +184,6 @@ public class PricingModel : PageModel
                 Description = "Try Kalshi Signals with free market coverage.",
                 IsSandbox = false
             }
-        },
-        new SubscriptionTierDto
-        {
-            Tier = "core-data",
-            Name = "Core Data",
-            MonthlyPlan = new SubscriptionPlanDto
-            {
-                Id = "core-data",
-                Code = "core-data",
-                Name = "Core Data",
-                Amount = 79,
-                Currency = "usd",
-                Interval = "month",
-                Description = "Live and historical market data feed with export-ready access.",
-                IsSandbox = false
-            },
-            AnnualPlan = new SubscriptionPlanDto
-            {
-                Id = "core-data-annual",
-                Code = "core-data-annual",
-                Name = "Core Data",
-                Amount = 790,
-                Currency = "usd",
-                Interval = "year",
-                Description = "Annual billing for Core Data with export-ready access.",
-                IsSandbox = false
-            }
         }
     };
 

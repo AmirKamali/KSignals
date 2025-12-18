@@ -342,6 +342,48 @@ public class KalshiService
         }
     }
 
+    public async Task<ClientEventDetailsResponse?> GetEventDetailsFromDbAsync(string eventTickerId, CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(eventTickerId))
+        {
+            throw new ArgumentException("EventID is required", nameof(eventTickerId));
+        }
+
+        var evt = await _db.MarketEvents.AsNoTracking()
+            .FirstOrDefaultAsync(e => e.EventTicker == eventTickerId && !e.IsDeleted, cancellationToken);
+        if (evt == null)
+        {
+            return null;
+        }
+
+        var snapshots = await _db.MarketSnapshotsLatestView.AsNoTracking()
+            .Where(s => s.EventTicker == eventTickerId && s.MveCollectionTicker == null)
+            .ToListAsync(cancellationToken);
+
+        if (snapshots.Count == 0)
+        {
+            return null;
+        }
+
+        var markets = snapshots.Select(s => MapSnapshotToClientEvent(evt, s)).ToList();
+        var eventData = new ClientEventData
+        {
+            EventTicker = evt.EventTicker,
+            SeriesTicker = evt.SeriesTicker,
+            SubTitle = evt.SubTitle,
+            Title = evt.Title,
+            Category = evt.Category,
+            StrikeDate = evt.StrikeDate,
+            StrikePeriod = evt.StrikePeriod
+        };
+
+        return new ClientEventDetailsResponse
+        {
+            Event = eventData,
+            Markets = markets
+        };
+    }
+
     private static void CopyMarketSnapshot(MarketSnapshot target, MarketSnapshot source)
     {
         target.Ticker = source.Ticker;
@@ -510,6 +552,60 @@ public class KalshiService
             PriceLevelStructure = market.PriceLevelStructure,
             PriceRanges = market.PriceRanges != null && market.PriceRanges.Any() ? JsonConvert.SerializeObject(market.PriceRanges) : null,
             GenerateDate = generateDate
+        };
+    }
+
+    private static ClientEvent MapSnapshotToClientEvent(MarketEvent evt, MarketSnapshotLatest snapshot)
+    {
+        return new ClientEvent
+        {
+            EventTicker = evt.EventTicker,
+            SeriesTicker = evt.SeriesTicker,
+            Title = evt.Title,
+            SubTitle = evt.SubTitle,
+            Category = evt.Category,
+
+            Ticker = snapshot.Ticker,
+            MarketType = snapshot.MarketType,
+            YesSubTitle = snapshot.YesSubTitle,
+            NoSubTitle = snapshot.NoSubTitle,
+
+            CreatedTime = snapshot.CreatedTime,
+            OpenTime = snapshot.OpenTime,
+            CloseTime = snapshot.CloseTime,
+            ExpectedExpirationTime = snapshot.ExpectedExpirationTime,
+            LatestExpirationTime = snapshot.LatestExpirationTime,
+            Status = snapshot.Status,
+
+            YesBid = snapshot.YesBid,
+            YesBidDollars = snapshot.YesBidDollars,
+            YesAsk = snapshot.YesAsk,
+            YesAskDollars = snapshot.YesAskDollars,
+            NoBid = snapshot.NoBid,
+            NoBidDollars = snapshot.NoBidDollars,
+            NoAsk = snapshot.NoAsk,
+            NoAskDollars = snapshot.NoAskDollars,
+            LastPrice = snapshot.LastPrice,
+            LastPriceDollars = snapshot.LastPriceDollars,
+            PreviousYesBid = snapshot.PreviousYesBid,
+            PreviousYesBidDollars = snapshot.PreviousYesBidDollars,
+            PreviousYesAsk = snapshot.PreviousYesAsk,
+            PreviousYesAskDollars = snapshot.PreviousYesAskDollars,
+            PreviousPrice = snapshot.PreviousPrice,
+            PreviousPriceDollars = snapshot.PreviousPriceDollars,
+            SettlementValue = snapshot.SettlementValue,
+            SettlementValueDollars = snapshot.SettlementValueDollars,
+
+            Volume = snapshot.Volume,
+            Volume24h = snapshot.Volume24h,
+            OpenInterest = snapshot.OpenInterest,
+            NotionalValue = snapshot.NotionalValue,
+            NotionalValueDollars = snapshot.NotionalValueDollars,
+
+            Liquidity = snapshot.Liquidity,
+            LiquidityDollars = snapshot.LiquidityDollars,
+
+            GenerateDate = snapshot.GenerateDate
         };
     }
 

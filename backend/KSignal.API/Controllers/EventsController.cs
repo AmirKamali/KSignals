@@ -237,8 +237,13 @@ public class EventsController : ControllerBase
 
         try
         {
-            var eventResponse = await _kalshiService.GetEventDetailsAsync(eventTicker);
+            var dbEventDetails = await _kalshiService.GetEventDetailsFromDbAsync(eventTicker, cancellationToken);
+            if (dbEventDetails != null)
+            {
+                return Ok(dbEventDetails);
+            }
 
+            var eventResponse = await _kalshiService.GetEventDetailsAsync(eventTicker);
             if (eventResponse?.Event == null)
             {
                 return NotFound(new { error = "Event not found" });
