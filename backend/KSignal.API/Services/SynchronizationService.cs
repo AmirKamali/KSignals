@@ -602,7 +602,7 @@ public class SynchronizationService
         }
     }
 
-    public async Task EnqueueEventDetailSyncAsync(string eventTicker, CancellationToken cancellationToken = default)
+    public async Task EnqueueEventDetailSyncAsync(string eventTicker, bool withNestedMarkets = false, CancellationToken cancellationToken = default)
     {
         try
         {
@@ -610,7 +610,7 @@ public class SynchronizationService
             {
                 throw new ArgumentException("Event ticker is required", nameof(eventTicker));
             }
-            await _publishEndpoint.Publish(new SynchronizeEventDetail(eventTicker), cancellationToken);
+            await _publishEndpoint.Publish(new SynchronizeEventDetail(eventTicker, withNestedMarkets), cancellationToken);
             await _syncLogService.LogSyncEventAsync("SynchronizeEventDetail", 1, cancellationToken);
         }
         catch (Exception ex)

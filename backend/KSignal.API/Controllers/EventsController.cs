@@ -4,6 +4,7 @@ using Kalshi.Api.Client;
 using Kalshi.Api.Model;
 using KSignal.API.Models;
 using KSignal.API.Services;
+using KSignals.DTO;
 using Microsoft.AspNetCore.Mvc;
 
 namespace KSignal.API.Controllers;
@@ -19,6 +20,8 @@ public class EventsController : ControllerBase
     private readonly KalshiClient _kalshiClient;
     private readonly ISyncLogService _syncLogService;
     private readonly KalshiService _kalshiService;
+    private readonly SynchronizationService _synchronizationService;
+    private readonly ILogger<EventsController> _logger;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="EventsController"/> class.
@@ -26,11 +29,18 @@ public class EventsController : ControllerBase
     /// <param name="kalshiClient">The Kalshi API client</param>
     /// <param name="syncLogService">The sync log service</param>
     /// <param name="kalshiService">Market service for caching and filtering</param>
-    public EventsController(KalshiClient kalshiClient, ISyncLogService syncLogService, KalshiService kalshiService)
+    public EventsController(
+        KalshiClient kalshiClient,
+        ISyncLogService syncLogService,
+        KalshiService kalshiService,
+        SynchronizationService synchronizationService,
+        ILogger<EventsController> logger)
     {
         _kalshiClient = kalshiClient ?? throw new ArgumentNullException(nameof(kalshiClient));
         _syncLogService = syncLogService ?? throw new ArgumentNullException(nameof(syncLogService));
         _kalshiService = kalshiService ?? throw new ArgumentNullException(nameof(kalshiService));
+        _synchronizationService = synchronizationService ?? throw new ArgumentNullException(nameof(synchronizationService));
+        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
 
     /// <summary>
@@ -240,6 +250,7 @@ public class EventsController : ControllerBase
             var dbEventDetails = await _kalshiService.GetEventDetailsFromDbAsync(eventTicker, cancellationToken);
             if (dbEventDetails != null)
             {
+                await _synchronizationService.EnqueueEventDetailSyncAsync(eventTicker, withNestedMarkets: true, cancellationToken);
                 return Ok(dbEventDetails);
             }
 

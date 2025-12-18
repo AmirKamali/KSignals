@@ -1,4 +1,4 @@
 namespace KSignal.API.Messaging;
 
-public record SynchronizeEventDetail(string EventTicker);
+public record SynchronizeEventDetail(string EventTicker, bool withNestedMarkets = false);
 
