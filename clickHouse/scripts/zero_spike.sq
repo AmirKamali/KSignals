@@ -1,0 +1,24 @@
+CREATE MATERIALIZED VIEW kalshi_signals.level3_zero_spike_mv
+TO kalshi_signals.level3_signals
+AS
+WITH grouped AS
+(
+    SELECT
+        EventTicker,
+        sum(if(Ticker LIKE '%=0%', YesAsk, 0)) AS p0,
+        sum(YesAsk) AS total_p
+    FROM kalshi_signals.edge_features
+    GROUP BY EventTicker
+)
+SELECT
+    e.MarketSnapshotID,
+    e.EventTicker,
+
+    if(g.p0 > 0.75, 1, 0) AS zero_spike,
+    0 AS mode_spike,
+    0 AS threshold_violation,
+    0 AS range_violation,
+
+    if(g.p0 > 0.75, g.p0, 0) AS level3_score
+FROM kalshi_signals.edge_features e
+JOIN grouped g USING (EventTicker);

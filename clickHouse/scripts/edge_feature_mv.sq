@@ -1,0 +1,47 @@
+CREATE MATERIALIZED VIEW kalshi_signals.edge_features_mv
+TO kalshi_signals.edge_features
+AS
+SELECT
+    MarketSnapshotID,
+    EventTicker,
+    Ticker,
+    MarketType,
+    Status,
+
+    toFloat64(YesBidDollars) AS YesBid,
+    toFloat64(YesAskDollars) AS YesAsk,
+    Volume,
+    Volume24h,
+    OpenInterest,
+    Liquidity,
+    TickSize,
+    toFloat64(LastPriceDollars) AS LastPrice,
+    CanCloseEarly,
+    StrikeType,
+    CloseTime,
+
+    toFloat64(YesAskDollars) - toFloat64(YesBidDollars) AS spread,
+    sqrt(toFloat64(Volume) + 1.) AS vol_norm,
+    sqrt(toFloat64(OpenInterest) + 1.) AS oi_norm,
+
+    abs(toFloat64(YesBidDollars) - toFloat64(ifNull(PreviousYesBidDollars, YesBidDollars)))
+  + abs(toFloat64(YesAskDollars) - toFloat64(ifNull(PreviousYesAskDollars, YesAskDollars)))
+        AS price_change,
+
+    greatest(dateDiff('hour', now(), CloseTime), 1) AS hours_to_close,
+
+    (
+        spread
+        * (1. / sqrt(toFloat64(Volume) + 1.))
+        * (1. / sqrt(toFloat64(OpenInterest) + 1.))
+        * if(price_change < 0.01, 1.25, 1.)
+        * (1 + TickSize)
+        * (1 + abs(toFloat64(LastPriceDollars) - 0.5))
+        * exp(-hours_to_close / 72.)
+        * (1 - exp(-hours_to_close / 6.))
+        * if(CanCloseEarly = 1, 0.7, 1.)
+        * if(StrikeType != 'standard', 0.8, 1.)
+    ) AS edge_score
+FROM kalshi_signals.market_snapshots_latest
+WHERE YesBidDollars IS NOT NULL
+  AND YesAskDollars IS NOT NULL;

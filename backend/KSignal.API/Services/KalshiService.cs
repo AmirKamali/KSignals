@@ -79,8 +79,8 @@ public class KalshiService
         if (normalizedStrategy == "new_opportunities")
         {
             baseQuery = baseQuery.Where(x =>
-                ((x.Snapshot.YesBid - x.Snapshot.NoBid) > 0.1m) ||
-                ((x.Snapshot.NoBid - x.Snapshot.YesBid) > 0.1m));
+                ((x.Snapshot.YesAsk - x.Snapshot.YesBid) > 0.1m) ||
+                ((x.Snapshot.NoAsk - x.Snapshot.NoBid) > 0.1m));
             baseQuery = baseQuery.Where(x => x.Snapshot.Volume < 500);
         }
 

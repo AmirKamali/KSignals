@@ -1,0 +1,30 @@
+CREATE TABLE kalshi_signals.edge_features
+(
+    MarketSnapshotID UUID,
+    EventTicker String,
+    Ticker String,
+    MarketType String,
+    Status String,
+
+    YesBid Float64,
+    YesAsk Float64,
+    Volume Int32,
+    Volume24h Int32,
+    OpenInterest Int32,
+    Liquidity Int32,
+    TickSize Int32,
+    LastPrice Float64,
+    CanCloseEarly UInt8,
+    StrikeType Nullable(String),
+    CloseTime DateTime,
+
+    spread Float64,
+    vol_norm Float64,
+    oi_norm Float64,
+    price_change Float64,
+    hours_to_close Int64,
+
+    edge_score Float64
+)
+ENGINE = MergeTree
+ORDER BY (EventTicker, Ticker);

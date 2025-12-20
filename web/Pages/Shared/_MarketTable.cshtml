@@ -75,30 +75,6 @@
 <section class="section">
     <div class="container">
         <div class="filterContainer">
-            <div class="strategyPanel">
-                <div class="strategyHeader">
-                    <span class="strategyBadge">Strategy</span>
-                    <span class="strategyHint">Curated market moves</span>
-                </div>
-                <div class="controls strategyControls">
-                    @foreach (var strategy in strategies)
-                    {
-                        var strategyLink = BuildLink(new Dictionary<string, string?>
-                        {
-                            ["strategy"] = string.IsNullOrEmpty(strategy.Key) ? null : strategy.Key,
-                            ["page"] = "1"
-                        });
-                        var isActiveStrategy = string.IsNullOrEmpty(strategy.Key)
-                            ? string.IsNullOrEmpty(Model.ActiveStrategy)
-                            : string.Equals(Model.ActiveStrategy, strategy.Key, StringComparison.OrdinalIgnoreCase);
-                        var premiumClass = strategy.IsPremium ? "premiumBtn" : string.Empty;
-                        <a class="segmentBtn strategyBtn @premiumClass @(isActiveStrategy ? "active" : string.Empty)" href="@strategyLink">
-                            @strategy.Label
-                        </a>
-                    }
-                </div>
-            </div>
-
             <div class="controls">
                 @foreach (var cat in categories)
                 {
@@ -126,6 +102,30 @@
                     }
                 </div>
             }
+
+            <div class="strategyPanel">
+                <div class="strategyHeader">
+                    <span class="strategyBadge">Strategy</span>
+                    <span class="strategyHint">Curated market moves</span>
+                </div>
+                <div class="controls strategyControls">
+                    @foreach (var strategy in strategies)
+                    {
+                        var strategyLink = BuildLink(new Dictionary<string, string?>
+                        {
+                            ["strategy"] = string.IsNullOrEmpty(strategy.Key) ? null : strategy.Key,
+                            ["page"] = "1"
+                        });
+                        var isActiveStrategy = string.IsNullOrEmpty(strategy.Key)
+                            ? string.IsNullOrEmpty(Model.ActiveStrategy)
+                            : string.Equals(Model.ActiveStrategy, strategy.Key, StringComparison.OrdinalIgnoreCase);
+                        var premiumClass = strategy.IsPremium ? "premiumBtn" : string.Empty;
+                        <a class="segmentBtn strategyBtn @premiumClass @(isActiveStrategy ? "active" : string.Empty)" href="@strategyLink">
+                            @strategy.Label
+                        </a>
+                    }
+                </div>
+            </div>
 
             <div style="display: flex; gap: 1rem; justify-content: center; flex-wrap: wrap;">
                 <div class="dateFilterContainer" style="margin: 0;">

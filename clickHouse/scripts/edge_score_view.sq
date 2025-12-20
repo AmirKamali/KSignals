@@ -1,0 +1,72 @@
+CREATE VIEW kalshi_signals.signal_market_score1
+(
+    `MarketSnapshotID` UUID,
+    `EventTicker` String,
+    `Ticker` String,
+    `MarketType` String,
+    `Status` String,
+    `YesBid` Float64,
+    `YesAsk` Float64,
+    `Volume` Int32,
+    `Volume24h` Int32,
+    `OpenInterest` Int32,
+    `Liquidity` Int32,
+    `TickSize` Int32,
+    `LastPrice` Float64,
+    `CanCloseEarly` UInt8,
+    `StrikeType` Nullable(String),
+    `CloseTime` DateTime,
+    `spread` Float64,
+    `vol_norm` Float64,
+    `oi_norm` Float64,
+    `price_change` Float64,
+    `hours_to_close` Int64,
+    `edge_score` Float64,
+    `edge_score_norm` Nullable(Float64)
+)
+AS WITH
+    base AS
+    (
+        SELECT
+            MarketSnapshotID,
+            EventTicker,
+            Ticker,
+            MarketType,
+            Status,
+            toFloat64(YesBidDollars) AS YesBid,
+            toFloat64(YesAskDollars) AS YesAsk,
+            Volume,
+            Volume24h,
+            OpenInterest,
+            Liquidity,
+            TickSize,
+            toFloat64(LastPriceDollars) AS LastPrice,
+            CanCloseEarly,
+            StrikeType,
+            CloseTime,
+            toFloat64(YesAskDollars) - toFloat64(YesBidDollars) AS spread,
+            sqrt(toFloat64(Volume) + 1.) AS vol_norm,
+            sqrt(toFloat64(OpenInterest) + 1.) AS oi_norm,
+            abs(toFloat64(YesBidDollars) - toFloat64(ifNull(PreviousYesBidDollars, YesBidDollars))) + abs(toFloat64(YesAskDollars) - toFloat64(ifNull(PreviousYesAskDollars, YesAskDollars))) AS price_change,
+            greatest(dateDiff('hour', now(), CloseTime), 1) AS hours_to_close
+        FROM kalshi_signals.market_snapshots_latest
+        WHERE (YesBidDollars IS NOT NULL) AND (YesAskDollars IS NOT NULL)
+    ),
+    scored AS
+    (
+        SELECT
+            *,
+            ((((((((spread * (1. / vol_norm)) * (1. / oi_norm)) * if(price_change < 0.01, 1.25, 1.)) * (1 + TickSize)) * (1 + abs(LastPrice - 0.5))) * exp((-hours_to_close) / 72.)) * (1 - exp((-hours_to_close) / 6.))) * if(CanCloseEarly = 1, 0.7, 1.)) * if(StrikeType != 'standard', 0.8, 1.) AS edge_score
+        FROM base
+    ),
+    stats AS
+    (
+        SELECT max(log1p(edge_score)) AS max_log_score
+        FROM scored
+    )
+SELECT
+    s.*,
+    round((100 * log1p(s.edge_score)) / nullIf(st.max_log_score, 0), 2) AS edge_score_norm
+FROM scored AS s
+CROSS JOIN stats AS st
+ORDER BY edge_score_norm DESC
