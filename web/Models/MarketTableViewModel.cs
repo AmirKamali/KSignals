@@ -18,4 +18,5 @@ public class MarketTableViewModel
     public int PageSize { get; set; } = 20;
     public string Query { get; set; } = string.Empty;
     public bool ShowSearch { get; set; } = true;
+    public string? ActiveStrategy { get; set; }
 }

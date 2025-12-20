@@ -36,6 +36,7 @@ public class KalshiService
         string? tag = null,
         string? query = null,
         string? closeDateType = "next_30_days",
+        string? strategy = null,
         string? status = "Active",
         MarketSort sortBy = MarketSort.Volume24H,
         SortDirection direction = SortDirection.Desc,
@@ -73,6 +74,15 @@ public class KalshiService
         // Apply close time filter
         if (maxCloseTime.HasValue)
             baseQuery = baseQuery.Where(x => x.Snapshot == null || x.Snapshot.CloseTime <= maxCloseTime.Value);
+
+        var normalizedStrategy = strategy?.Trim().ToLowerInvariant();
+        if (normalizedStrategy == "new_opportunities")
+        {
+            baseQuery = baseQuery.Where(x =>
+                ((x.Snapshot.YesBid - x.Snapshot.NoBid) > 0.1m) ||
+                ((x.Snapshot.NoBid - x.Snapshot.YesBid) > 0.1m));
+            baseQuery = baseQuery.Where(x => x.Snapshot.Volume < 500);
+        }
 
         // Apply search filter (case-insensitive)
         if (searchTerm != null)

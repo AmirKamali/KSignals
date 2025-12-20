@@ -16,6 +16,7 @@
             page: "1",
             pageSize: target.dataset.pagesize ?? "20",
             query: target.dataset.query ?? "",
+            strategy: target.dataset.strategy ?? "",
         };
 
         // Only include direction if we're NOT changing the sort type

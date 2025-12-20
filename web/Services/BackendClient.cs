@@ -829,6 +829,8 @@ public class BackendClient
             dict["close_date_type"] = query.CloseDateType;
         if (!string.IsNullOrWhiteSpace(query.Query))
             dict["query"] = query.Query;
+        if (!string.IsNullOrWhiteSpace(query.Strategy))
+            dict["strategy"] = query.Strategy;
 
         dict["sort_by"] = query.Sort;
         dict["direction"] = query.Direction;

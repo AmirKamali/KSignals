@@ -8,6 +8,11 @@
     var subTags = Model.ActiveCategory != "All" && Model.TagsByCategories.TryGetValue(Model.ActiveCategory, out var tagList)
         ? tagList
         : new List<string>();
+    var strategies = new List<(string Key, string Label, bool IsPremium)>
+    {
+        (string.Empty, "All", false),
+        ("new_opportunities", "New opportunities", true)
+    };
 
     var dateOptions = new List<(string Value, string Label)>
     {
@@ -45,7 +50,8 @@
             ["direction"] = Model.SortDirection,
             ["page"] = Model.CurrentPage > 1 ? Model.CurrentPage.ToString() : null,
             ["pageSize"] = Model.PageSize.ToString(),
-            ["query"] = string.IsNullOrWhiteSpace(Model.Query) ? null : Model.Query
+            ["query"] = string.IsNullOrWhiteSpace(Model.Query) ? null : Model.Query,
+            ["strategy"] = string.IsNullOrWhiteSpace(Model.ActiveStrategy) ? null : Model.ActiveStrategy
         };
 
         foreach (var kvp in overrides)
@@ -69,6 +75,30 @@
 <section class="section">
     <div class="container">
         <div class="filterContainer">
+            <div class="strategyPanel">
+                <div class="strategyHeader">
+                    <span class="strategyBadge">Strategy</span>
+                    <span class="strategyHint">Curated market moves</span>
+                </div>
+                <div class="controls strategyControls">
+                    @foreach (var strategy in strategies)
+                    {
+                        var strategyLink = BuildLink(new Dictionary<string, string?>
+                        {
+                            ["strategy"] = string.IsNullOrEmpty(strategy.Key) ? null : strategy.Key,
+                            ["page"] = "1"
+                        });
+                        var isActiveStrategy = string.IsNullOrEmpty(strategy.Key)
+                            ? string.IsNullOrEmpty(Model.ActiveStrategy)
+                            : string.Equals(Model.ActiveStrategy, strategy.Key, StringComparison.OrdinalIgnoreCase);
+                        var premiumClass = strategy.IsPremium ? "premiumBtn" : string.Empty;
+                        <a class="segmentBtn strategyBtn @premiumClass @(isActiveStrategy ? "active" : string.Empty)" href="@strategyLink">
+                            @strategy.Label
+                        </a>
+                    }
+                </div>
+            </div>
+
             <div class="controls">
                 @foreach (var cat in categories)
                 {
@@ -111,6 +141,7 @@
                         data-direction="@Model.SortDirection"
                         data-query="@Model.Query"
                         data-pagesize="@Model.PageSize"
+                        data-strategy="@(Model.ActiveStrategy ?? string.Empty)"
                     >
                         @foreach (var option in dateOptions)
                         {
@@ -132,6 +163,7 @@
                         data-direction="@Model.SortDirection"
                         data-query="@Model.Query"
                         data-pagesize="@Model.PageSize"
+                        data-strategy="@(Model.ActiveStrategy ?? string.Empty)"
                     >
                         @foreach (var option in sortOptions)
                         {
@@ -152,6 +184,7 @@
                 <input type="hidden" name="direction" value="@Model.SortDirection" />
                 <input type="hidden" name="page" value="1" />
                 <input type="hidden" name="pageSize" value="@Model.PageSize" />
+                <input type="hidden" name="strategy" value="@(Model.ActiveStrategy ?? string.Empty)" />
                 <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: var(--primary);">
                     <circle cx="11" cy="11" r="8"></circle>
                     <line x1="21" y1="21" x2="16.65" y2="16.65"></line>

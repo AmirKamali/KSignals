@@ -966,6 +966,57 @@ main {
   flex-wrap: wrap;
 }
 
+.strategyPanel {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.35rem;
+  margin-bottom: 0.5rem;
+}
+
+.strategyHeader {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: var(--text-muted);
+  font-weight: 600;
+}
+
+.strategyBadge {
+  padding: 0.25rem 0.65rem;
+  border-radius: 999px;
+  background: linear-gradient(120deg, #ffd8a8, #ffe8cc);
+  color: #9a3412;
+  letter-spacing: 0.05em;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+}
+
+.strategyHint {
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+}
+
+.strategyControls {
+  border: 1px solid rgba(251, 146, 60, 0.35);
+  background: radial-gradient(circle at 20% 20%, rgba(251, 146, 60, 0.12), transparent 35%),
+    radial-gradient(circle at 80% 0%, rgba(59, 130, 246, 0.08), transparent 45%),
+    var(--surface);
+  box-shadow: 0 12px 30px rgba(251, 146, 60, 0.15);
+}
+
+.strategyBtn {
+  border: 1px solid transparent;
+  font-weight: 600;
+}
+
+.premiumBtn {
+  background: linear-gradient(135deg, #fff7ed 0%, #fef3c7 45%, #fdf2e9 100%);
+  color: #9a3412;
+  border-color: rgba(251, 146, 60, 0.6);
+  box-shadow: 0 10px 25px rgba(251, 146, 60, 0.25);
+}
+
 .segmentBtn {
   padding: 0.5rem 1.5rem;
   border-radius: 1.5rem;
@@ -986,6 +1037,13 @@ main {
   color: var(--primary);
   box-shadow: 0 6px 18px rgba(15, 23, 42, 0.12);
   border: 1px solid var(--border);
+}
+
+.strategyControls .premiumBtn.active {
+  background: linear-gradient(135deg, #f97316 0%, #fb923c 50%, #ffb454 100%);
+  color: #0b1021;
+  border-color: #f97316;
+  box-shadow: 0 16px 36px rgba(249, 115, 22, 0.35);
 }
 
 .tableContainer {

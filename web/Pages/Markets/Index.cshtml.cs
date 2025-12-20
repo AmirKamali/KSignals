@@ -16,12 +16,13 @@ public class IndexModel : PageModel
         _backendClient = backendClient;
     }
 
-    public async Task<IActionResult> OnGetAsync(string? category, string? tag, string? date, string? sort_type, string? direction, int? page, int? pageSize, string? query)
+    public async Task<IActionResult> OnGetAsync(string? category, string? tag, string? date, string? sort_type, string? direction, int? page, int? pageSize, string? query, string? strategy)
     {
         var activeCategory = string.IsNullOrWhiteSpace(category) ? "All" : category!;
         var activeTag = string.IsNullOrWhiteSpace(tag) ? null : tag;
         var activeDate = string.IsNullOrWhiteSpace(date) ? "next_30_days" : date!;
         var activeSort = string.IsNullOrWhiteSpace(sort_type) ? "Volume24H" : sort_type!;
+        var activeStrategy = string.IsNullOrWhiteSpace(strategy) ? null : strategy;
 
         // Set default direction based on sort type if not specified
         string sortDirection;
@@ -71,7 +72,8 @@ public class IndexModel : PageModel
             Direction = sortDirection,
             Page = currentPage,
             PageSize = size,
-            Query = string.IsNullOrWhiteSpace(query) ? null : query
+            Query = string.IsNullOrWhiteSpace(query) ? null : query,
+            Strategy = activeStrategy
         };
 
         var tagsByCategories = await _backendClient.GetTagsByCategoriesAsync();
@@ -91,7 +93,8 @@ public class IndexModel : PageModel
             TotalCount = response.TotalCount,
             PageSize = response.PageSize > 0 ? response.PageSize : size,
             Query = query ?? string.Empty,
-            ShowSearch = true
+            ShowSearch = true,
+            ActiveStrategy = activeStrategy
         };
 
         return Page();

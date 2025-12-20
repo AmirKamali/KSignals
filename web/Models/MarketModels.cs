@@ -23,6 +23,7 @@ public class MarketQuery
     public string Direction { get; set; } = "desc";
     public int Page { get; set; } = 1;
     public int PageSize { get; set; } = 20;
+    public string? Strategy { get; set; }
 }
 
 public class BackendOptions
