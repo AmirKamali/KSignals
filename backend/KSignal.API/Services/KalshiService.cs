@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Linq;
 using Kalshi.Api;
 using Kalshi.Api.Client;
@@ -124,32 +125,32 @@ public class KalshiService
                 Status = x.Snapshot.Status,
 
                 YesBid = x.Snapshot.YesBid,
-                YesBidDollars = x.Snapshot.YesBidDollars,
+                YesBidDollars = FormatDollarValue(x.Snapshot.YesBidDollars),
                 YesAsk = x.Snapshot.YesAsk,
-                YesAskDollars = x.Snapshot.YesAskDollars,
+                YesAskDollars = FormatDollarValue(x.Snapshot.YesAskDollars),
                 NoBid = x.Snapshot.NoBid,
-                NoBidDollars = x.Snapshot.NoBidDollars,
+                NoBidDollars = FormatDollarValue(x.Snapshot.NoBidDollars),
                 NoAsk = x.Snapshot.NoAsk,
-                NoAskDollars = x.Snapshot.NoAskDollars,
+                NoAskDollars = FormatDollarValue(x.Snapshot.NoAskDollars),
                 LastPrice = x.Snapshot.LastPrice,
-                LastPriceDollars = x.Snapshot.LastPriceDollars,
+                LastPriceDollars = FormatDollarValue(x.Snapshot.LastPriceDollars),
                 PreviousYesBid = x.Snapshot.PreviousYesBid,
-                PreviousYesBidDollars = x.Snapshot.PreviousYesBidDollars,
+                PreviousYesBidDollars = FormatDollarValue(x.Snapshot.PreviousYesBidDollars),
                 PreviousYesAsk = x.Snapshot.PreviousYesAsk,
-                PreviousYesAskDollars = x.Snapshot.PreviousYesAskDollars,
+                PreviousYesAskDollars = FormatDollarValue(x.Snapshot.PreviousYesAskDollars),
                 PreviousPrice = x.Snapshot.PreviousPrice,
-                PreviousPriceDollars = x.Snapshot.PreviousPriceDollars,
+                PreviousPriceDollars = FormatDollarValue(x.Snapshot.PreviousPriceDollars),
                 SettlementValue = x.Snapshot.SettlementValue,
-                SettlementValueDollars = x.Snapshot.SettlementValueDollars,
+                SettlementValueDollars = FormatDollarValue(x.Snapshot.SettlementValueDollars),
 
                 Volume = x.Snapshot.Volume,
                 Volume24h = x.Snapshot.Volume24h,
                 OpenInterest = x.Snapshot.OpenInterest,
                 NotionalValue = x.Snapshot.NotionalValue,
-                NotionalValueDollars = x.Snapshot.NotionalValueDollars,
+                NotionalValueDollars = FormatDollarValue(x.Snapshot.NotionalValueDollars),
 
                 Liquidity = x.Snapshot.Liquidity,
-                LiquidityDollars = x.Snapshot.LiquidityDollars,
+                LiquidityDollars = FormatDollarValue(x.Snapshot.LiquidityDollars),
 
                 GenerateDate = x.Snapshot.GenerateDate
             })
@@ -272,32 +273,32 @@ public class KalshiService
                 Status = result.Snapshot.Status,
 
                 YesBid = result.Snapshot.YesBid,
-                YesBidDollars = result.Snapshot.YesBidDollars,
+                YesBidDollars = FormatDollarValue(result.Snapshot.YesBidDollars),
                 YesAsk = result.Snapshot.YesAsk,
-                YesAskDollars = result.Snapshot.YesAskDollars,
+                YesAskDollars = FormatDollarValue(result.Snapshot.YesAskDollars),
                 NoBid = result.Snapshot.NoBid,
-                NoBidDollars = result.Snapshot.NoBidDollars,
+                NoBidDollars = FormatDollarValue(result.Snapshot.NoBidDollars),
                 NoAsk = result.Snapshot.NoAsk,
-                NoAskDollars = result.Snapshot.NoAskDollars,
+                NoAskDollars = FormatDollarValue(result.Snapshot.NoAskDollars),
                 LastPrice = result.Snapshot.LastPrice,
-                LastPriceDollars = result.Snapshot.LastPriceDollars,
+                LastPriceDollars = FormatDollarValue(result.Snapshot.LastPriceDollars),
                 PreviousYesBid = result.Snapshot.PreviousYesBid,
-                PreviousYesBidDollars = result.Snapshot.PreviousYesBidDollars,
+                PreviousYesBidDollars = FormatDollarValue(result.Snapshot.PreviousYesBidDollars),
                 PreviousYesAsk = result.Snapshot.PreviousYesAsk,
-                PreviousYesAskDollars = result.Snapshot.PreviousYesAskDollars,
+                PreviousYesAskDollars = FormatDollarValue(result.Snapshot.PreviousYesAskDollars),
                 PreviousPrice = result.Snapshot.PreviousPrice,
-                PreviousPriceDollars = result.Snapshot.PreviousPriceDollars,
+                PreviousPriceDollars = FormatDollarValue(result.Snapshot.PreviousPriceDollars),
                 SettlementValue = result.Snapshot.SettlementValue,
-                SettlementValueDollars = result.Snapshot.SettlementValueDollars,
+                SettlementValueDollars = FormatDollarValue(result.Snapshot.SettlementValueDollars),
 
                 Volume = result.Snapshot.Volume,
                 Volume24h = result.Snapshot.Volume24h,
                 OpenInterest = result.Snapshot.OpenInterest,
                 NotionalValue = result.Snapshot.NotionalValue,
-                NotionalValueDollars = result.Snapshot.NotionalValueDollars,
+                NotionalValueDollars = FormatDollarValue(result.Snapshot.NotionalValueDollars),
 
                 Liquidity = result.Snapshot.Liquidity,
-                LiquidityDollars = result.Snapshot.LiquidityDollars,
+                LiquidityDollars = FormatDollarValue(result.Snapshot.LiquidityDollars),
 
                 GenerateDate = result.Snapshot.GenerateDate
             };
@@ -519,32 +520,32 @@ public class KalshiService
             Status = market.Status.ToString(),
             ResponsePriceUnits = market.ResponsePriceUnits.ToString(),
             YesBid = market.YesBid,
-            YesBidDollars = market.YesBidDollars,
+            YesBidDollars = ParseDollarValue(market.YesBidDollars),
             YesAsk = market.YesAsk,
-            YesAskDollars = market.YesAskDollars,
+            YesAskDollars = ParseDollarValue(market.YesAskDollars),
             NoBid = market.NoBid,
-            NoBidDollars = market.NoBidDollars,
+            NoBidDollars = ParseDollarValue(market.NoBidDollars),
             NoAsk = market.NoAsk,
-            NoAskDollars = market.NoAskDollars,
+            NoAskDollars = ParseDollarValue(market.NoAskDollars),
             LastPrice = market.LastPrice,
-            LastPriceDollars = market.LastPriceDollars,
+            LastPriceDollars = ParseDollarValue(market.LastPriceDollars),
             Volume = market.Volume,
             Volume24h = market.Volume24h,
             Result = market.Result.ToString(),
             CanCloseEarly = market.CanCloseEarly,
             OpenInterest = market.OpenInterest,
             NotionalValue = market.NotionalValue,
-            NotionalValueDollars = market.NotionalValueDollars,
+            NotionalValueDollars = ParseDollarValue(market.NotionalValueDollars),
             PreviousYesBid = market.PreviousYesBid,
-            PreviousYesBidDollars = market.PreviousYesBidDollars,
+            PreviousYesBidDollars = ParseDollarValue(market.PreviousYesBidDollars),
             PreviousYesAsk = market.PreviousYesAsk,
-            PreviousYesAskDollars = market.PreviousYesAskDollars,
+            PreviousYesAskDollars = ParseDollarValue(market.PreviousYesAskDollars),
             PreviousPrice = market.PreviousPrice,
-            PreviousPriceDollars = market.PreviousPriceDollars,
+            PreviousPriceDollars = ParseDollarValue(market.PreviousPriceDollars),
             Liquidity = market.Liquidity,
-            LiquidityDollars = market.LiquidityDollars,
+            LiquidityDollars = ParseDollarValue(market.LiquidityDollars),
             SettlementValue = market.SettlementValue,
-            SettlementValueDollars = market.SettlementValueDollars,
+            SettlementValueDollars = ParseDollarValueNullable(market.SettlementValueDollars),
             ExpirationValue = market.ExpirationValue,
             FeeWaiverExpirationTime = market.FeeWaiverExpirationTime,
             EarlyCloseCondition = market.EarlyCloseCondition,
@@ -588,36 +589,69 @@ public class KalshiService
             Status = snapshot.Status,
 
             YesBid = snapshot.YesBid,
-            YesBidDollars = snapshot.YesBidDollars,
+            YesBidDollars = FormatDollarValue(snapshot.YesBidDollars),
             YesAsk = snapshot.YesAsk,
-            YesAskDollars = snapshot.YesAskDollars,
+            YesAskDollars = FormatDollarValue(snapshot.YesAskDollars),
             NoBid = snapshot.NoBid,
-            NoBidDollars = snapshot.NoBidDollars,
+            NoBidDollars = FormatDollarValue(snapshot.NoBidDollars),
             NoAsk = snapshot.NoAsk,
-            NoAskDollars = snapshot.NoAskDollars,
+            NoAskDollars = FormatDollarValue(snapshot.NoAskDollars),
             LastPrice = snapshot.LastPrice,
-            LastPriceDollars = snapshot.LastPriceDollars,
+            LastPriceDollars = FormatDollarValue(snapshot.LastPriceDollars),
             PreviousYesBid = snapshot.PreviousYesBid,
-            PreviousYesBidDollars = snapshot.PreviousYesBidDollars,
+            PreviousYesBidDollars = FormatDollarValue(snapshot.PreviousYesBidDollars),
             PreviousYesAsk = snapshot.PreviousYesAsk,
-            PreviousYesAskDollars = snapshot.PreviousYesAskDollars,
+            PreviousYesAskDollars = FormatDollarValue(snapshot.PreviousYesAskDollars),
             PreviousPrice = snapshot.PreviousPrice,
-            PreviousPriceDollars = snapshot.PreviousPriceDollars,
+            PreviousPriceDollars = FormatDollarValue(snapshot.PreviousPriceDollars),
             SettlementValue = snapshot.SettlementValue,
-            SettlementValueDollars = snapshot.SettlementValueDollars,
+            SettlementValueDollars = FormatDollarValue(snapshot.SettlementValueDollars),
 
             Volume = snapshot.Volume,
             Volume24h = snapshot.Volume24h,
             OpenInterest = snapshot.OpenInterest,
             NotionalValue = snapshot.NotionalValue,
-            NotionalValueDollars = snapshot.NotionalValueDollars,
+            NotionalValueDollars = FormatDollarValue(snapshot.NotionalValueDollars),
 
             Liquidity = snapshot.Liquidity,
-            LiquidityDollars = snapshot.LiquidityDollars,
-
+            LiquidityDollars = FormatDollarValue(snapshot.LiquidityDollars),
             GenerateDate = snapshot.GenerateDate
         };
     }
 
+    private static decimal ParseDollarValue(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return 0m;
+        }
 
+        return decimal.TryParse(value, NumberStyles.Number, CultureInfo.InvariantCulture, out var parsed)
+            ? parsed
+            : 0m;
+    }
+
+    private static decimal? ParseDollarValueNullable(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return null;
+        }
+
+        return decimal.TryParse(value, NumberStyles.Number, CultureInfo.InvariantCulture, out var parsed)
+            ? parsed
+            : null;
+    }
+
+    private static string FormatDollarValue(decimal value)
+    {
+        return value.ToString("0.0000", CultureInfo.InvariantCulture);
+    }
+
+    private static string? FormatDollarValue(decimal? value)
+    {
+        return value.HasValue
+            ? value.Value.ToString("0.0000", CultureInfo.InvariantCulture)
+            : null;
+    }
 }

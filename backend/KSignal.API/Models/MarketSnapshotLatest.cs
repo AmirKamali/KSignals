@@ -20,34 +20,34 @@ public class MarketSnapshotLatest
     public DateTime LatestExpirationTime { get; set; }
     public DateTime? FeeWaiverExpirationTime { get; set; }
     public int? SettlementValue { get; set; }
-    public string? SettlementValueDollars { get; set; }
+    public decimal? SettlementValueDollars { get; set; }
     public string Status { get; set; } = string.Empty;
     public string Result { get; set; } = string.Empty;
     public bool CanCloseEarly { get; set; }
     public string ResponsePriceUnits { get; set; } = string.Empty;
     public decimal YesBid { get; set; }
-    public string YesBidDollars { get; set; } = string.Empty;
+    public decimal YesBidDollars { get; set; }
     public decimal YesAsk { get; set; }
-    public string YesAskDollars { get; set; } = string.Empty;
+    public decimal YesAskDollars { get; set; }
     public decimal NoBid { get; set; }
-    public string NoBidDollars { get; set; } = string.Empty;
+    public decimal NoBidDollars { get; set; }
     public decimal NoAsk { get; set; }
-    public string NoAskDollars { get; set; } = string.Empty;
+    public decimal NoAskDollars { get; set; }
     public decimal LastPrice { get; set; }
-    public string LastPriceDollars { get; set; } = string.Empty;
+    public decimal LastPriceDollars { get; set; }
     public int PreviousYesBid { get; set; }
-    public string PreviousYesBidDollars { get; set; } = string.Empty;
+    public decimal PreviousYesBidDollars { get; set; }
     public int PreviousYesAsk { get; set; }
-    public string PreviousYesAskDollars { get; set; } = string.Empty;
+    public decimal PreviousYesAskDollars { get; set; }
     public int PreviousPrice { get; set; }
-    public string PreviousPriceDollars { get; set; } = string.Empty;
+    public decimal PreviousPriceDollars { get; set; }
     public int Volume { get; set; }
     public int Volume24h { get; set; }
     public int OpenInterest { get; set; }
     public int NotionalValue { get; set; }
-    public string NotionalValueDollars { get; set; } = string.Empty;
+    public decimal NotionalValueDollars { get; set; }
     public int Liquidity { get; set; }
-    public string LiquidityDollars { get; set; } = string.Empty;
+    public decimal LiquidityDollars { get; set; }
     public string ExpirationValue { get; set; } = string.Empty;
     public int TickSize { get; set; }
     public string? StrikeType { get; set; }

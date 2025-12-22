@@ -1,4 +1,5 @@
 using System;
+using System.Globalization;
 using System.Collections.Generic;
 using System.Linq;
 using KSignal.API.Models;
@@ -102,27 +103,27 @@ internal static class MarketResponseMapper
             market.OpenTime,
             market.Status,
             market.YesBid,
-            market.YesBidDollars,
+            YesBidDollars = FormatDollarValue(market.YesBidDollars),
             market.YesAsk,
-            market.YesAskDollars,
+            YesAskDollars = FormatDollarValue(market.YesAskDollars),
             market.NoBid,
-            market.NoBidDollars,
+            NoBidDollars = FormatDollarValue(market.NoBidDollars),
             market.NoAsk,
-            market.NoAskDollars,
+            NoAskDollars = FormatDollarValue(market.NoAskDollars),
             market.LastPrice,
-            market.LastPriceDollars,
+            LastPriceDollars = FormatDollarValue(market.LastPriceDollars),
             market.PreviousYesBid,
-            market.PreviousYesBidDollars,
+            PreviousYesBidDollars = FormatDollarValue(market.PreviousYesBidDollars),
             market.PreviousYesAsk,
-            market.PreviousYesAskDollars,
+            PreviousYesAskDollars = FormatDollarValue(market.PreviousYesAskDollars),
             market.PreviousPrice,
-            market.PreviousPriceDollars,
+            PreviousPriceDollars = FormatDollarValue(market.PreviousPriceDollars),
             market.Liquidity,
-            market.LiquidityDollars,
+            LiquidityDollars = FormatDollarValue(market.LiquidityDollars),
             market.SettlementValue,
-            market.SettlementValueDollars,
+            SettlementValueDollars = FormatDollarValue(market.SettlementValueDollars),
             market.NotionalValue,
-            market.NotionalValueDollars,
+            NotionalValueDollars = FormatDollarValue(market.NotionalValueDollars),
             market.GenerateDate,
             Category = category,
             Tags = tags?.ToArray()
@@ -236,4 +237,17 @@ internal static class MarketResponseMapper
     {
         return $"${(cents / 100.0m):F2}";
     }
+
+    private static string FormatDollarValue(decimal value)
+    {
+        return value.ToString("0.0000", CultureInfo.InvariantCulture);
+    }
+
+    private static string? FormatDollarValue(decimal? value)
+    {
+        return value.HasValue
+            ? value.Value.ToString("0.0000", CultureInfo.InvariantCulture)
+            : null;
+    }
+
 }
