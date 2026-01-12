@@ -84,7 +84,8 @@ namespace Kalshi.Api.Model
         /// <param name="feeType">FeeType is a string representing the series&#39; fee structure. Fee structures can be found at https://kalshi.com/docs/kalshi-fee-schedule.pdf. &#39;quadratic&#39; is described by the General Trading Fees Table, &#39;quadratic_with_maker_fees&#39; is described by the General Trading Fees Table with maker fees described in the Maker Fees section, &#39;flat&#39; is described by the Specific Trading Fees Table. (required).</param>
         /// <param name="feeMultiplier">FeeMultiplier is a floating point multiplier applied to the fee calculations. (required).</param>
         /// <param name="additionalProhibitions">AdditionalProhibitions is a list of additional trading prohibitions for this series. (required).</param>
-        public Series(string ticker = default, string frequency = default, string title = default, string category = default, List<string> tags = default, List<SettlementSource> settlementSources = default, string contractUrl = default, string contractTermsUrl = default, Object productMetadata = default, FeeTypeEnum feeType = default, double feeMultiplier = default, List<string> additionalProhibitions = default)
+        /// <param name="volume">Volume is the total number of contracts traded across all events in this series..</param>
+        public Series(string ticker = default, string frequency = default, string title = default, string category = default, List<string> tags = default, List<SettlementSource> settlementSources = default, string contractUrl = default, string contractTermsUrl = default, Object productMetadata = default, FeeTypeEnum feeType = default, double feeMultiplier = default, List<string> additionalProhibitions = default, long? volume = default)
         {
             // to ensure "ticker" is required (not null)
             if (ticker == null)
@@ -143,6 +144,7 @@ namespace Kalshi.Api.Model
             }
             this.AdditionalProhibitions = additionalProhibitions;
             this.ProductMetadata = productMetadata;
+            this.Volume = volume;
         }
 
         /// <summary>
@@ -223,6 +225,13 @@ namespace Kalshi.Api.Model
         public List<string> AdditionalProhibitions { get; set; }
 
         /// <summary>
+        /// Volume is the total number of contracts traded across all events in this series.
+        /// </summary>
+        /// <value>Volume is the total number of contracts traded across all events in this series.</value>
+        [DataMember(Name = "volume", EmitDefaultValue = true)]
+        public long? Volume { get; set; }
+
+        /// <summary>
         /// Returns the string presentation of the object
         /// </summary>
         /// <returns>String presentation of the object</returns>
@@ -242,6 +251,7 @@ namespace Kalshi.Api.Model
             sb.Append("  FeeType: ").Append(FeeType).Append("\n");
             sb.Append("  FeeMultiplier: ").Append(FeeMultiplier).Append("\n");
             sb.Append("  AdditionalProhibitions: ").Append(AdditionalProhibitions).Append("\n");
+            sb.Append("  Volume: ").Append(Volume).Append("\n");
             sb.Append("}\n");
             return sb.ToString();
         }
