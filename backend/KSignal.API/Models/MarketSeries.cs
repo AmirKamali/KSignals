@@ -76,12 +76,17 @@ public class MarketSeries
     /// Additional trading prohibitions for this series (stored as JSON array)
     /// </summary>
     public string? AdditionalProhibitions { get; set; }
-    
+
+    /// <summary>
+    /// Total contracts traded across all events in this series (optional)
+    /// </summary>
+    public long? Volume { get; set; }
+
     /// <summary>
     /// Timestamp when this record was last updated
     /// </summary>
     public DateTime LastUpdate { get; set; }
-    
+
     /// <summary>
     /// Soft delete flag
     /// </summary>

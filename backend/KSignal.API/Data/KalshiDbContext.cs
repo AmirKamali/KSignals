@@ -284,6 +284,7 @@ public class KalshiDbContext : DbContext
         marketSeries.Property(e => e.FeeType).HasMaxLength(50).IsRequired();
         marketSeries.Property(e => e.FeeMultiplier).IsRequired();
         marketSeries.Property(e => e.AdditionalProhibitions);
+        marketSeries.Property(e => e.Volume);
         marketSeries.Property(e => e.LastUpdate).IsRequired();
         marketSeries.Property(e => e.IsDeleted).IsRequired();
 

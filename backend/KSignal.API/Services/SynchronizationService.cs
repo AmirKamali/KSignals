@@ -510,6 +510,7 @@ public class SynchronizationService
             AdditionalProhibitions = series.AdditionalProhibitions != null
                 ? JsonConvert.SerializeObject(series.AdditionalProhibitions)
                 : null,
+            Volume = series.Volume,
             LastUpdate = timestamp,
             IsDeleted = false
         };
