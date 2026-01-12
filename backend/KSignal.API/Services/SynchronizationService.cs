@@ -20,6 +20,8 @@ public class SynchronizationService
 
     private const string MarketSyncLockKey = "sync:market-snapshots:lock";
     private const string MarketSyncCounterKey = "sync:market-snapshots:pending";
+    private const string SeriesSyncLockKey = "sync:market-series:lock";
+    private const string SeriesSyncCounterKey = "sync:market-series:pending";
 
     public SynchronizationService(
         KalshiClient kalshiClient,
@@ -387,14 +389,33 @@ public class SynchronizationService
 
     public async Task EnqueueSeriesSyncAsync(CancellationToken cancellationToken = default)
     {
+        // Try to acquire the distributed lock to prevent concurrent sync operations
+        var lockAcquired = await _lockService.AcquireWithCounterAsync(
+            SeriesSyncLockKey,
+            SeriesSyncCounterKey,
+            TimeSpan.FromMinutes(30), // Lock expires after 30 minutes as safety fallback
+            cancellationToken);
+
+        if (!lockAcquired)
+        {
+            await _syncLogService.LogSyncEventAsync("SeriesSync_FailedToAcquireLock", 0, cancellationToken, LogType.WARN);
+            throw new InvalidOperationException("Market series synchronization is already in progress. Please wait for the current operation to complete.");
+        }
+
+        await _syncLogService.LogSyncEventAsync("SeriesSync_LockAcquired", 1, cancellationToken, LogType.Info);
+
         try
         {
             await _publishEndpoint.Publish(new SynchronizeSeries(), cancellationToken);
-            await _syncLogService.LogSyncEventAsync("SynchronizeSeries", 1, cancellationToken);
+            await _syncLogService.LogSyncEventAsync("SynchronizeSeries_Enqueued", 1, cancellationToken);
         }
         catch (Exception ex)
         {
             await _syncLogService.LogSyncEventAsync($"SeriesSync_EnqueueError_{ex.GetType().Name}", 0, cancellationToken, LogType.ERROR);
+
+            // Release the lock and reset counter on failure
+            await _lockService.ReleaseWithCounterAsync(SeriesSyncLockKey, SeriesSyncCounterKey, cancellationToken);
+
             throw;
         }
     }
@@ -412,6 +433,7 @@ public class SynchronizationService
             if (response?.Series == null || response.Series.Count == 0)
             {
                 await _syncLogService.LogSyncEventAsync("SeriesSync_NoDataReceived", 0, cancellationToken, LogType.WARN);
+                await _lockService.ReleaseWithCounterAsync(SeriesSyncLockKey, SeriesSyncCounterKey, cancellationToken);
                 return;
             }
 
@@ -433,6 +455,7 @@ public class SynchronizationService
             if (incomingRecords.Count == 0)
             {
                 await _syncLogService.LogSyncEventAsync("SeriesSync_NoValidData", 0, cancellationToken, LogType.WARN);
+                await _lockService.ReleaseWithCounterAsync(SeriesSyncLockKey, SeriesSyncCounterKey, cancellationToken);
                 return;
             }
 
@@ -451,7 +474,15 @@ public class SynchronizationService
 
             // For ClickHouse ReplacingMergeTree, we always INSERT new rows.
             // The engine will keep only the row with the latest LastUpdate after background merges.
-            await _dbContext.MarketSeries.AddRangeAsync(incomingRecords, cancellationToken);
+            // Process in batches of 1000 for better performance
+            const int batchSize = 200;
+            for (int i = 0; i < incomingRecords.Count; i += batchSize)
+            {
+                var batch = incomingRecords.Skip(i).Take(batchSize).ToList();
+                await _dbContext.MarketSeries.AddRangeAsync(batch, cancellationToken);
+                await _dbContext.SaveChangesAsync(cancellationToken);
+                await _syncLogService.LogSyncEventAsync($"SeriesSync_BatchInserted_{i / batchSize + 1}", batch.Count, cancellationToken, LogType.DEBUG);
+            }
 
             // Mark records as deleted if they're not in incoming data
             // Insert new rows with IsDeleted = true for soft delete
@@ -482,10 +513,17 @@ public class SynchronizationService
                 insertedCount + deletedCount,
                 cancellationToken,
                 LogType.Info);
+
+            // Release the lock and reset counter on successful completion
+            await _lockService.ReleaseWithCounterAsync(SeriesSyncLockKey, SeriesSyncCounterKey, cancellationToken);
         }
         catch (Exception ex)
         {
             await _syncLogService.LogSyncEventAsync("SeriesSync_Error", 0, cancellationToken, LogType.ERROR);
+
+            // Release the lock and reset counter on error
+            await _lockService.ReleaseWithCounterAsync(SeriesSyncLockKey, SeriesSyncCounterKey, cancellationToken);
+
             throw;
         }
     }
